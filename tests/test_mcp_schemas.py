@@ -1,7 +1,12 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+from pydantic import ValidationError
+
 from app.schemas.mcp import (
+    McpServerCreate,
     McpServerDetail,
     McpServerRuntimeStatus,
     McpServerTool,
@@ -38,3 +43,53 @@ def test_mcp_tool_schema_defaults_input_schema() -> None:
     tool = McpServerTool(name="search", description=None)
 
     assert tool.input_schema == {}
+
+
+def test_mcp_server_detail_validates_nested_orm_like_tools() -> None:
+    server = SimpleNamespace(
+        id=uuid4(),
+        name="filesystem",
+        transport="stdio",
+        command="uvx",
+        args=["mcp-server-filesystem"],
+        env={},
+        url=None,
+        headers={},
+        enabled=True,
+        desired_state="running",
+        runtime_status="running",
+        last_checked_at=None,
+        last_error=None,
+        tool_count=1,
+        tools=[
+            SimpleNamespace(
+                name="search",
+                description="Search files",
+                input_schema={"type": "object"},
+                discovered_at=datetime.now(UTC),
+            ),
+        ],
+    )
+
+    detail = McpServerDetail.model_validate(server)
+
+    assert detail.tools[0].name == "search"
+    assert detail.tools[0].input_schema == {"type": "object"}
+
+
+def test_mcp_server_create_rejects_blank_stdio_command() -> None:
+    with pytest.raises(ValidationError, match="stdio MCP servers require command"):
+        McpServerCreate(
+            name="filesystem",
+            transport=McpTransport.stdio,
+            command="   ",
+        )
+
+
+def test_mcp_server_create_rejects_invalid_http_url() -> None:
+    with pytest.raises(ValidationError, match="http MCP servers require valid url"):
+        McpServerCreate(
+            name="remote",
+            transport=McpTransport.http,
+            url="not-a-url",
+        )

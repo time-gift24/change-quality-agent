@@ -2,10 +2,19 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    TypeAdapter,
+    field_serializer,
+    model_validator,
+)
 
 
 REDACTED = "********"
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
 
 class McpTransport(StrEnum):
@@ -28,6 +37,8 @@ class McpServerRuntimeStatus(StrEnum):
 
 
 class McpServerTool(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     name: str
     description: str | None = None
     input_schema: dict = Field(default_factory=dict)
@@ -47,10 +58,16 @@ class McpServerCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_transport_fields(self):
-        if self.transport == McpTransport.stdio and not self.command:
-            raise ValueError("stdio MCP servers require command")
-        if self.transport == McpTransport.http and not self.url:
-            raise ValueError("http MCP servers require url")
+        if self.transport == McpTransport.stdio:
+            if not self.command or not self.command.strip():
+                raise ValueError("stdio MCP servers require command")
+        if self.transport == McpTransport.http:
+            if not self.url or not self.url.strip():
+                raise ValueError("http MCP servers require url")
+            try:
+                self.url = str(_HTTP_URL_ADAPTER.validate_python(self.url))
+            except ValueError as exc:
+                raise ValueError("http MCP servers require valid url") from exc
         return self
 
 
