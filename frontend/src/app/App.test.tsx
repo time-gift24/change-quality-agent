@@ -28,4 +28,12 @@ describe("App", () => {
       screen.getByLabelText("SOP quality workspace"),
     ).toHaveTextContent("SOP quality page");
   });
+
+  it("shows restrained hover feedback on the active navigation link", () => {
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: "SOP" }).className).toContain(
+      "hover:bg-[#eeece7]",
+    );
+  });
 });

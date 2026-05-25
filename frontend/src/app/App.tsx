@@ -22,7 +22,7 @@ export function App() {
           <nav aria-label="Primary" className="text-xs text-[#616161]">
             <a
               aria-current="page"
-              className="rounded px-2 py-1 text-[#17171c] outline-none focus-visible:ring-2 focus-visible:ring-[#4c6ee6]"
+              className="rounded px-2 py-1 text-[#17171c] outline-none transition-colors hover:bg-[#eeece7] focus-visible:ring-2 focus-visible:ring-[#4c6ee6]"
               href={activeRoute.path}
             >
               SOP
