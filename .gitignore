@@ -12,3 +12,8 @@ wheels/
 # Local agent skills/configuration
 .agents/
 skills-lock.json
+
+# Frontend-generated files
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
