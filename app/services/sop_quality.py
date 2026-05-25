@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from agent.graph import run_mock_sop_quality_graph
 from app.core.config import Settings
 from app.repositories.runs import ActiveRunExistsError, RunRepository
 from app.schemas.runs import RunStatus
@@ -99,4 +100,30 @@ async def run_sop_quality_graph(
     run_id: UUID,
     repository: RunRepository,
 ) -> dict[str, Any]:
-    raise NotImplementedError("Graph runner is implemented in the next task.")
+    run = await repository.mark_running(run_id)
+    await repository.append_event(
+        run_id,
+        event_type="custom",
+        thread_id=run.thread_id,
+        payload={"message": "Started mock SOP quality graph."},
+        node="start",
+    )
+    raw_graph_output = await run_mock_sop_quality_graph(
+        run_id=str(run_id),
+        sop_snapshot=run.subject_snapshot,
+    )
+    await repository.append_event(
+        run_id,
+        event_type="updates",
+        thread_id=run.thread_id,
+        payload={"status": raw_graph_output["status"]},
+        node="validate_sop",
+    )
+    await repository.mark_terminal(
+        run_id,
+        RunStatus.success,
+        raw_graph_output=raw_graph_output,
+        structured_result=None,
+        result_status="mock_success",
+    )
+    return raw_graph_output
