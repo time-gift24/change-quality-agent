@@ -114,6 +114,26 @@ async def test_runtime_start_enabled_servers_records_early_start_failures() -> N
 
 
 @pytest.mark.asyncio
+async def test_runtime_start_enabled_servers_skips_without_single_instance_confirmation() -> None:
+    repository = FakeStartupRepository()
+    probe = FakeProbe()
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=probe,
+        single_instance_confirmed=False,
+    )
+
+    await manager.start_enabled_servers()
+
+    assert probe.started == []
+    assert [server.runtime_status for server in repository.servers] == [
+        McpServerRuntimeStatus.error.value,
+        McpServerRuntimeStatus.error.value,
+    ]
+    assert repository.commits == 2
+
+
+@pytest.mark.asyncio
 async def test_lifespan_starts_and_shuts_down_mcp_runtime(monkeypatch) -> None:
     events = []
 

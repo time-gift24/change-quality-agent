@@ -5,8 +5,10 @@ from uuid import uuid4
 import pytest
 
 from app.schemas.mcp import McpDesiredState, McpServerRuntimeStatus
+import app.services.mcp_runtime as mcp_runtime_module
 from app.services.mcp_runtime import (
     McpCommandNotAllowedError,
+    McpRuntimeNotEnabledError,
     McpRuntimeManager,
     StdioMcpProbe,
     UnsupportedMcpTransportError,
@@ -122,6 +124,24 @@ class FailingListProbe(FakeProbe):
         raise RuntimeError("list failed")
 
 
+class FlakyListProbe(FakeProbe):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_next_list = True
+
+    async def list_tools(self, handle):
+        if self.fail_next_list:
+            self.fail_next_list = False
+            raise RuntimeError("list failed")
+        return await super().list_tools(handle)
+
+
+class FailingStopProbe(FakeProbe):
+    async def stop(self, handle):
+        self.stopped += 1
+        raise RuntimeError("stop failed")
+
+
 class SlowProbe(FakeProbe):
     async def start(self, server):
         self.started += 1
@@ -150,6 +170,24 @@ async def test_start_sets_running_and_stores_tools() -> None:
     assert repository.tools[0]["name"] == "search"
     assert probe.started == 1
     assert repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_start_requires_single_instance_confirmation() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = FakeProbe()
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=probe,
+        single_instance_confirmed=False,
+    )
+
+    with pytest.raises(McpRuntimeNotEnabledError):
+        await manager.start(server.id)
+
+    assert probe.started == 0
+    assert server.runtime_status == McpServerRuntimeStatus.unknown.value
 
 
 @pytest.mark.asyncio
@@ -216,6 +254,22 @@ async def test_stop_is_idempotent_without_handle() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stop_failure_keeps_handle_for_retry() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = FailingStopProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await manager.start(server.id)
+    with pytest.raises(RuntimeError):
+        await manager.stop(server.id)
+
+    assert manager.is_running(server.id) is True
+    assert server.runtime_status == McpServerRuntimeStatus.error.value
+    assert server.last_error == "stop failed"
+
+
+@pytest.mark.asyncio
 async def test_http_start_is_unsupported_in_v1() -> None:
     server = FakeServer(transport="http")
     repository = FakeRepository(server)
@@ -261,6 +315,68 @@ async def test_stdio_probe_rejects_unregistered_command_args() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stdio_probe_requires_spec_allowlist() -> None:
+    server = FakeServer()
+    server.command = "uvx"
+    server.args = ["mcp-server-filesystem"]
+    probe = StdioMcpProbe(allowed_commands={"uvx"})
+
+    with pytest.raises(McpCommandNotAllowedError):
+        await probe.start(server)
+
+
+@pytest.mark.asyncio
+async def test_stdio_probe_cleans_exit_stack_on_cancellation(monkeypatch) -> None:
+    events = []
+    server = FakeServer()
+    server.command = "python"
+    server.args = ["server.py"]
+
+    class FakeStdioContext:
+        async def __aenter__(self):
+            events.append("stdio-enter")
+            return object(), object()
+
+        async def __aexit__(self, exc_type, exc, tb):
+            events.append("stdio-exit")
+
+    class FakeClientSession:
+        def __init__(self, read_stream, write_stream) -> None:
+            pass
+
+        async def __aenter__(self):
+            events.append("session-enter")
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            events.append("session-exit")
+
+        async def initialize(self):
+            raise asyncio.CancelledError()
+
+    monkeypatch.setattr(
+        mcp_runtime_module,
+        "stdio_client",
+        lambda params: FakeStdioContext(),
+    )
+    monkeypatch.setattr(mcp_runtime_module, "ClientSession", FakeClientSession)
+    probe = StdioMcpProbe(
+        allowed_commands={"python"},
+        allowed_stdio_specs={"python:server.py"},
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        await probe.start(server)
+
+    assert events == [
+        "stdio-enter",
+        "session-enter",
+        "session-exit",
+        "stdio-exit",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_restart_stops_then_starts() -> None:
     server = FakeServer()
     repository = FakeRepository(server)
@@ -286,7 +402,7 @@ async def test_check_temporary_session_does_not_change_desired_state() -> None:
     status = await manager.check(server.id)
 
     assert status.desired_state == McpDesiredState.stopped
-    assert status.runtime_status == McpServerRuntimeStatus.unknown
+    assert status.runtime_status == McpServerRuntimeStatus.stopped
     assert repository.tools[0]["name"] == "search"
     assert probe.started == 1
     assert probe.stopped == 1
@@ -328,6 +444,42 @@ async def test_live_check_failure_records_error_without_stopping_handle() -> Non
 
 
 @pytest.mark.asyncio
+async def test_live_check_success_restores_running_status_after_error() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = FlakyListProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await manager.start(server.id)
+    with pytest.raises(RuntimeError):
+        await manager.check(server.id)
+
+    status = await manager.check(server.id)
+
+    assert status.runtime_status == McpServerRuntimeStatus.running
+    assert server.runtime_status == McpServerRuntimeStatus.running.value
+    assert server.last_error is None
+
+
+@pytest.mark.asyncio
+async def test_start_existing_handle_restores_running_status_after_error() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = FlakyListProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await manager.start(server.id)
+    with pytest.raises(RuntimeError):
+        await manager.check(server.id)
+
+    status = await manager.start(server.id)
+
+    assert status.runtime_status == McpServerRuntimeStatus.running
+    assert server.runtime_status == McpServerRuntimeStatus.running.value
+    assert server.last_error is None
+
+
+@pytest.mark.asyncio
 async def test_shutdown_stops_handles_without_changing_desired_state() -> None:
     server = FakeServer()
     repository = FakeRepository(server)
@@ -340,3 +492,17 @@ async def test_shutdown_stops_handles_without_changing_desired_state() -> None:
     assert server.desired_state == McpDesiredState.running.value
     assert server.runtime_status == McpServerRuntimeStatus.stopped.value
     assert probe.stopped == 1
+
+
+@pytest.mark.asyncio
+async def test_shutdown_stop_failure_keeps_handle() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = FailingStopProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await manager.start(server.id)
+    await manager.shutdown()
+
+    assert manager.is_running(server.id) is True
+    assert server.runtime_status == McpServerRuntimeStatus.error.value

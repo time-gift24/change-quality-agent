@@ -19,6 +19,7 @@ from app.schemas.mcp import (
 )
 from app.services.mcp_runtime import (
     McpCommandNotAllowedError,
+    McpRuntimeNotEnabledError,
     UnsupportedMcpTransportError,
 )
 
@@ -189,6 +190,11 @@ async def _run_lifecycle(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="MCP stdio command is not allowed.",
+        ) from exc
+    except McpRuntimeNotEnabledError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
         ) from exc
     except Exception as exc:
         raise HTTPException(

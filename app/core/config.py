@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     mcp_allowed_stdio_commands: list[str] = Field(default_factory=list)
     mcp_allowed_stdio_specs: list[str] = Field(default_factory=list)
     mcp_operation_timeout_seconds: float = 10.0
+    mcp_runtime_single_instance: bool = False
 
     @classmethod
     def settings_customise_sources(

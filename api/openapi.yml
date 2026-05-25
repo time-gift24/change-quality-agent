@@ -190,6 +190,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/McpServerSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
     post:
       tags:
         - mcp
@@ -216,6 +220,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}:
@@ -237,6 +245,10 @@ paths:
                 $ref: "#/components/schemas/McpServerDetail"
         "404":
           $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
     patch:
@@ -269,6 +281,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
     delete:
@@ -285,6 +301,10 @@ paths:
           description: MCP server deleted.
         "404":
           $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/start:
@@ -308,6 +328,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/stop:
@@ -331,6 +355,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/restart:
@@ -354,6 +382,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/check:
@@ -377,6 +409,10 @@ paths:
           $ref: "#/components/responses/NotFound"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
         "422":
           $ref: "#/components/responses/ValidationError"
 components:
@@ -423,6 +459,18 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     BadGateway:
       description: Upstream dependency or lifecycle failure before completion.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Missing or invalid MCP admin token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: MCP runtime is not configured or not enabled.
       content:
         application/json:
           schema:

@@ -19,6 +19,10 @@ def test_openapi_includes_mcp_server_routes() -> None:
     for path, methods in expected_paths.items():
         assert path in paths
         assert methods <= set(paths[path])
+        for method in methods:
+            responses = paths[path][method]["responses"]
+            assert "403" in responses
+            assert "503" in responses
 
     schemas = spec["components"]["schemas"]
     assert {
@@ -37,5 +41,7 @@ def test_openapi_includes_mcp_server_routes() -> None:
         {"McpAdminToken": []}
     ]
 
-    responses = paths["/api/mcp/servers/{server_id}/start"]["post"]["responses"]
-    assert "502" in responses
+    lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
+        "responses"
+    ]
+    assert "502" in lifecycle_responses

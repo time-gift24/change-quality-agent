@@ -69,6 +69,7 @@ def get_mcp_runtime_manager() -> McpRuntimeManager:
         _mcp_runtime_manager = McpRuntimeManager(
             repository_factory=mcp_runtime_repository_context,
             operation_timeout_seconds=settings.mcp_operation_timeout_seconds,
+            single_instance_confirmed=settings.mcp_runtime_single_instance,
             probe=StdioMcpProbe(
                 allowed_commands=set(settings.mcp_allowed_stdio_commands),
                 allowed_stdio_specs=set(settings.mcp_allowed_stdio_specs),

@@ -26,7 +26,14 @@ class McpCommandNotAllowedError(Exception):
     pass
 
 
+class McpRuntimeNotEnabledError(Exception):
+    pass
+
+
 MCP_OPERATION_TIMEOUT_MESSAGE = "MCP operation timed out."
+MCP_RUNTIME_NOT_ENABLED_MESSAGE = (
+    "MCP runtime requires mcp_runtime_single_instance=true."
+)
 
 
 @dataclass
@@ -96,7 +103,7 @@ class StdioMcpProbe:
         if server.command not in self._allowed_commands:
             raise McpCommandNotAllowedError(server.command or "")
         stdio_spec = self._stdio_spec(server)
-        if self._allowed_stdio_specs and stdio_spec not in self._allowed_stdio_specs:
+        if not self._allowed_stdio_specs or stdio_spec not in self._allowed_stdio_specs:
             raise McpCommandNotAllowedError(stdio_spec)
 
         exit_stack = AsyncExitStack()
@@ -115,8 +122,8 @@ class StdioMcpProbe:
             await session.initialize()
             handle = McpRuntimeHandle(exit_stack=exit_stack, session=session)
             return handle, await self.list_tools(handle)
-        except Exception:
-            await exit_stack.aclose()
+        except BaseException:
+            await asyncio.shield(exit_stack.aclose())
             raise
 
     async def list_tools(self, handle: McpRuntimeHandle) -> list[dict[str, Any]]:
@@ -145,14 +152,17 @@ class McpRuntimeManager:
         repository_factory: Callable[[], Any],
         probe: McpProbe | None = None,
         operation_timeout_seconds: float | None = 10.0,
+        single_instance_confirmed: bool = True,
     ) -> None:
         self._repository_factory = repository_factory
         self._probe = probe or StdioMcpProbe()
         self._operation_timeout_seconds = operation_timeout_seconds
+        self._single_instance_confirmed = single_instance_confirmed
         self._handles: dict[UUID, Any] = {}
         self._locks: dict[UUID, asyncio.Lock] = {}
 
     async def start(self, server_id: UUID) -> McpLifecycleResponse:
+        self._require_runtime_enabled()
         async with self._lock_for(server_id):
             return await self._start_locked(server_id)
 
@@ -166,6 +176,12 @@ class McpRuntimeManager:
             )
 
             if server_id in self._handles:
+                await repository.update_runtime_status(
+                    server_id,
+                    runtime_status=McpServerRuntimeStatus.running.value,
+                    last_error=None,
+                    checked=True,
+                )
                 await repository.commit()
                 return await self._response(repository, server_id)
 
@@ -213,9 +229,20 @@ class McpRuntimeManager:
                 server_id,
                 runtime_status=McpServerRuntimeStatus.stopping.value,
             )
-            handle = self._handles.pop(server_id, None)
+            handle = self._handles.get(server_id)
             if handle is not None:
-                await self._run_operation(self._probe.stop(handle))
+                try:
+                    await self._run_operation(self._probe.stop(handle))
+                except Exception as exc:
+                    await repository.update_runtime_status(
+                        server_id,
+                        runtime_status=McpServerRuntimeStatus.error.value,
+                        last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                        checked=True,
+                    )
+                    await repository.commit()
+                    raise
+                self._handles.pop(server_id, None)
             await repository.update_runtime_status(
                 server_id,
                 runtime_status=McpServerRuntimeStatus.stopped.value,
@@ -225,6 +252,7 @@ class McpRuntimeManager:
             return await self._response(repository, server_id)
 
     async def restart(self, server_id: UUID) -> McpLifecycleResponse:
+        self._require_runtime_enabled()
         async with self._lock_for(server_id):
             await self._stop_locked(server_id)
             return await self._start_locked(server_id)
@@ -232,6 +260,18 @@ class McpRuntimeManager:
     async def start_enabled_servers(self) -> None:
         async with self._repository_context() as repository:
             servers = await repository.list_startup_servers()
+
+        if not self._single_instance_confirmed:
+            for server in servers:
+                async with self._repository_context() as repository:
+                    await repository.update_runtime_status(
+                        server.id,
+                        runtime_status=McpServerRuntimeStatus.error.value,
+                        last_error=MCP_RUNTIME_NOT_ENABLED_MESSAGE,
+                        checked=True,
+                    )
+                    await repository.commit()
+            return
 
         for server in servers:
             try:
@@ -257,6 +297,7 @@ class McpRuntimeManager:
                         await repository.commit()
 
     async def check(self, server_id: UUID) -> McpLifecycleResponse:
+        self._require_runtime_enabled()
         async with self._lock_for(server_id):
             return await self._check_locked(server_id)
 
@@ -276,9 +317,14 @@ class McpRuntimeManager:
                     tools = await self._run_operation(self._probe.list_tools(handle))
 
                 await repository.replace_tools(server_id, tools)
+                runtime_status = (
+                    McpServerRuntimeStatus.running.value
+                    if handle is not None
+                    else McpServerRuntimeStatus.stopped.value
+                )
                 await repository.update_runtime_status(
                     server_id,
-                    runtime_status=server.runtime_status,
+                    runtime_status=runtime_status,
                     last_error=None,
                     checked=True,
                 )
@@ -300,7 +346,6 @@ class McpRuntimeManager:
     async def shutdown(self) -> None:
         for server_id, handle in list(self._handles.items()):
             async with self._repository_context() as repository:
-                self._handles.pop(server_id, None)
                 try:
                     await self._run_operation(self._probe.stop(handle))
                 except Exception as exc:
@@ -313,6 +358,7 @@ class McpRuntimeManager:
                     await repository.commit()
                     continue
 
+                self._handles.pop(server_id, None)
                 await repository.update_runtime_status(
                     server_id,
                     runtime_status=McpServerRuntimeStatus.stopped.value,
@@ -338,6 +384,10 @@ class McpRuntimeManager:
     def _require_supported_transport(self, server: Any) -> None:
         if server.transport != "stdio":
             raise UnsupportedMcpTransportError(server.transport)
+
+    def _require_runtime_enabled(self) -> None:
+        if not self._single_instance_confirmed:
+            raise McpRuntimeNotEnabledError(MCP_RUNTIME_NOT_ENABLED_MESSAGE)
 
     def is_running(self, server_id: UUID) -> bool:
         return server_id in self._handles

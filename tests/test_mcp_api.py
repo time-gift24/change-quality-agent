@@ -9,6 +9,7 @@ from app.api.deps import get_mcp_repository, get_mcp_runtime_manager
 from app.core.config import settings
 from app.main import app
 from app.schemas.mcp import McpLifecycleResponse
+from app.services.mcp_runtime import McpRuntimeNotEnabledError
 
 ADMIN_HEADERS = {"x-mcp-admin-token": "test-token"}
 
@@ -355,6 +356,24 @@ async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
 
     assert response.status_code == 502
     assert "secret" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_start_mcp_server_without_runtime_confirmation_returns_unavailable(
+    overrides,
+) -> None:
+    server, _, runtime = overrides
+    runtime.start_error = McpRuntimeNotEnabledError()
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/mcp/servers/{server.id}/start",
+            headers=ADMIN_HEADERS,
+        )
+
+    assert response.status_code == 503
 
 
 @pytest.mark.asyncio
