@@ -156,7 +156,6 @@ def test_environment_lookup_by_key() -> None:
                 key="dev",
                 name_zh="开发",
                 name_en="Development",
-                sop_client_options={"base_url": "https://dev.example.test"},
             )
         ]
     )
@@ -201,7 +200,6 @@ class EnvironmentConfig(BaseModel):
     key: str
     name_zh: str
     name_en: str
-    sop_client_options: dict[str, str] = Field(default_factory=dict)
 
     def public_dict(self) -> dict[str, str]:
         return {
@@ -221,7 +219,6 @@ class Settings(BaseSettings):
                 key="dev",
                 name_zh="开发",
                 name_en="Development",
-                sop_client_options={},
             )
         ]
     )
