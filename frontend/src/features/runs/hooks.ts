@@ -9,6 +9,8 @@ import {
 } from "./reducer";
 import type { RunEvent, RunSummary } from "./types";
 
+const RECONNECT_DELAY_MS = 1_000;
+
 type UseRunEventsOptions = {
   enabled?: boolean;
   onTerminal?: () => void;
@@ -23,6 +25,8 @@ export type UseRunResult = {
 };
 
 export function useRun(runId: string): UseRunResult {
+  const activeRunIdRef = useRef(runId);
+  const summaryRequestRef = useRef(0);
   const [summary, setSummary] = useState<RunSummary | null>(null);
   const [eventsInitialAfter, setEventsInitialAfter] = useState<
     number | undefined
@@ -30,20 +34,47 @@ export function useRun(runId: string): UseRunResult {
   const [summaryError, setSummaryError] = useState<Error | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
+  activeRunIdRef.current = runId;
+
   const refreshSummary = useCallback(async () => {
+    const requestId = summaryRequestRef.current + 1;
+    const requestedRunId = runId;
+
+    summaryRequestRef.current = requestId;
     setSummaryLoading(true);
     setSummaryError(null);
 
     try {
-      const nextSummary = await getRun(runId);
+      const nextSummary = await getRun(requestedRunId);
+
+      if (
+        summaryRequestRef.current !== requestId ||
+        activeRunIdRef.current !== requestedRunId
+      ) {
+        return;
+      }
 
       setSummary(nextSummary);
       setEventsInitialAfter((current) =>
         current === undefined ? nextSummary.latest_sequence : current,
       );
     } catch (error) {
+      if (
+        summaryRequestRef.current !== requestId ||
+        activeRunIdRef.current !== requestedRunId
+      ) {
+        return;
+      }
+
       setSummaryError(asError(error));
     } finally {
+      if (
+        summaryRequestRef.current !== requestId ||
+        activeRunIdRef.current !== requestedRunId
+      ) {
+        return;
+      }
+
       setSummaryLoading(false);
     }
   }, [runId]);
@@ -51,6 +82,7 @@ export function useRun(runId: string): UseRunResult {
   useEffect(() => {
     setSummary(null);
     setEventsInitialAfter(undefined);
+    setSummaryLoading(true);
   }, [runId]);
 
   useEffect(() => {
@@ -89,6 +121,7 @@ export function useRunEvents(
 
   useEffect(() => {
     if (!enabled) {
+      setState(initialState(initialAfter));
       return;
     }
 
@@ -153,7 +186,10 @@ export function useRunEvents(
           ...current,
           connectionStatus: "reconnecting",
         }));
-        reconnectTimer = setTimeout(connect, 0);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, RECONNECT_DELAY_MS);
       };
     };
 

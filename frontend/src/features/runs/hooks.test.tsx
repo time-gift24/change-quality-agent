@@ -36,14 +36,15 @@ describe("run SSE hooks", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
+    vi.useFakeTimers();
+
     act(() => {
       MockEventSource.instances[0]?.emit(event({ sequence: 2 }), "5");
       MockEventSource.instances[0]?.fail();
+      vi.advanceTimersByTime(1_000);
     });
 
-    await waitFor(() => {
-      expect(MockEventSource.instances).toHaveLength(2);
-    });
+    expect(MockEventSource.instances).toHaveLength(2);
     expect(MockEventSource.instances[1]?.url).toBe(
       "/api/runs/run-1/events?after=5",
     );
@@ -52,11 +53,10 @@ describe("run SSE hooks", () => {
     act(() => {
       MockEventSource.instances[1]?.emit(event({ sequence: 9 }));
       MockEventSource.instances[1]?.fail();
+      vi.advanceTimersByTime(1_000);
     });
 
-    await waitFor(() => {
-      expect(MockEventSource.instances).toHaveLength(3);
-    });
+    expect(MockEventSource.instances).toHaveLength(3);
     expect(MockEventSource.instances[2]?.url).toBe(
       "/api/runs/run-1/events?after=9",
     );
@@ -84,14 +84,15 @@ describe("run SSE hooks", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
+    vi.useFakeTimers();
+
     act(() => {
       MockEventSource.instances[0]?.emit(event({ sequence: 1 }));
       MockEventSource.instances[0]?.fail();
+      vi.advanceTimersByTime(1_000);
     });
 
-    await waitFor(() => {
-      expect(MockEventSource.instances).toHaveLength(2);
-    });
+    expect(MockEventSource.instances).toHaveLength(2);
 
     act(() => {
       MockEventSource.instances[1]?.emit(
@@ -100,6 +101,112 @@ describe("run SSE hooks", () => {
     });
 
     expect(result.current.events.map((item) => item.sequence)).toEqual([1, 2]);
+  });
+
+  it("paces reconnect attempts when the stream errors", async () => {
+    const { result } = renderHook(() => useRunEvents("run-1", 0));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    vi.useFakeTimers();
+
+    act(() => {
+      MockEventSource.instances[0]?.fail();
+    });
+
+    expect(result.current.connectionStatus).toBe("reconnecting");
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(999);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+  });
+
+  it("resets stream state when disabled", async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useRunEvents("run-1", 0, { enabled }),
+      {
+        initialProps: { enabled: true },
+      },
+    );
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emit(event({ sequence: 1 }));
+    });
+
+    expect(result.current.events).toHaveLength(1);
+
+    rerender({ enabled: false });
+
+    expect(result.current.events).toEqual([]);
+    expect(result.current.latestSequence).toBe(0);
+    expect(result.current.connectionStatus).toBe("idle");
+  });
+
+  it("ignores stale summary responses after runId changes", async () => {
+    const requests: Array<Deferred<Response>> = [];
+    const fetchMock = vi.fn(() => {
+      const request = deferred<Response>();
+      requests.push(request);
+      return request.promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, rerender } = renderHook(
+      ({ runId }) => useRun(runId),
+      {
+        initialProps: { runId: "run-a" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/runs/run-a",
+        expect.any(Object),
+      );
+    });
+
+    rerender({ runId: "run-b" });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/runs/run-b",
+        expect.any(Object),
+      );
+    });
+
+    await act(async () => {
+      requests[1]?.resolve(
+        jsonResponse(summary({ run_id: "run-b", latest_sequence: 7 })),
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.summary?.run_id).toBe("run-b");
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        jsonResponse(summary({ run_id: "run-a", latest_sequence: 3 })),
+      );
+    });
+
+    expect(result.current.summary?.run_id).toBe("run-b");
+    expect(result.current.events.latestSequence).toBe(7);
   });
 
   it("terminal done closes stream and triggers summary refresh", async () => {
@@ -130,7 +237,9 @@ describe("run SSE hooks", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
     expect(MockEventSource.instances[0]?.closed).toBe(true);
-    expect(result.current.summary?.status).toBe("success");
+    await waitFor(() => {
+      expect(result.current.summary?.status).toBe("success");
+    });
     expect(result.current.events.isRunning).toBe(false);
   });
 
@@ -231,4 +340,18 @@ function jsonResponse(body: unknown): Response {
     headers: { "Content-Type": "application/json" },
     status: 200,
   });
+}
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
 }
