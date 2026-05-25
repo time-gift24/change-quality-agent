@@ -32,6 +32,9 @@ class McpRepository(Protocol):
     async def require_server(self, server_id: UUID) -> Any:
         ...
 
+    async def list_startup_servers(self) -> list[Any]:
+        ...
+
     async def update_desired_state(self, server_id: UUID, desired_state: str) -> Any:
         ...
 
@@ -199,6 +202,16 @@ class McpRuntimeManager:
     async def restart(self, server_id: UUID) -> McpLifecycleResponse:
         await self.stop(server_id)
         return await self.start(server_id)
+
+    async def start_enabled_servers(self) -> None:
+        async with self._repository_context() as repository:
+            servers = await repository.list_startup_servers()
+
+        for server in servers:
+            try:
+                await self.start(server.id)
+            except Exception:
+                continue
 
     async def check(self, server_id: UUID) -> McpLifecycleResponse:
         async with self._repository_context() as repository:
