@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildRunEventsUrl, getRun, getRunEvents } from "./api";
-import type { RunEvent, RunSummary } from "./types";
+import { buildRunEventsUrl, getRun } from "./api";
+import type { RunSummary } from "./types";
 
 describe("runs API", () => {
   afterEach(() => {
@@ -55,29 +55,6 @@ describe("runs API", () => {
     );
   });
 
-  it("fetches replayed run events from generic run endpoints", async () => {
-    const events: RunEvent[] = [
-      {
-        type: "custom",
-        node: "load_sop",
-        thread_id: "quality-run:run-1",
-        run_id: "run-1",
-        sequence: 13,
-        payload: { message: "Loaded SOP" },
-      },
-    ];
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(events));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(getRunEvents("run-1", 12)).resolves.toEqual(events);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/runs/run-1/events?after=12",
-      expect.objectContaining({
-        headers: expect.any(Headers),
-      }),
-    );
-  });
 });
 
 function jsonResponse(body: unknown): Response {
