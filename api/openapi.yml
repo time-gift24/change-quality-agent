@@ -1,0 +1,437 @@
+openapi: 3.0.3
+info:
+  title: Change Quality Agent API
+  version: 0.1.0
+  description: >
+    API contract for SOP quality runs, run history, and generic run observation.
+    SOP fetching is mocked in v1.
+servers:
+  - url: /
+tags:
+  - name: sop
+    description: SOP entry points and SOP-scoped run history.
+  - name: runs
+    description: Generic run observation APIs.
+paths:
+  /api/sop/environments:
+    get:
+      tags:
+        - sop
+      summary: List configured SOP environments
+      operationId: listSopEnvironments
+      responses:
+        "200":
+          description: Configured public environments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EnvironmentPublic"
+  /api/sop/{sop_id}:
+    get:
+      tags:
+        - sop
+      summary: Preview a mocked SOP snapshot
+      operationId: getSopPreview
+      parameters:
+        - $ref: "#/components/parameters/SopId"
+        - $ref: "#/components/parameters/EnvironmentKey"
+      responses:
+        "200":
+          description: Mocked SOP snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SopSnapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/sop/{sop_id}/runs:
+    post:
+      tags:
+        - sop
+      summary: Start a quality run for a mocked SOP snapshot
+      operationId: startSopRun
+      parameters:
+        - $ref: "#/components/parameters/SopId"
+        - $ref: "#/components/parameters/EnvironmentKey"
+      responses:
+        "202":
+          description: Run accepted and scheduled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunStartResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: An active run already exists for this SOP and environment.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveRunConflict"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags:
+        - sop
+      summary: List SOP run history
+      operationId: listSopRuns
+      parameters:
+        - $ref: "#/components/parameters/SopId"
+        - $ref: "#/components/parameters/EnvironmentKey"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: SOP run history, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/runs/{run_id}:
+    get:
+      tags:
+        - runs
+      summary: Get generic run details
+      description: >
+        Generic run details intentionally do not expose SOP-specific fields such
+        as env_key at the top level.
+      operationId: getRun
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - name: debug
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Generic run details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/runs/{run_id}/events:
+    get:
+      tags:
+        - runs
+      summary: Stream persisted run events
+      description: >
+        Server-Sent Events stream. The server first replays persisted events
+        with sequence greater than after, then polls persisted events until it
+        sends terminal done or error.
+      operationId: streamRunEvents
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: >
+            SSE frames using id as sequence, event as event type, and data as a
+            JSON RunEvent envelope.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  id: 3
+                  event: done
+                  data: {"run_id":"2f4f9c1c-5f97-4c9c-89d2-9e7e3b6a1a11","sequence":3,"type":"done","node":null,"thread_id":"thread-id","checkpoint_id":null,"task_id":null,"payload":{"status":"done"},"created_at":"2026-05-25T00:00:00Z"}
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+components:
+  parameters:
+    SopId:
+      name: sop_id
+      in: path
+      required: true
+      schema:
+        type: string
+      example: release-checklist
+    RunId:
+      name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    EnvironmentKey:
+      name: env
+      in: query
+      required: true
+      schema:
+        type: string
+      example: dev
+  responses:
+    NotFound:
+      description: Unknown environment, SOP, or run.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadGateway:
+      description: SOP client failure before a run is created.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: Request validation error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationErrorResponse"
+  schemas:
+    EnvironmentPublic:
+      type: object
+      required:
+        - key
+        - name_zh
+        - name_en
+      properties:
+        key:
+          type: string
+          example: dev
+        name_zh:
+          type: string
+          example: 开发
+        name_en:
+          type: string
+          example: Development
+    SopSnapshot:
+      type: object
+      required:
+        - sop_id
+        - env_key
+        - payload
+      properties:
+        sop_id:
+          type: string
+        env_key:
+          type: string
+        source_version:
+          type: string
+          nullable: true
+          example: mock-v1
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+    RunStatus:
+      type: string
+      enum:
+        - pending
+        - running
+        - success
+        - error
+        - timeout
+        - interrupted
+    RunStartResponse:
+      type: object
+      required:
+        - run_id
+        - status
+        - status_url
+        - events_url
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        status_url:
+          type: string
+        events_url:
+          type: string
+    ActiveRunConflict:
+      type: object
+      required:
+        - message
+        - active_run_id
+        - status_url
+        - events_url
+      properties:
+        message:
+          type: string
+        active_run_id:
+          type: string
+          format: uuid
+        status_url:
+          type: string
+        events_url:
+          type: string
+    RunSummary:
+      type: object
+      required:
+        - run_id
+        - subject_type
+        - subject_id
+        - status
+        - completed_nodes
+        - latest_sequence
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        subject_type:
+          type: string
+          example: sop
+        subject_id:
+          type: string
+          example: release-checklist
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        current_node:
+          type: string
+          nullable: true
+        completed_nodes:
+          type: array
+          items:
+            type: string
+        latest_sequence:
+          type: integer
+          minimum: 0
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        result_status:
+          type: string
+          nullable: true
+        error_summary:
+          type: string
+          nullable: true
+    RunDebug:
+      type: object
+      required:
+        - thread_id
+      properties:
+        thread_id:
+          type: string
+        current_checkpoint_id:
+          type: string
+          nullable: true
+        langgraph_state_snapshot:
+          type: object
+          nullable: true
+          additionalProperties: true
+        raw_graph_output:
+          type: object
+          nullable: true
+          additionalProperties: true
+        raw_last_event:
+          allOf:
+            - $ref: "#/components/schemas/RunEvent"
+          nullable: true
+    RunDetail:
+      allOf:
+        - $ref: "#/components/schemas/RunSummary"
+        - type: object
+          required:
+            - debug
+          properties:
+            debug:
+              allOf:
+                - $ref: "#/components/schemas/RunDebug"
+              nullable: true
+    RunEventType:
+      type: string
+      enum:
+        - tasks
+        - messages
+        - updates
+        - custom
+        - checkpoints
+        - error
+        - done
+    RunEvent:
+      type: object
+      required:
+        - run_id
+        - sequence
+        - type
+        - thread_id
+        - payload
+        - created_at
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          minimum: 1
+        type:
+          $ref: "#/components/schemas/RunEventType"
+        node:
+          type: string
+          nullable: true
+        thread_id:
+          type: string
+        checkpoint_id:
+          type: string
+          nullable: true
+        task_id:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+    ValidationErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
