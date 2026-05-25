@@ -11,6 +11,11 @@ events and the frontend renders node progress, node outputs, token streams,
 history, and recoverable errors without flattening everything into one text
 response.
 
+The frontend stack is fixed: create a dedicated `frontend/` child directory
+containing a Vite React TypeScript app, using React 19 and Tailwind CSS v4.
+Tailwind should be integrated through the official Vite plugin
+`@tailwindcss/vite`.
+
 Official references:
 
 - https://docs.langchain.com/oss/python/langgraph/streaming
@@ -18,6 +23,9 @@ Official references:
 - https://docs.langchain.com/oss/javascript/langgraph/frontend/overview
 - https://docs.langchain.com/oss/javascript/langgraph/frontend/graph-execution
 - https://docs.langchain.com/langgraph-platform/use-stream-react
+- https://vite.dev/guide/
+- https://tailwindcss.com/docs/installation/using-vite
+- https://react.dev/blog/2024/12/05/react-19
 
 ## Goals
 
@@ -62,6 +70,32 @@ Each raw LangGraph chunk is adapted into a normalized server-sent event. The
 adapter is intentionally thin: it keeps the original payload available, but
 adds stable top-level routing fields so frontend code does not need to know
 LangGraph internals.
+
+## Frontend Architecture
+
+All browser code lives under `frontend/`. The frontend is a Vite React
+TypeScript app pinned to the chosen stack:
+
+- React 19 and React DOM 19 for UI rendering.
+- Vite for local development, build, and preview.
+- Tailwind CSS v4 through `@tailwindcss/vite`.
+- Vitest for reducer, hook, and component tests.
+
+The app owns a small LangGraph stream adapter layer instead of spreading SSE
+parsing through components. The recommended shape is:
+
+```text
+frontend/
+  index.html
+  package.json
+  vite.config.ts
+  src/
+    main.tsx
+    index.css
+    lib/langgraphStream.ts
+    hooks/useGraphRunStream.ts
+    components/PipelineRun.tsx
+```
 
 ## Event Contract
 
@@ -212,8 +246,6 @@ Integration tests:
 
 ## Open Decisions
 
-- Choose the frontend stack and whether to use the official React `useStream`
-  hook directly or a local `useGraphRunStream` wrapper first.
 - Choose the initial Postgres deployment path and migration ownership for
   checkpointer setup.
 - Decide which graph nodes are product-visible and which remain internal.

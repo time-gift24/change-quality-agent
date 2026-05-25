@@ -6,7 +6,7 @@
 
 **Architecture:** The backend owns the compiled LangGraph graph and streams normalized SSE events from `graph.astream(...)`. A thin adapter converts raw LangGraph stream chunks into a stable event envelope. The frontend consumes the event envelope with a reducer and hook, keeping node runtime state separate from final chat messages.
 
-**Tech Stack:** Python 3.12, FastAPI, LangGraph, Postgres checkpointer for production persistence, pytest, httpx, TypeScript, React, Vitest.
+**Tech Stack:** Python 3.12, FastAPI, LangGraph, Postgres checkpointer for production persistence, pytest, httpx, Vite, TypeScript, React 19, Tailwind CSS v4, Vitest.
 
 ---
 
@@ -17,6 +17,9 @@
 - Use TDD for each task: write the failing test first, run it, implement, run it again.
 - Commit after each task or small group of tightly related files.
 - Do not add a production LLM provider call in this plan. Use deterministic graph nodes first so streaming, persistence, and UI behavior can be tested without secrets.
+- All frontend code must live under the new `frontend/` child directory.
+- The frontend stack is fixed: Vite + React 19 + TypeScript + Tailwind CSS v4.
+- Integrate Tailwind CSS v4 through `@tailwindcss/vite`; do not add a Tailwind v3-style `tailwind.config.js` unless a later requirement needs custom theme tokens.
 
 ## Task 1: Add Runtime And Test Dependencies
 
@@ -1186,13 +1189,20 @@ git add app/main.py app/graph/checkpointing.py tests/graph/test_checkpointing_po
 git commit -m "feat: own checkpointer lifecycle in app startup"
 ```
 
-## Task 11: Add Frontend Reducer Package
+## Task 11: Add Vite React Tailwind Frontend App
 
 **Files:**
 - Create: `frontend/package.json`
+- Create: `frontend/index.html`
+- Create: `frontend/vite.config.ts`
+- Create: `frontend/tsconfig.json`
+- Create: `frontend/tsconfig.app.json`
+- Create: `frontend/tsconfig.node.json`
+- Create: `frontend/src/main.tsx`
+- Create: `frontend/src/App.tsx`
+- Create: `frontend/src/index.css`
 - Create: `frontend/src/lib/langgraphStream.ts`
 - Create: `frontend/src/lib/langgraphStream.test.ts`
-- Create: `frontend/tsconfig.json`
 
 **Step 1: Create the frontend package metadata**
 
@@ -1204,38 +1214,149 @@ Create `frontend/package.json`:
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^5.0.0",
-    "vite": "^7.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "@tailwindcss/vite": "^4.0.0"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.0.0",
+    "vite": "^7.0.0",
     "vitest": "^4.0.0"
   }
 }
+```
+
+Create `frontend/index.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Change Quality Agent</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+```
+
+Create `frontend/vite.config.ts`:
+
+```ts
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+});
 ```
 
 Create `frontend/tsconfig.json`:
 
 ```json
 {
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+```
+
+Create `frontend/tsconfig.app.json`:
+
+```json
+{
   "compilerOptions": {
     "target": "ES2022",
+    "useDefineForClassFields": true,
     "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
     "strict": true,
     "jsx": "react-jsx",
     "skipLibCheck": true
   },
   "include": ["src"]
 }
+```
+
+Create `frontend/tsconfig.node.json`:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["vite.config.ts"]
+}
+```
+
+Create `frontend/src/index.css`:
+
+```css
+@import "tailwindcss";
+
+body {
+  margin: 0;
+}
+```
+
+Create `frontend/src/App.tsx`:
+
+```tsx
+export function App() {
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <div className="mx-auto max-w-5xl px-6 py-8">
+        <h1 className="text-2xl font-semibold">Change Quality Agent</h1>
+      </div>
+    </main>
+  );
+}
+```
+
+Create `frontend/src/main.tsx`:
+
+```tsx
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./App";
+import "./index.css";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
 ```
 
 **Step 2: Write failing reducer tests**
@@ -1427,12 +1548,12 @@ function nodeState(state: GraphRunState, node: string): NodeRuntime {
 }
 ```
 
-**Step 5: Run frontend tests**
+**Step 5: Run frontend tests and build**
 
 Run:
 
 ```bash
-cd frontend && npm test && npm run typecheck
+cd frontend && npm test && npm run typecheck && npm run build
 ```
 
 Expected: PASS.
@@ -1441,7 +1562,7 @@ Expected: PASS.
 
 ```bash
 git add frontend
-git commit -m "feat: add frontend stream reducer"
+git commit -m "feat: add Vite React streaming frontend"
 ```
 
 ## Task 12: Add React Streaming Hook
@@ -1558,7 +1679,7 @@ export function useGraphRunStream(apiBaseUrl: string) {
 Run:
 
 ```bash
-cd frontend && npm test && npm run typecheck
+cd frontend && npm test && npm run typecheck && npm run build
 ```
 
 Expected: PASS.
@@ -1628,7 +1749,7 @@ export function PipelineRun({ run }: Props) {
 Run:
 
 ```bash
-cd frontend && npm test && npm run typecheck
+cd frontend && npm test && npm run typecheck && npm run build
 ```
 
 Expected: PASS.
@@ -1709,7 +1830,7 @@ Terminal 2:
 ```bash
 uv run pytest -v
 uv run python scripts/smoke_stream.py
-cd frontend && npm test && npm run typecheck
+cd frontend && npm test && npm run typecheck && npm run build
 ```
 
 Expected:
@@ -1732,7 +1853,7 @@ Run:
 ```bash
 git status --short
 uv run pytest -v
-cd frontend && npm test && npm run typecheck
+cd frontend && npm test && npm run typecheck && npm run build
 ```
 
 Expected:
@@ -1749,6 +1870,5 @@ Expected:
   `stream.values`, and `getMessagesMetadata` into the same UI components.
 - If the graph later uses a real streaming chat model, keep the event envelope
   unchanged and update only graph node implementations.
-- If frontend stack already exists elsewhere, port `langgraphStream.ts`,
-  `useGraphRunStream.ts`, and `PipelineRun.tsx` into that app instead of keeping
-  the standalone `frontend/` folder.
+- Keep all browser code in `frontend/`; do not create a second frontend app at
+  the repository root.
