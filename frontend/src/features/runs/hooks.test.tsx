@@ -302,6 +302,75 @@ describe("run SSE hooks", () => {
     expect(snapshots[0]?.events.latestSequence).toBe(0);
   });
 
+  it("ignores late events from the previous stream after runId changes", async () => {
+    const requests: Array<Deferred<Response>> = [];
+    const fetchMock = vi.fn(() => {
+      const request = deferred<Response>();
+      requests.push(request);
+      return request.promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, rerender } = renderHook(
+      ({ runId }) => useRun(runId),
+      {
+        initialProps: { runId: "run-a" },
+      },
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/runs/run-a",
+        expect.any(Object),
+      );
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        jsonResponse(summary({ run_id: "run-a", latest_sequence: 0 })),
+      );
+    });
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+    const oldSource = MockEventSource.instances[0];
+
+    rerender({ runId: "run-b" });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/runs/run-b",
+        expect.any(Object),
+      );
+    });
+
+    await act(async () => {
+      requests[1]?.resolve(
+        jsonResponse(summary({ run_id: "run-b", latest_sequence: 10 })),
+      );
+    });
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(2);
+    });
+
+    act(() => {
+      oldSource?.emitNamed(
+        event({
+          run_id: "run-a",
+          sequence: 99,
+          payload: { delta: "late old event" },
+        }),
+        "99",
+      );
+    });
+
+    expect(result.current.summary?.run_id).toBe("run-b");
+    expect(result.current.events.events).toEqual([]);
+    expect(result.current.events.latestSequence).toBe(10);
+  });
+
   it("terminal done closes stream and triggers summary refresh", async () => {
     const fetchMock = vi
       .fn()

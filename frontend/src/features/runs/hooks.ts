@@ -189,6 +189,10 @@ export function useRunEvents(
       };
 
       const handleRunMessage = (message: MessageEvent<string>) => {
+        if (isClosed || isTerminal) {
+          return;
+        }
+
         const event = parseRunEvent(message.data);
 
         if (!event) {
