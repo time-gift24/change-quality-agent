@@ -10,6 +10,15 @@ import {
 import type { RunEvent, RunSummary } from "./types";
 
 const RECONNECT_DELAY_MS = 1_000;
+const RUN_EVENT_NAMES: RunEvent["type"][] = [
+  "tasks",
+  "messages",
+  "updates",
+  "custom",
+  "checkpoints",
+  "done",
+  "error",
+];
 
 type UseRunEventsOptions = {
   enabled?: boolean;
@@ -179,7 +188,7 @@ export function useRunEvents(
         }));
       };
 
-      source.onmessage = (message) => {
+      const handleRunMessage = (message: MessageEvent<string>) => {
         const event = parseRunEvent(message.data);
 
         if (!event) {
@@ -197,8 +206,24 @@ export function useRunEvents(
         }
       };
 
-      source.onerror = () => {
+      source.onmessage = handleRunMessage;
+
+      const handleNamedRunEvent = (event: Event) => {
+        if (isMessageEvent(event)) {
+          handleRunMessage(event);
+        }
+      };
+
+      for (const eventName of RUN_EVENT_NAMES) {
+        source.addEventListener(eventName, handleNamedRunEvent);
+      }
+
+      source.onerror = (event) => {
         if (isClosed || isTerminal) {
+          return;
+        }
+
+        if (isMessageEvent(event)) {
           return;
         }
 
@@ -251,6 +276,13 @@ function parseRunEvent(data: string): RunEvent | null {
   } catch {
     return null;
   }
+}
+
+function isMessageEvent(event: Event): event is MessageEvent<string> {
+  return (
+    "data" in event &&
+    typeof (event as MessageEvent<unknown>).data === "string"
+  );
 }
 
 function nextCursor(

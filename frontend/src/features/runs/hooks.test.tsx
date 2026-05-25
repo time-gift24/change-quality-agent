@@ -62,6 +62,27 @@ describe("run SSE hooks", () => {
     );
   });
 
+  it("reduces named SSE event frames", async () => {
+    const { result } = renderHook(() => useRunEvents("run-1", 0));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emitNamed(
+        event({
+          sequence: 2,
+          payload: { delta: "named frame" },
+        }),
+        "2",
+      );
+    });
+
+    expect(result.current.events.map((item) => item.sequence)).toEqual([2]);
+    expect(result.current.nodes.check_steps?.streamText).toBe("named frame");
+  });
+
   it("ignores heartbeat comments", async () => {
     const { result } = renderHook(() => useRunEvents("run-1", 0));
 
@@ -315,6 +336,35 @@ describe("run SSE hooks", () => {
     expect(result.current.events.isRunning).toBe(false);
   });
 
+  it("terminal named done closes stream and triggers summary refresh", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(summary({ latest_sequence: 2 })))
+      .mockResolvedValueOnce(
+        jsonResponse(summary({ status: "success", latest_sequence: 3 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useRun("run-1"));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emitNamed(
+        event({ type: "done", node: null, sequence: 3 }),
+        "3",
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.summary?.status).toBe("success");
+    });
+    expect(MockEventSource.instances[0]?.closed).toBe(true);
+    expect(result.current.events.isRunning).toBe(false);
+  });
+
   it("terminal error closes stream and triggers summary refresh", async () => {
     const fetchMock = vi
       .fn()
@@ -346,10 +396,54 @@ describe("run SSE hooks", () => {
     });
     expect(MockEventSource.instances[0]?.closed).toBe(true);
   });
+
+  it("terminal named error closes stream instead of reconnecting", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(summary({ latest_sequence: 4 })))
+      .mockResolvedValueOnce(
+        jsonResponse(summary({ status: "error", latest_sequence: 5 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useRun("run-1"));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    vi.useFakeTimers();
+
+    await act(async () => {
+      MockEventSource.instances[0]?.emitNamed(
+        event({
+          type: "error",
+          node: "check_steps",
+          sequence: 5,
+          payload: { message: "failed" },
+        }),
+        "5",
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.summary?.status).toBe("error");
+    expect(MockEventSource.instances[0]?.closed).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(1);
+    expect(result.current.events.connectionStatus).toBe("closed");
+  });
 });
 
 class MockEventSource {
   static instances: MockEventSource[] = [];
+
+  private readonly listeners = new Map<string, Set<EventListener>>();
 
   onerror: ((event: Event) => void) | null = null;
   onmessage: ((event: MessageEvent<string>) => void) | null = null;
@@ -364,6 +458,16 @@ class MockEventSource {
     this.closed = true;
   }
 
+  addEventListener(type: string, listener: EventListener): void {
+    const listeners = this.listeners.get(type) ?? new Set<EventListener>();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
   comment(): void {
     this.onopen?.(new Event("open"));
   }
@@ -375,6 +479,21 @@ class MockEventSource {
         lastEventId,
       }),
     );
+  }
+
+  emitNamed(runEvent: RunEvent, lastEventId = ""): void {
+    const message = new MessageEvent(runEvent.type, {
+      data: JSON.stringify(runEvent),
+      lastEventId,
+    });
+
+    for (const listener of this.listeners.get(runEvent.type) ?? []) {
+      listener(message);
+    }
+
+    if (runEvent.type === "error") {
+      this.onerror?.(message);
+    }
   }
 
   fail(): void {
