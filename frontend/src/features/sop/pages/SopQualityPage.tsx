@@ -217,7 +217,11 @@ export function SopQualityPage({
               <h2 className="text-sm font-medium text-[#17171c]">Preview</h2>
               <span className="text-xs text-[#75758a]">{selectedEnvironmentName}</span>
             </div>
-            <SopPreviewPanel preview={preview.data} loading={preview.loading} />
+            <SopPreviewPanel
+              error={preview.error}
+              preview={preview.data}
+              loading={preview.loading}
+            />
           </section>
 
           <section
@@ -256,14 +260,24 @@ export function SopQualityPage({
 }
 
 function SopPreviewPanel({
+  error,
   loading,
   preview,
 }: {
+  error: Error | null;
   loading: boolean;
   preview: SopPreview | null;
 }) {
   if (loading) {
     return <p className="pt-3 text-sm text-[#616161]">Loading preview</p>;
+  }
+
+  if (error) {
+    return (
+      <p className="pt-3 text-sm text-[#b30000]" role="alert">
+        {error.message}
+      </p>
+    );
   }
 
   if (!preview) {

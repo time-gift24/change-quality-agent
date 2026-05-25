@@ -185,10 +185,45 @@ describe("SopQualityPage", () => {
     render(<SopQualityPage />);
 
     await screen.findByRole("option", { name: "Development (dev)" });
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    const startButton = screen.getByRole("button", { name: "Start run" });
+
+    await waitFor(() => {
+      expect(startButton).toBeEnabled();
+    });
+    fireEvent.click(startButton);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "API request failed: 500 Server Error",
+    );
+  });
+
+  it("announces preview errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({ runs: [] }),
+        "GET /api/sop/release-checklist?env=dev": jsonResponse(
+          { message: "not found" },
+          { status: 404, statusText: "Not Found" },
+        ),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByRole("option", { name: "Development (dev)" });
+    const previewButton = screen.getByRole("button", { name: "Preview SOP" });
+
+    await waitFor(() => {
+      expect(previewButton).toBeEnabled();
+    });
+    fireEvent.click(previewButton);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "API request failed: 404 Not Found",
     );
   });
 
