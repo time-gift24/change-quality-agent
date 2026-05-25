@@ -119,6 +119,31 @@ describe("run event reducer", () => {
       getOrderedNodeIds(state, ["load_sop", "check_steps", "summarize_result"]),
     ).toEqual(["a_early_unknown", "z_late_unknown"]);
   });
+
+  it("clears stale task errors when a node recovers", () => {
+    const failed = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "tasks",
+        node: "check_steps",
+        sequence: 1,
+        payload: { status: "failed", error: "boom" },
+      }),
+    );
+
+    const recovered = reduceRunEvent(
+      failed,
+      event({
+        type: "tasks",
+        node: "check_steps",
+        sequence: 2,
+        payload: { status: "completed" },
+      }),
+    );
+
+    expect(recovered.nodes.check_steps?.status).toBe("done");
+    expect(recovered.nodes.check_steps?.error).toBeUndefined();
+  });
 });
 
 function event(overrides: Partial<RunEvent>): RunEvent {

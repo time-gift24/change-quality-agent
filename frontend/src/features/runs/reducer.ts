@@ -81,11 +81,15 @@ export function reduceRunEvent(
     return updateNode(
       nextState,
       event.node,
-      (node) => ({
-        ...node,
-        status: taskStatus(event, node.status),
-        error: taskError(event, node.error),
-      }),
+      (node) => {
+        const nextStatus = taskStatus(event, node.status);
+
+        return {
+          ...node,
+          status: nextStatus,
+          error: taskError(event, nextStatus),
+        };
+      },
       event.sequence,
     );
   }
@@ -217,8 +221,15 @@ function taskStatus(
   return fallback;
 }
 
-function taskError(event: RunEvent, fallback: string | undefined): string | undefined {
-  return stringPayloadValue(event, "error") ?? fallback;
+function taskError(
+  event: RunEvent,
+  status: NodeRuntimeStatus,
+): string | undefined {
+  if (status !== "error" && status !== "interrupted") {
+    return undefined;
+  }
+
+  return stringPayloadValue(event, "error");
 }
 
 function eventError(event: RunEvent): string | undefined {
