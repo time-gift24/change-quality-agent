@@ -30,6 +30,13 @@
 - KISS (Keep It Simple and Stupid，尽可能保持简单)
 - DRY (Don't Repeat Yourself，禁止重复你自身)
 
+# 前端开发指南
+
+- 前端技术栈以 `frontend/README.md` 为准：Vite、React 19、TypeScript、Tailwind CSS v4。
+- 新增或修改任何前端 UI 前，必须先阅读根目录 `DESIGN.md`。
+- 后续前端实现必须严格遵循 `DESIGN.md` 中的颜色、字体、圆角、间距、组件和交互设计规范。
+- 如果实现需求与 `DESIGN.md` 存在冲突，先更新设计规范或向用户确认，不要自行偏离。
+
 # 后端开发指南
 
 - 遵守 python 的[规则](./rules/python)
