@@ -49,8 +49,8 @@ describe("SopQualityPage", () => {
       "fetch",
       fetchSequence([
         jsonResponse([
-          { key: "dev", name_en: "Development", name_zh: "Development" },
-          { key: "prod", name_en: "Production", name_zh: "Production" },
+          { key: "dev", name_en: "Development", name_zh: "开发环境" },
+          { key: "prod", name_en: "Production", name_zh: "生产环境" },
         ]),
         jsonResponse({ runs: [] }),
       ]),
@@ -58,10 +58,37 @@ describe("SopQualityPage", () => {
 
     render(<SopQualityPage />);
 
-    expect(await screen.findByRole("option", { name: "Development (dev)" }))
-      .toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Production (prod)" }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", {
+        name: "Development / 开发环境 (dev)",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Production / 生产环境 (prod)" }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText("SOP preview")).toHaveTextContent(
+        "Development / 开发环境 (dev)",
+      );
+    });
+  });
+
+  it("announces environment load errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse(
+          { message: "unavailable" },
+          { status: 500, statusText: "Server Error" },
+        ),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "API request failed: 500 Server Error",
+    );
   });
 
   it("fetches preview without creating a run", async () => {
@@ -225,6 +252,102 @@ describe("SopQualityPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "API request failed: 404 Not Found",
     );
+  });
+
+  it("announces history load errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse(
+          { message: "bad gateway" },
+          { status: 502, statusText: "Bad Gateway" },
+        ),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "API request failed: 502 Bad Gateway",
+    );
+  });
+
+  it("hides stale history while a new environment history is loading", async () => {
+    const prodHistory = deferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url === "/api/sop/environments") {
+          return Promise.resolve(
+            jsonResponse([
+              { key: "dev", name_en: "Development", name_zh: "Development" },
+              { key: "prod", name_en: "Production", name_zh: "Production" },
+            ]),
+          );
+        }
+
+        if (url === "/api/sop/release-checklist/runs?env=dev") {
+          return Promise.resolve(
+            jsonResponse({
+              runs: [{ run_id: "dev-run", status: "success" }],
+            }),
+          );
+        }
+
+        if (url === "/api/sop/release-checklist/runs?env=prod") {
+          return prodHistory.promise;
+        }
+
+        throw new Error(`Unexpected fetch: ${url}`);
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    expect(await screen.findByRole("button", { name: /dev-run/ }))
+      .toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Environment"), {
+      target: { value: "prod" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /dev-run/ }))
+        .not.toBeInTheDocument();
+    });
+    expect(screen.getByLabelText("Run history")).toHaveTextContent("Loading");
+
+    await prodHistory.resolve(
+      jsonResponse({ runs: [{ run_id: "prod-run", status: "running" }] }),
+    );
+    expect(await screen.findByRole("button", { name: /prod-run/ }))
+      .toBeInTheDocument();
+  });
+
+  it("shows hover feedback on primary SOP actions", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({ runs: [] }),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByRole("option", { name: "Development (dev)" });
+
+    expect(screen.getByRole("button", { name: "Preview SOP" }).className)
+      .toContain("hover:bg-[#f8f8f6]");
+    expect(screen.getByRole("button", { name: "Start run" }).className)
+      .toContain("hover:bg-[#003c33]");
   });
 
   it("clears the observed run when the SOP id changes", async () => {

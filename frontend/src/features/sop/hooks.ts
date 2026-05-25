@@ -110,7 +110,7 @@ export function useSopRunHistory(
 
     let cancelled = false;
 
-    setState((current) => ({ ...current, error: null, loading: true }));
+    setState({ data: [], error: null, loading: true });
     getSopRunHistory(sopId, envKey)
       .then((runs) => {
         if (!cancelled) {

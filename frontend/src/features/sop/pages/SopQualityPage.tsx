@@ -8,7 +8,7 @@ import {
   useSopPreview,
   useSopRunHistory,
 } from "../hooks";
-import type { SopPreview, SopRunHistoryItem } from "../types";
+import type { SopEnvironment, SopPreview, SopRunHistoryItem } from "../types";
 
 type SopQualityPageProps = {
   initialSopId?: string;
@@ -51,9 +51,7 @@ export function SopQualityPage({
   const selectedEnvironmentName = useMemo(() => {
     const environment = environments.data.find((item) => item.key === selectedEnv);
 
-    return environment
-      ? `${environment.name_en} (${environment.key})`
-      : "Select environment";
+    return environment ? environmentLabel(environment) : "Select environment";
   }, [environments.data, selectedEnv]);
 
   async function handleStartRun() {
@@ -168,13 +166,19 @@ export function SopQualityPage({
           >
             {environments.data.map((environment) => (
               <option key={environment.key} value={environment.key}>
-                {environment.name_en} ({environment.key})
+                {environmentLabel(environment)}
               </option>
             ))}
           </select>
 
+          {environments.error ? (
+            <p className="rounded border border-[#b30000]/25 bg-white px-3 py-2 text-sm text-[#b30000]" role="alert">
+              {environments.error.message}
+            </p>
+          ) : null}
+
           <button
-            className="w-full rounded-lg border border-[#d9d9dd] bg-white px-3 py-2 text-sm font-medium text-[#17171c] disabled:cursor-not-allowed disabled:text-[#93939f]"
+            className="w-full rounded-lg border border-[#d9d9dd] bg-white px-3 py-2 text-sm font-medium text-[#17171c] transition-colors hover:bg-[#f8f8f6] disabled:cursor-not-allowed disabled:text-[#93939f] disabled:hover:bg-white"
             disabled={!sopId || !selectedEnv || preview.loading}
             onClick={handlePreview}
             type="button"
@@ -183,7 +187,7 @@ export function SopQualityPage({
           </button>
 
           <button
-            className="w-full rounded-lg bg-[#17171c] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-[#93939f]"
+            className="w-full rounded-lg bg-[#17171c] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#003c33] disabled:cursor-not-allowed disabled:bg-[#93939f] disabled:hover:bg-[#93939f]"
             disabled={!sopId || !selectedEnv || starting}
             onClick={handleStartRun}
             type="button"
@@ -235,6 +239,8 @@ export function SopQualityPage({
               ) : null}
             </div>
             <RunHistory
+              error={history.error}
+              loading={history.loading}
               observedRunId={observedRunId}
               onSelectRun={setObservedRunId}
               runs={history.data}
@@ -297,14 +303,30 @@ function SopPreviewPanel({
 }
 
 function RunHistory({
+  error,
+  loading,
   observedRunId,
   onSelectRun,
   runs,
 }: {
+  error: Error | null;
+  loading: boolean;
   observedRunId: string | null;
   onSelectRun: (runId: string) => void;
   runs: SopRunHistoryItem[];
 }) {
+  if (error) {
+    return (
+      <p className="pt-3 text-sm text-[#b30000]" role="alert">
+        {error.message}
+      </p>
+    );
+  }
+
+  if (loading) {
+    return <p className="pt-3 text-sm text-[#616161]">Loading history</p>;
+  }
+
   if (runs.length === 0) {
     return <p className="pt-3 text-sm text-[#616161]">No runs yet.</p>;
   }
@@ -337,6 +359,15 @@ function getPreviewTitle(preview: SopPreview): string {
   const title = payload.title;
 
   return typeof title === "string" && title ? title : "SOP preview";
+}
+
+function environmentLabel(environment: SopEnvironment): string {
+  const localizedName =
+    environment.name_zh && environment.name_zh !== environment.name_en
+      ? ` / ${environment.name_zh}`
+      : "";
+
+  return `${environment.name_en}${localizedName} (${environment.key})`;
 }
 
 function formatCreatedAt(value: string | null | undefined): string {
