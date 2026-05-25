@@ -69,6 +69,20 @@ class FakeRepository:
         self.commits += 1
 
 
+class FakeRepositoryContext:
+    def __init__(self, repository: FakeRepository) -> None:
+        self.repository = repository
+        self.entered = False
+        self.exited = False
+
+    async def __aenter__(self):
+        self.entered = True
+        return self.repository
+
+    async def __aexit__(self, exc_type, exc, tb):
+        self.exited = True
+
+
 class FakeProbe:
     def __init__(self) -> None:
         self.started = 0
@@ -117,6 +131,22 @@ async def test_start_sets_running_and_stores_tools() -> None:
     assert repository.tools[0]["name"] == "search"
     assert probe.started == 1
     assert repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_start_supports_repository_context_factory() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    repository_context = FakeRepositoryContext(repository)
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository_context,
+        probe=FakeProbe(),
+    )
+
+    await manager.start(server.id)
+
+    assert repository_context.entered is True
+    assert repository_context.exited is True
 
 
 @pytest.mark.asyncio

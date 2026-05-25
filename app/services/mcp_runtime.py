@@ -1,5 +1,5 @@
-from collections.abc import Callable
-from contextlib import AsyncExitStack
+from collections.abc import AsyncIterator, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, Protocol
 from uuid import UUID
@@ -125,7 +125,7 @@ class McpRuntimeManager:
     def __init__(
         self,
         *,
-        repository_factory: Callable[[], McpRepository],
+        repository_factory: Callable[[], Any],
         probe: McpProbe | None = None,
     ) -> None:
         self._repository_factory = repository_factory
@@ -133,114 +133,94 @@ class McpRuntimeManager:
         self._handles: dict[UUID, Any] = {}
 
     async def start(self, server_id: UUID) -> McpLifecycleResponse:
-        repository = self._repository_factory()
-        server = await repository.require_server(server_id)
-        self._require_supported_transport(server)
-        await repository.update_desired_state(
-            server_id,
-            McpDesiredState.running.value,
-        )
+        async with self._repository_context() as repository:
+            server = await repository.require_server(server_id)
+            self._require_supported_transport(server)
+            await repository.update_desired_state(
+                server_id,
+                McpDesiredState.running.value,
+            )
 
-        if server_id in self._handles:
+            if server_id in self._handles:
+                await repository.commit()
+                return await self._response(repository, server_id)
+
+            await repository.update_runtime_status(
+                server_id,
+                runtime_status=McpServerRuntimeStatus.starting.value,
+            )
+            handle = None
+            try:
+                handle, tools = await self._probe.start(server)
+                await repository.replace_tools(server_id, tools)
+                await repository.update_runtime_status(
+                    server_id,
+                    runtime_status=McpServerRuntimeStatus.running.value,
+                    last_error=None,
+                    checked=True,
+                )
+            except Exception as exc:
+                if handle is not None:
+                    await self._probe.stop(handle)
+                await repository.update_runtime_status(
+                    server_id,
+                    runtime_status=McpServerRuntimeStatus.error.value,
+                    last_error=str(exc),
+                    checked=True,
+                )
+                await repository.commit()
+                raise
+
+            self._handles[server_id] = handle
             await repository.commit()
             return await self._response(repository, server_id)
 
-        await repository.update_runtime_status(
-            server_id,
-            runtime_status=McpServerRuntimeStatus.starting.value,
-        )
-        handle = None
-        try:
-            handle, tools = await self._probe.start(server)
-            await repository.replace_tools(server_id, tools)
+    async def stop(self, server_id: UUID) -> McpLifecycleResponse:
+        async with self._repository_context() as repository:
+            await repository.update_desired_state(
+                server_id,
+                McpDesiredState.stopped.value,
+            )
             await repository.update_runtime_status(
                 server_id,
-                runtime_status=McpServerRuntimeStatus.running.value,
-                last_error=None,
-                checked=True,
+                runtime_status=McpServerRuntimeStatus.stopping.value,
             )
-        except Exception as exc:
+            handle = self._handles.pop(server_id, None)
             if handle is not None:
                 await self._probe.stop(handle)
             await repository.update_runtime_status(
                 server_id,
-                runtime_status=McpServerRuntimeStatus.error.value,
-                last_error=str(exc),
-                checked=True,
+                runtime_status=McpServerRuntimeStatus.stopped.value,
+                last_error=None,
             )
             await repository.commit()
-            raise
-
-        self._handles[server_id] = handle
-        await repository.commit()
-        return await self._response(repository, server_id)
-
-    async def stop(self, server_id: UUID) -> McpLifecycleResponse:
-        repository = self._repository_factory()
-        await repository.update_desired_state(
-            server_id,
-            McpDesiredState.stopped.value,
-        )
-        await repository.update_runtime_status(
-            server_id,
-            runtime_status=McpServerRuntimeStatus.stopping.value,
-        )
-        handle = self._handles.pop(server_id, None)
-        if handle is not None:
-            await self._probe.stop(handle)
-        await repository.update_runtime_status(
-            server_id,
-            runtime_status=McpServerRuntimeStatus.stopped.value,
-            last_error=None,
-        )
-        await repository.commit()
-        return await self._response(repository, server_id)
+            return await self._response(repository, server_id)
 
     async def restart(self, server_id: UUID) -> McpLifecycleResponse:
         await self.stop(server_id)
         return await self.start(server_id)
 
     async def check(self, server_id: UUID) -> McpLifecycleResponse:
-        repository = self._repository_factory()
-        server = await repository.require_server(server_id)
-        self._require_supported_transport(server)
+        async with self._repository_context() as repository:
+            server = await repository.require_server(server_id)
+            self._require_supported_transport(server)
 
-        handle = self._handles.get(server_id)
-        temporary_handle = None
-        try:
-            if handle is None:
-                temporary_handle, tools = await self._probe.start(server)
-            else:
-                tools = await self._probe.list_tools(handle)
-
-            await repository.replace_tools(server_id, tools)
-            await repository.update_runtime_status(
-                server_id,
-                runtime_status=server.runtime_status,
-                last_error=None,
-                checked=True,
-            )
-            await repository.commit()
-        except Exception as exc:
-            await repository.update_runtime_status(
-                server_id,
-                runtime_status=McpServerRuntimeStatus.error.value,
-                last_error=str(exc),
-                checked=True,
-            )
-            await repository.commit()
-            raise
-        finally:
-            if temporary_handle is not None:
-                await self._probe.stop(temporary_handle)
-        return await self._response(repository, server_id)
-
-    async def shutdown(self) -> None:
-        for server_id, handle in list(self._handles.items()):
-            repository = self._repository_factory()
-            self._handles.pop(server_id, None)
+            handle = self._handles.get(server_id)
+            temporary_handle = None
             try:
-                await self._probe.stop(handle)
+                if handle is None:
+                    temporary_handle, tools = await self._probe.start(server)
+                else:
+                    tools = await self._probe.list_tools(handle)
+
+                await repository.replace_tools(server_id, tools)
+                await repository.update_runtime_status(
+                    server_id,
+                    runtime_status=server.runtime_status,
+                    last_error=None,
+                    checked=True,
+                )
+                await repository.commit()
             except Exception as exc:
                 await repository.update_runtime_status(
                     server_id,
@@ -249,14 +229,34 @@ class McpRuntimeManager:
                     checked=True,
                 )
                 await repository.commit()
-                continue
+                raise
+            finally:
+                if temporary_handle is not None:
+                    await self._probe.stop(temporary_handle)
+            return await self._response(repository, server_id)
 
-            await repository.update_runtime_status(
-                server_id,
-                runtime_status=McpServerRuntimeStatus.stopped.value,
-                last_error=None,
-            )
-            await repository.commit()
+    async def shutdown(self) -> None:
+        for server_id, handle in list(self._handles.items()):
+            async with self._repository_context() as repository:
+                self._handles.pop(server_id, None)
+                try:
+                    await self._probe.stop(handle)
+                except Exception as exc:
+                    await repository.update_runtime_status(
+                        server_id,
+                        runtime_status=McpServerRuntimeStatus.error.value,
+                        last_error=str(exc),
+                        checked=True,
+                    )
+                    await repository.commit()
+                    continue
+
+                await repository.update_runtime_status(
+                    server_id,
+                    runtime_status=McpServerRuntimeStatus.stopped.value,
+                    last_error=None,
+                )
+                await repository.commit()
 
     async def _response(
         self,
@@ -276,3 +276,13 @@ class McpRuntimeManager:
     def _require_supported_transport(self, server: Any) -> None:
         if server.transport != "stdio":
             raise UnsupportedMcpTransportError(server.transport)
+
+    @asynccontextmanager
+    async def _repository_context(self) -> AsyncIterator[McpRepository]:
+        repository_or_context = self._repository_factory()
+        if hasattr(repository_or_context, "__aenter__"):
+            async with repository_or_context as repository:
+                yield repository
+            return
+
+        yield repository_or_context
