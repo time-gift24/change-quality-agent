@@ -1,6 +1,8 @@
+import asyncio
 from collections.abc import AsyncIterator, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+import logging
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -13,6 +15,8 @@ from app.schemas.mcp import (
     McpServerRuntimeStatus,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class UnsupportedMcpTransportError(Exception):
     pass
@@ -20,6 +24,9 @@ class UnsupportedMcpTransportError(Exception):
 
 class McpCommandNotAllowedError(Exception):
     pass
+
+
+MCP_OPERATION_TIMEOUT_MESSAGE = "MCP operation timed out."
 
 
 @dataclass
@@ -74,13 +81,13 @@ class McpProbe(Protocol):
 
 
 class StdioMcpProbe:
-    def __init__(self, allowed_commands: set[str] | None = None) -> None:
-        self._allowed_commands = allowed_commands or {
-            "uvx",
-            "npx",
-            "node",
-            "python",
-        }
+    def __init__(
+        self,
+        allowed_commands: set[str] | None = None,
+        allowed_stdio_specs: set[str] | None = None,
+    ) -> None:
+        self._allowed_commands = set(allowed_commands or ())
+        self._allowed_stdio_specs = set(allowed_stdio_specs or ())
 
     async def start(
         self,
@@ -88,6 +95,9 @@ class StdioMcpProbe:
     ) -> tuple[McpRuntimeHandle, list[dict[str, Any]]]:
         if server.command not in self._allowed_commands:
             raise McpCommandNotAllowedError(server.command or "")
+        stdio_spec = self._stdio_spec(server)
+        if self._allowed_stdio_specs and stdio_spec not in self._allowed_stdio_specs:
+            raise McpCommandNotAllowedError(stdio_spec)
 
         exit_stack = AsyncExitStack()
         try:
@@ -123,6 +133,10 @@ class StdioMcpProbe:
     async def stop(self, handle: McpRuntimeHandle) -> None:
         await handle.exit_stack.aclose()
 
+    def _stdio_spec(self, server: Any) -> str:
+        first_arg = server.args[0] if server.args else ""
+        return f"{server.command}:{first_arg}"
+
 
 class McpRuntimeManager:
     def __init__(
@@ -130,12 +144,19 @@ class McpRuntimeManager:
         *,
         repository_factory: Callable[[], Any],
         probe: McpProbe | None = None,
+        operation_timeout_seconds: float | None = 10.0,
     ) -> None:
         self._repository_factory = repository_factory
         self._probe = probe or StdioMcpProbe()
+        self._operation_timeout_seconds = operation_timeout_seconds
         self._handles: dict[UUID, Any] = {}
+        self._locks: dict[UUID, asyncio.Lock] = {}
 
     async def start(self, server_id: UUID) -> McpLifecycleResponse:
+        async with self._lock_for(server_id):
+            return await self._start_locked(server_id)
+
+    async def _start_locked(self, server_id: UUID) -> McpLifecycleResponse:
         async with self._repository_context() as repository:
             server = await repository.require_server(server_id)
             self._require_supported_transport(server)
@@ -154,7 +175,7 @@ class McpRuntimeManager:
             )
             handle = None
             try:
-                handle, tools = await self._probe.start(server)
+                handle, tools = await self._run_operation(self._probe.start(server))
                 await repository.replace_tools(server_id, tools)
                 await repository.update_runtime_status(
                     server_id,
@@ -164,11 +185,11 @@ class McpRuntimeManager:
                 )
             except Exception as exc:
                 if handle is not None:
-                    await self._probe.stop(handle)
+                    await self._run_operation(self._probe.stop(handle))
                 await repository.update_runtime_status(
                     server_id,
                     runtime_status=McpServerRuntimeStatus.error.value,
-                    last_error=str(exc),
+                    last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
                     checked=True,
                 )
                 await repository.commit()
@@ -179,6 +200,10 @@ class McpRuntimeManager:
             return await self._response(repository, server_id)
 
     async def stop(self, server_id: UUID) -> McpLifecycleResponse:
+        async with self._lock_for(server_id):
+            return await self._stop_locked(server_id)
+
+    async def _stop_locked(self, server_id: UUID) -> McpLifecycleResponse:
         async with self._repository_context() as repository:
             await repository.update_desired_state(
                 server_id,
@@ -190,7 +215,7 @@ class McpRuntimeManager:
             )
             handle = self._handles.pop(server_id, None)
             if handle is not None:
-                await self._probe.stop(handle)
+                await self._run_operation(self._probe.stop(handle))
             await repository.update_runtime_status(
                 server_id,
                 runtime_status=McpServerRuntimeStatus.stopped.value,
@@ -200,8 +225,9 @@ class McpRuntimeManager:
             return await self._response(repository, server_id)
 
     async def restart(self, server_id: UUID) -> McpLifecycleResponse:
-        await self.stop(server_id)
-        return await self.start(server_id)
+        async with self._lock_for(server_id):
+            await self._stop_locked(server_id)
+            return await self._start_locked(server_id)
 
     async def start_enabled_servers(self) -> None:
         async with self._repository_context() as repository:
@@ -210,10 +236,31 @@ class McpRuntimeManager:
         for server in servers:
             try:
                 await self.start(server.id)
-            except Exception:
-                continue
+            except Exception as exc:
+                logger.warning(
+                    "Failed to start MCP server during startup.",
+                    extra={"server_id": str(server.id), "server_name": server.name},
+                    exc_info=True,
+                )
+                async with self._repository_context() as repository:
+                    current = await repository.require_server(server.id)
+                    if (
+                        current.runtime_status != McpServerRuntimeStatus.error.value
+                        or not current.last_error
+                    ):
+                        await repository.update_runtime_status(
+                            server.id,
+                            runtime_status=McpServerRuntimeStatus.error.value,
+                            last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                            checked=True,
+                        )
+                        await repository.commit()
 
     async def check(self, server_id: UUID) -> McpLifecycleResponse:
+        async with self._lock_for(server_id):
+            return await self._check_locked(server_id)
+
+    async def _check_locked(self, server_id: UUID) -> McpLifecycleResponse:
         async with self._repository_context() as repository:
             server = await repository.require_server(server_id)
             self._require_supported_transport(server)
@@ -222,9 +269,11 @@ class McpRuntimeManager:
             temporary_handle = None
             try:
                 if handle is None:
-                    temporary_handle, tools = await self._probe.start(server)
+                    temporary_handle, tools = await self._run_operation(
+                        self._probe.start(server)
+                    )
                 else:
-                    tools = await self._probe.list_tools(handle)
+                    tools = await self._run_operation(self._probe.list_tools(handle))
 
                 await repository.replace_tools(server_id, tools)
                 await repository.update_runtime_status(
@@ -238,14 +287,14 @@ class McpRuntimeManager:
                 await repository.update_runtime_status(
                     server_id,
                     runtime_status=McpServerRuntimeStatus.error.value,
-                    last_error=str(exc),
+                    last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
                     checked=True,
                 )
                 await repository.commit()
                 raise
             finally:
                 if temporary_handle is not None:
-                    await self._probe.stop(temporary_handle)
+                    await self._run_operation(self._probe.stop(temporary_handle))
             return await self._response(repository, server_id)
 
     async def shutdown(self) -> None:
@@ -253,12 +302,12 @@ class McpRuntimeManager:
             async with self._repository_context() as repository:
                 self._handles.pop(server_id, None)
                 try:
-                    await self._probe.stop(handle)
+                    await self._run_operation(self._probe.stop(handle))
                 except Exception as exc:
                     await repository.update_runtime_status(
                         server_id,
                         runtime_status=McpServerRuntimeStatus.error.value,
-                        last_error=str(exc),
+                        last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
                         checked=True,
                     )
                     await repository.commit()
@@ -289,6 +338,27 @@ class McpRuntimeManager:
     def _require_supported_transport(self, server: Any) -> None:
         if server.transport != "stdio":
             raise UnsupportedMcpTransportError(server.transport)
+
+    def is_running(self, server_id: UUID) -> bool:
+        return server_id in self._handles
+
+    def _lock_for(self, server_id: UUID) -> asyncio.Lock:
+        lock = self._locks.get(server_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[server_id] = lock
+        return lock
+
+    async def _run_operation(self, operation):
+        if self._operation_timeout_seconds is None:
+            return await operation
+        try:
+            return await asyncio.wait_for(
+                operation,
+                timeout=self._operation_timeout_seconds,
+            )
+        except TimeoutError as exc:
+            raise TimeoutError(MCP_OPERATION_TIMEOUT_MESSAGE) from exc
 
     @asynccontextmanager
     async def _repository_context(self) -> AsyncIterator[McpRepository]:

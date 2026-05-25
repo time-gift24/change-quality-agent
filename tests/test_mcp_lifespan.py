@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from app import main
@@ -7,7 +9,7 @@ from app.services.mcp_runtime import McpRuntimeManager
 
 class FakeStartupServer:
     def __init__(self, name: str) -> None:
-        self.id = name
+        self.id = uuid4()
         self.name = name
         self.transport = "stdio"
         self.command = "uvx"
@@ -87,11 +89,28 @@ async def test_runtime_start_enabled_servers_starts_startup_servers() -> None:
 
     await manager.start_enabled_servers()
 
-    assert probe.started == ["server-1", "server-2"]
+    assert probe.started == [server.id for server in repository.servers]
     assert [server.runtime_status for server in repository.servers] == [
         McpServerRuntimeStatus.running.value,
         McpServerRuntimeStatus.running.value,
     ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_start_enabled_servers_records_early_start_failures() -> None:
+    repository = FakeStartupRepository()
+    repository.servers = [FakeStartupServer("http-server")]
+    repository.servers[0].transport = "http"
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=FakeProbe(),
+    )
+
+    await manager.start_enabled_servers()
+
+    assert repository.servers[0].runtime_status == McpServerRuntimeStatus.error.value
+    assert repository.servers[0].last_error == "http"
+    assert repository.commits == 1
 
 
 @pytest.mark.asyncio

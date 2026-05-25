@@ -74,7 +74,10 @@ async def test_stdio_probe_discovers_tools_from_real_mcp_server() -> None:
     repository = IntegrationRepository(server)
     manager = McpRuntimeManager(
         repository_factory=lambda: repository,
-        probe=StdioMcpProbe(allowed_commands={sys.executable}),
+        probe=StdioMcpProbe(
+            allowed_commands={sys.executable},
+            allowed_stdio_specs={f"{sys.executable}:{server_script}"},
+        ),
     )
 
     try:

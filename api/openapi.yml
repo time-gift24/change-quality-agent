@@ -179,6 +179,8 @@ paths:
         - mcp
       summary: List MCP servers
       operationId: listMcpServers
+      security:
+        - McpAdminToken: []
       responses:
         "200":
           description: MCP servers with redacted config values.
@@ -193,6 +195,8 @@ paths:
         - mcp
       summary: Create an MCP server configuration
       operationId: createMcpServer
+      security:
+        - McpAdminToken: []
       requestBody:
         required: true
         content:
@@ -206,6 +210,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/McpServerDetail"
+        "409":
+          description: An MCP server with this name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}:
@@ -214,6 +224,8 @@ paths:
         - mcp
       summary: Get MCP server details
       operationId: getMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -232,6 +244,8 @@ paths:
         - mcp
       summary: Update an MCP server configuration
       operationId: updateMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       requestBody:
@@ -262,6 +276,8 @@ paths:
         - mcp
       summary: Delete an MCP server configuration
       operationId: deleteMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -277,6 +293,8 @@ paths:
         - mcp
       summary: Start an MCP server
       operationId: startMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -288,6 +306,8 @@ paths:
                 $ref: "#/components/schemas/McpLifecycleResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/stop:
@@ -296,6 +316,8 @@ paths:
         - mcp
       summary: Stop an MCP server
       operationId: stopMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -307,6 +329,8 @@ paths:
                 $ref: "#/components/schemas/McpLifecycleResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/restart:
@@ -315,6 +339,8 @@ paths:
         - mcp
       summary: Restart an MCP server
       operationId: restartMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -326,6 +352,8 @@ paths:
                 $ref: "#/components/schemas/McpLifecycleResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
         "422":
           $ref: "#/components/responses/ValidationError"
   /api/mcp/servers/{server_id}/check:
@@ -334,6 +362,8 @@ paths:
         - mcp
       summary: Check an MCP server and refresh tools
       operationId: checkMcpServer
+      security:
+        - McpAdminToken: []
       parameters:
         - $ref: "#/components/parameters/McpServerId"
       responses:
@@ -345,9 +375,16 @@ paths:
                 $ref: "#/components/schemas/McpLifecycleResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
         "422":
           $ref: "#/components/responses/ValidationError"
 components:
+  securitySchemes:
+    McpAdminToken:
+      type: apiKey
+      in: header
+      name: X-MCP-Admin-Token
   parameters:
     SopId:
       name: sop_id
@@ -385,7 +422,7 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     BadGateway:
-      description: SOP client failure before a run is created.
+      description: Upstream dependency or lifecycle failure before completion.
       content:
         application/json:
           schema:

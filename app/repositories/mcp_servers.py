@@ -53,8 +53,7 @@ class McpServerRepository:
     async def update_server(self, server_id: UUID, **values: Any) -> McpServer:
         server = await self.require_server(server_id)
         for key, value in values.items():
-            if value is not None:
-                setattr(server, key, value)
+            setattr(server, key, value)
         await self._session.flush()
         return server
 

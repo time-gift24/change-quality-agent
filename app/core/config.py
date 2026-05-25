@@ -40,6 +40,10 @@ class Settings(BaseSettings):
             )
         ]
     )
+    mcp_admin_token: str | None = None
+    mcp_allowed_stdio_commands: list[str] = Field(default_factory=list)
+    mcp_allowed_stdio_specs: list[str] = Field(default_factory=list)
+    mcp_operation_timeout_seconds: float = 10.0
 
     @classmethod
     def settings_customise_sources(

@@ -1,10 +1,16 @@
+import asyncio
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 
 from app.schemas.mcp import McpDesiredState, McpServerRuntimeStatus
-from app.services.mcp_runtime import McpRuntimeManager, UnsupportedMcpTransportError
+from app.services.mcp_runtime import (
+    McpCommandNotAllowedError,
+    McpRuntimeManager,
+    StdioMcpProbe,
+    UnsupportedMcpTransportError,
+)
 
 
 class FakeServer:
@@ -116,6 +122,19 @@ class FailingListProbe(FakeProbe):
         raise RuntimeError("list failed")
 
 
+class SlowProbe(FakeProbe):
+    async def start(self, server):
+        self.started += 1
+        await asyncio.sleep(0.01)
+        return object(), []
+
+
+class HangingProbe(FakeProbe):
+    async def start(self, server):
+        await asyncio.sleep(1)
+        return object(), []
+
+
 @pytest.mark.asyncio
 async def test_start_sets_running_and_stores_tools() -> None:
     server = FakeServer()
@@ -131,6 +150,40 @@ async def test_start_sets_running_and_stores_tools() -> None:
     assert repository.tools[0]["name"] == "search"
     assert probe.started == 1
     assert repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_start_only_starts_one_handle() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = SlowProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    statuses = await asyncio.gather(manager.start(server.id), manager.start(server.id))
+
+    assert [status.runtime_status for status in statuses] == [
+        McpServerRuntimeStatus.running,
+        McpServerRuntimeStatus.running,
+    ]
+    assert probe.started == 1
+
+
+@pytest.mark.asyncio
+async def test_start_timeout_records_error_status() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=HangingProbe(),
+        operation_timeout_seconds=0.01,
+    )
+
+    with pytest.raises(TimeoutError):
+        await manager.start(server.id)
+
+    assert server.runtime_status == McpServerRuntimeStatus.error.value
+    assert server.last_error == "MCP operation timed out."
+    assert server.last_checked_at is not None
 
 
 @pytest.mark.asyncio
@@ -191,6 +244,20 @@ async def test_start_failure_records_error_status() -> None:
     assert server.last_error == "boom"
     assert server.last_checked_at is not None
     assert repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_stdio_probe_rejects_unregistered_command_args() -> None:
+    server = FakeServer()
+    server.command = "uvx"
+    server.args = ["mcp-server-filesystem"]
+    probe = StdioMcpProbe(
+        allowed_commands={"uvx"},
+        allowed_stdio_specs={"uvx:mcp-server-github"},
+    )
+
+    with pytest.raises(McpCommandNotAllowedError):
+        await probe.start(server)
 
 
 @pytest.mark.asyncio

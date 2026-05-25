@@ -12,3 +12,7 @@ checks and observing their progress.
 - Streams persisted run events for replay and progress observation.
 - Uses an in-process v1 runner while worker leases, checkpoint resume, and the
   real SOP client remain future integration points.
+- Manages MCP server configuration and stdio runtime lifecycle behind the
+  `X-MCP-Admin-Token` header. Set `mcp_admin_token`, allow commands with
+  `mcp_allowed_stdio_commands`, and pin launchable command/first-arg pairs with
+  `mcp_allowed_stdio_specs` such as `uvx:mcp-server-filesystem`.

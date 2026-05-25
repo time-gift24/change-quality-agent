@@ -7,7 +7,35 @@ def test_openapi_includes_mcp_server_routes() -> None:
     spec = yaml.safe_load(Path("api/openapi.yml").read_text())
     paths = spec["paths"]
 
-    assert "/api/mcp/servers" in paths
-    assert "/api/mcp/servers/{server_id}" in paths
-    assert "/api/mcp/servers/{server_id}/start" in paths
-    assert "/api/mcp/servers/{server_id}/check" in paths
+    expected_paths = {
+        "/api/mcp/servers": {"get", "post"},
+        "/api/mcp/servers/{server_id}": {"get", "patch", "delete"},
+        "/api/mcp/servers/{server_id}/start": {"post"},
+        "/api/mcp/servers/{server_id}/stop": {"post"},
+        "/api/mcp/servers/{server_id}/restart": {"post"},
+        "/api/mcp/servers/{server_id}/check": {"post"},
+    }
+
+    for path, methods in expected_paths.items():
+        assert path in paths
+        assert methods <= set(paths[path])
+
+    schemas = spec["components"]["schemas"]
+    assert {
+        "McpServerCreate",
+        "McpServerUpdate",
+        "McpServerSummary",
+        "McpServerDetail",
+        "McpLifecycleResponse",
+    } <= set(schemas)
+    assert spec["components"]["securitySchemes"]["McpAdminToken"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-MCP-Admin-Token",
+    }
+    assert paths["/api/mcp/servers"]["get"]["security"] == [
+        {"McpAdminToken": []}
+    ]
+
+    responses = paths["/api/mcp/servers/{server_id}/start"]["post"]["responses"]
+    assert "502" in responses

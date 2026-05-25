@@ -3,10 +3,14 @@ from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_mcp_repository, get_mcp_runtime_manager
+from app.core.config import settings
 from app.main import app
 from app.schemas.mcp import McpLifecycleResponse
+
+ADMIN_HEADERS = {"x-mcp-admin-token": "test-token"}
 
 
 class FakeTool:
@@ -39,6 +43,8 @@ class FakeRepository:
         self.server = server
         self.deleted = False
         self.committed = False
+        self.raise_integrity_on_create = False
+        self.raise_integrity_on_update = False
 
     async def list_servers(self):
         return [self.server]
@@ -47,6 +53,8 @@ class FakeRepository:
         return self.server if server_id == self.server.id else None
 
     async def create_server(self, **values):
+        if self.raise_integrity_on_create:
+            raise IntegrityError("insert", {}, Exception("duplicate"))
         for key, value in values.items():
             setattr(self.server, key, value)
         self.server.runtime_status = "unknown"
@@ -54,9 +62,10 @@ class FakeRepository:
         return self.server
 
     async def update_server(self, server_id, **values):
+        if self.raise_integrity_on_update:
+            raise IntegrityError("update", {}, Exception("duplicate"))
         for key, value in values.items():
-            if value is not None:
-                setattr(self.server, key, value)
+            setattr(self.server, key, value)
         return self.server
 
     async def delete_server(self, server_id):
@@ -70,13 +79,19 @@ class FakeRuntimeManager:
     def __init__(self) -> None:
         self.started = []
         self.stopped = []
+        self.running_ids = set()
+        self.start_error: Exception | None = None
 
     async def start(self, server_id):
+        if self.start_error is not None:
+            raise self.start_error
         self.started.append(server_id)
+        self.running_ids.add(server_id)
         return _lifecycle_response(server_id)
 
     async def stop(self, server_id):
         self.stopped.append(server_id)
+        self.running_ids.discard(server_id)
         return _lifecycle_response(server_id, desired_state="stopped")
 
     async def restart(self, server_id):
@@ -84,6 +99,9 @@ class FakeRuntimeManager:
 
     async def check(self, server_id):
         return _lifecycle_response(server_id)
+
+    def is_running(self, server_id):
+        return server_id in self.running_ids
 
 
 def _lifecycle_response(
@@ -103,6 +121,8 @@ def _lifecycle_response(
 
 @pytest.fixture(autouse=True)
 def overrides():
+    old_admin_token = settings.mcp_admin_token
+    settings.mcp_admin_token = "test-token"
     server = FakeServer()
     repository = FakeRepository(server)
     runtime = FakeRuntimeManager()
@@ -110,6 +130,18 @@ def overrides():
     app.dependency_overrides[get_mcp_runtime_manager] = lambda: runtime
     yield server, repository, runtime
     app.dependency_overrides.clear()
+    settings.mcp_admin_token = old_admin_token
+
+
+@pytest.mark.asyncio
+async def test_mcp_admin_routes_require_admin_token(overrides) -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/mcp/servers")
+
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -118,7 +150,7 @@ async def test_list_mcp_servers_redacts_env_and_counts_tools(overrides) -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/mcp/servers")
+        response = await client.get("/api/mcp/servers", headers=ADMIN_HEADERS)
 
     assert response.status_code == 200
     body = response.json()
@@ -134,7 +166,10 @@ async def test_get_mcp_server_returns_tools(overrides) -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.get(f"/api/mcp/servers/{server.id}")
+        response = await client.get(
+            f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
+        )
 
     assert response.status_code == 200
     body = response.json()
@@ -151,6 +186,7 @@ async def test_create_mcp_server_persists_and_redacts_response(overrides) -> Non
     ) as client:
         response = await client.post(
             "/api/mcp/servers",
+            headers=ADMIN_HEADERS,
             json={
                 "name": "github",
                 "transport": "stdio",
@@ -171,6 +207,27 @@ async def test_create_mcp_server_persists_and_redacts_response(overrides) -> Non
 
 
 @pytest.mark.asyncio
+async def test_create_duplicate_mcp_server_name_returns_conflict(overrides) -> None:
+    _, repository, _ = overrides
+    repository.raise_integrity_on_create = True
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/mcp/servers",
+            headers=ADMIN_HEADERS,
+            json={
+                "name": "filesystem",
+                "transport": "stdio",
+                "command": "uvx",
+            },
+        )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_update_running_mcp_server_returns_conflict(overrides) -> None:
     server, _, _ = overrides
     async with AsyncClient(
@@ -179,6 +236,27 @@ async def test_update_running_mcp_server_returns_conflict(overrides) -> None:
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
+            json={"command": "node"},
+        )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_update_live_handle_returns_conflict_even_when_status_is_error(
+    overrides,
+) -> None:
+    server, _, runtime = overrides
+    server.runtime_status = "error"
+    runtime.running_ids.add(server.id)
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
             json={"command": "node"},
         )
 
@@ -195,6 +273,7 @@ async def test_update_stopped_mcp_server_validates_merged_config(overrides) -> N
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
             json={"command": "   "},
         )
 
@@ -211,6 +290,7 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
             json={"command": " node "},
         )
 
@@ -221,17 +301,60 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_stopped_mcp_server_can_clear_nullable_config(
+    overrides,
+) -> None:
+    server, repository, _ = overrides
+    server.runtime_status = "stopped"
+    server.url = "https://example.com/mcp"
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
+            json={"url": None},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["url"] is None
+    assert server.url is None
+    assert repository.committed is True
+
+
+@pytest.mark.asyncio
 async def test_start_mcp_server_returns_runtime_status(overrides) -> None:
     server, _, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.post(f"/api/mcp/servers/{server.id}/start")
+        response = await client.post(
+            f"/api/mcp/servers/{server.id}/start",
+            headers=ADMIN_HEADERS,
+        )
 
     assert response.status_code == 200
     assert response.json()["runtime_status"] == "running"
     assert runtime.started == [server.id]
+
+
+@pytest.mark.asyncio
+async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
+    server, _, runtime = overrides
+    runtime.start_error = RuntimeError("token=secret")
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/mcp/servers/{server.id}/start",
+            headers=ADMIN_HEADERS,
+        )
+
+    assert response.status_code == 502
+    assert "secret" not in response.text
 
 
 @pytest.mark.asyncio
@@ -241,7 +364,29 @@ async def test_delete_running_mcp_server_stops_then_deletes(overrides) -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.delete(f"/api/mcp/servers/{server.id}")
+        response = await client.delete(
+            f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
+        )
+
+    assert response.status_code == 204
+    assert runtime.stopped == [server.id]
+    assert repository.deleted is True
+
+
+@pytest.mark.asyncio
+async def test_delete_live_handle_stops_even_when_status_is_error(overrides) -> None:
+    server, repository, runtime = overrides
+    server.runtime_status = "error"
+    runtime.running_ids.add(server.id)
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.delete(
+            f"/api/mcp/servers/{server.id}",
+            headers=ADMIN_HEADERS,
+        )
 
     assert response.status_code == 204
     assert runtime.stopped == [server.id]
