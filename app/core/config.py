@@ -1,5 +1,10 @@
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 
 class EnvironmentConfig(BaseModel):
@@ -17,7 +22,11 @@ class EnvironmentConfig(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_nested_delimiter="__", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_nested_delimiter="__",
+        extra="ignore",
+        yaml_file="config.yaml",
+    )
 
     database_url: str = (
         "postgresql+asyncpg://postgres:postgres@localhost:5432/"
@@ -33,6 +42,23 @@ class Settings(BaseSettings):
             )
         ]
     )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            env_settings,
+            YamlConfigSettingsSource(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     def get_environment(self, key: str) -> EnvironmentConfig:
         for environment in self.environments:
