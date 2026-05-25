@@ -16,6 +16,11 @@ type UseRunEventsOptions = {
   onTerminal?: () => void;
 };
 
+type SummaryErrorState = {
+  runId: string;
+  error: Error;
+};
+
 export type UseRunResult = {
   summary: RunSummary | null;
   summaryError: Error | null;
@@ -31,7 +36,9 @@ export function useRun(runId: string): UseRunResult {
   const [eventsInitialAfter, setEventsInitialAfter] = useState<
     number | undefined
   >();
-  const [summaryError, setSummaryError] = useState<Error | null>(null);
+  const [summaryError, setSummaryError] = useState<SummaryErrorState | null>(
+    null,
+  );
   const [summaryLoading, setSummaryLoading] = useState(true);
 
   activeRunIdRef.current = runId;
@@ -66,7 +73,10 @@ export function useRun(runId: string): UseRunResult {
         return;
       }
 
-      setSummaryError(asError(error));
+      setSummaryError({
+        runId: requestedRunId,
+        error: asError(error),
+      });
     } finally {
       if (
         summaryRequestRef.current !== requestId ||
@@ -82,6 +92,7 @@ export function useRun(runId: string): UseRunResult {
   useEffect(() => {
     setSummary(null);
     setEventsInitialAfter(undefined);
+    setSummaryError(null);
     setSummaryLoading(true);
   }, [runId]);
 
@@ -89,18 +100,28 @@ export function useRun(runId: string): UseRunResult {
     void refreshSummary();
   }, [refreshSummary]);
 
-  const events = useRunEvents(runId, eventsInitialAfter, {
-    enabled:
-      summary?.run_id === runId && eventsInitialAfter !== undefined,
+  const visibleSummary = summary?.run_id === runId ? summary : null;
+  const visibleSummaryError =
+    summaryError?.runId === runId ? summaryError.error : null;
+  const streamInitialAfter =
+    visibleSummary && eventsInitialAfter !== undefined
+      ? eventsInitialAfter
+      : undefined;
+  const streamEnabled =
+    visibleSummary !== null && streamInitialAfter !== undefined;
+  const events = useRunEvents(runId, streamInitialAfter, {
+    enabled: streamEnabled,
     onTerminal: () => {
       void refreshSummary();
     },
   });
 
   return {
-    summary,
-    summaryError,
-    summaryLoading,
+    summary: visibleSummary,
+    summaryError: visibleSummaryError,
+    summaryLoading:
+      summaryLoading ||
+      (visibleSummary === null && visibleSummaryError === null),
     refreshSummary,
     events,
   };
@@ -205,6 +226,10 @@ export function useRunEvents(
       closeCurrentSource();
     };
   }, [enabled, initialAfter, runId]);
+
+  if (!enabled) {
+    return initialState(initialAfter);
+  }
 
   return state;
 }

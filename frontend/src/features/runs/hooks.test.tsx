@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useRun, useRunEvents } from "./hooks";
@@ -157,6 +157,31 @@ describe("run SSE hooks", () => {
     expect(result.current.connectionStatus).toBe("idle");
   });
 
+  it("does not expose stale stream state during the disabled render", async () => {
+    const snapshots: RunViewSnapshot[] = [];
+
+    function Capture({ enabled }: { enabled: boolean }) {
+      snapshots.push(useRunEvents("run-1", 0, { enabled }));
+      return null;
+    }
+
+    const { rerender } = render(<Capture enabled />);
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emit(event({ sequence: 1 }));
+    });
+
+    snapshots.length = 0;
+    rerender(<Capture enabled={false} />);
+
+    expect(snapshots[0]?.events).toEqual([]);
+    expect(snapshots[0]?.connectionStatus).toBe("idle");
+  });
+
   it("ignores stale summary responses after runId changes", async () => {
     const requests: Array<Deferred<Response>> = [];
     const fetchMock = vi.fn(() => {
@@ -207,6 +232,53 @@ describe("run SSE hooks", () => {
 
     expect(result.current.summary?.run_id).toBe("run-b");
     expect(result.current.events.latestSequence).toBe(7);
+  });
+
+  it("does not expose stale run data during the runId switch render", async () => {
+    const requests: Array<Deferred<Response>> = [];
+    const snapshots: UseRunSnapshot[] = [];
+    const fetchMock = vi.fn(() => {
+      const request = deferred<Response>();
+      requests.push(request);
+      return request.promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    function Capture({ runId }: { runId: string }) {
+      snapshots.push(useRun(runId));
+      return null;
+    }
+
+    const { rerender } = render(<Capture runId="run-a" />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/runs/run-a",
+        expect.any(Object),
+      );
+    });
+
+    await act(async () => {
+      requests[0]?.resolve(
+        jsonResponse(summary({ run_id: "run-a", latest_sequence: 7 })),
+      );
+    });
+
+    await waitFor(() => {
+      expect(snapshots.at(-1)?.summary?.run_id).toBe("run-a");
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emit(event({ sequence: 8 }));
+    });
+
+    snapshots.length = 0;
+    rerender(<Capture runId="run-b" />);
+
+    expect(snapshots[0]?.summary).toBeNull();
+    expect(snapshots[0]?.summaryLoading).toBe(true);
+    expect(snapshots[0]?.events.events).toEqual([]);
+    expect(snapshots[0]?.events.latestSequence).toBe(0);
   });
 
   it("terminal done closes stream and triggers summary refresh", async () => {
@@ -346,6 +418,9 @@ type Deferred<T> = {
   promise: Promise<T>;
   resolve: (value: T) => void;
 };
+
+type UseRunSnapshot = ReturnType<typeof useRun>;
+type RunViewSnapshot = ReturnType<typeof useRunEvents>;
 
 function deferred<T>(): Deferred<T> {
   let resolve: (value: T) => void = () => {};
