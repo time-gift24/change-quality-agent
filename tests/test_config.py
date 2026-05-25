@@ -3,6 +3,56 @@ import pytest
 from app.core.config import EnvironmentConfig, Settings
 
 
+def test_settings_load_config_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    (tmp_path / "config.yaml").write_text(
+        "\n".join(
+            [
+                "database_url: postgresql+asyncpg://config:config@db:5432/config_db",
+                "environments:",
+                "  - key: staging",
+                "    name_zh: 预发",
+                "    name_en: Staging",
+                "    sop_client_options:",
+                "      base_url: https://staging.example.test",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    settings = Settings()
+
+    assert settings.database_url == (
+        "postgresql+asyncpg://config:config@db:5432/config_db"
+    )
+    assert settings.environments == [
+        EnvironmentConfig(
+            key="staging",
+            name_zh="预发",
+            name_en="Staging",
+            sop_client_options={"base_url": "https://staging.example.test"},
+        )
+    ]
+
+
+def test_environment_variables_override_config_yaml(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql+asyncpg://env:env@db:5432/env_db"
+    )
+    (tmp_path / "config.yaml").write_text(
+        "database_url: postgresql+asyncpg://config:config@db:5432/config_db\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings()
+
+    assert settings.database_url == "postgresql+asyncpg://env:env@db:5432/env_db"
+
+
 def test_environment_lookup_by_key() -> None:
     settings = Settings(
         environments=[
