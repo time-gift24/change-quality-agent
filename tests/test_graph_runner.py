@@ -23,6 +23,7 @@ class FakeRepository:
         self.events = []
         self.terminal_status = None
         self.raw_graph_output = None
+        self.terminal_kwargs = None
         self.committed = False
 
     async def mark_running(self, run_id):
@@ -38,7 +39,8 @@ class FakeRepository:
     async def mark_terminal(self, run_id, status, **kwargs):
         assert run_id == self.run.id
         self.terminal_status = status
-        self.raw_graph_output = kwargs["raw_graph_output"]
+        self.terminal_kwargs = kwargs
+        self.raw_graph_output = kwargs.get("raw_graph_output")
         return self.run
 
     async def commit(self) -> None:
@@ -53,7 +55,36 @@ async def test_graph_runner_writes_done_event() -> None:
     await run_sop_quality_graph(run.id, repository)
 
     assert repository.marked_running is True
-    assert any(event["event_type"] in {"custom", "updates"} for event in repository.events)
+    assert [event["event_type"] for event in repository.events] == [
+        "custom",
+        "updates",
+        "done",
+    ]
     assert repository.raw_graph_output == {"status": "mock_success"}
     assert repository.terminal_status == RunStatus.success
+    assert repository.committed is True
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_persists_error_event(monkeypatch) -> None:
+    async def fail_graph(*, run_id, sop_snapshot):
+        raise ValueError("invalid SOP payload")
+
+    monkeypatch.setattr("app.services.sop_quality.run_mock_sop_quality_graph", fail_graph)
+    run = FakeRun()
+    repository = FakeRepository(run)
+
+    result = await run_sop_quality_graph(run.id, repository)
+
+    assert result["status"] == "error"
+    assert repository.terminal_status == RunStatus.error
+    assert repository.terminal_kwargs["error"] == {
+        "type": "ValueError",
+        "message": "invalid SOP payload",
+    }
+    assert repository.events[-1]["event_type"] == "error"
+    assert repository.events[-1]["payload"] == {
+        "type": "ValueError",
+        "message": "invalid SOP payload",
+    }
     assert repository.committed is True

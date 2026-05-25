@@ -7,8 +7,8 @@ def run_to_summary(run: Any) -> RunSummary:
     metadata = run.metadata_
     return RunSummary(
         run_id=run.id,
-        subject_type=metadata["subject_type"],
-        subject_id=metadata["subject_id"],
+        subject_type=getattr(run, "subject_type", None) or metadata["subject_type"],
+        subject_id=getattr(run, "subject_id", None) or metadata["subject_id"],
         status=RunStatus(run.status),
         current_node=run.current_node,
         completed_nodes=list(run.completed_nodes),

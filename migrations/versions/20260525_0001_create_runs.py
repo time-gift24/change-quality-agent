@@ -24,6 +24,9 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("thread_id", sa.Text(), nullable=False),
         sa.Column("assistant_id", sa.Text(), nullable=False),
+        sa.Column("subject_type", sa.Text(), nullable=False),
+        sa.Column("subject_id", sa.Text(), nullable=False),
+        sa.Column("env_key", sa.Text(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("active_conflict_key", sa.Text(), nullable=True),
         sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
@@ -77,6 +80,20 @@ def upgrade() -> None:
         unique=True,
         postgresql_where=sa.text("status IN ('pending', 'running')"),
     )
+    op.create_index(
+        "uq_runs_active_sop_subject_env",
+        "runs",
+        ["subject_type", "subject_id", "env_key"],
+        unique=True,
+        postgresql_where=sa.text(
+            "status IN ('pending', 'running') AND subject_type = 'sop'"
+        ),
+    )
+    op.create_index(
+        "ix_runs_subject_history",
+        "runs",
+        ["subject_type", "subject_id", "env_key", "created_at"],
+    )
 
     op.create_table(
         "run_events",
@@ -109,5 +126,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("uq_run_events_run_sequence", table_name="run_events")
     op.drop_table("run_events")
+    op.drop_index("ix_runs_subject_history", table_name="runs")
+    op.drop_index("uq_runs_active_sop_subject_env", table_name="runs")
     op.drop_index("uq_runs_active_conflict_key", table_name="runs")
     op.drop_table("runs")

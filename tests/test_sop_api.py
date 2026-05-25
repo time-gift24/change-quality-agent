@@ -9,6 +9,7 @@ from app.main import app
 from app.repositories.runs import ActiveRunExistsError
 from app.schemas.runs import RunStatus
 from app.schemas.sop import SopSnapshot
+from app.services.sop_client import SopClientError, SopNotFoundError
 
 
 class FakeSession:
@@ -28,6 +29,16 @@ class FakeSopClient:
             updated_at=None,
             payload={"id": sop_id, "title": f"Mock SOP {sop_id}"},
         )
+
+
+class MissingSopClient:
+    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
+        raise SopNotFoundError(sop_id)
+
+
+class FailingSopClient:
+    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
+        raise SopClientError("upstream unavailable")
 
 
 class FakeRun:
@@ -78,8 +89,16 @@ class FakeRunRepository:
 @pytest.fixture(autouse=True)
 def clear_overrides():
     app.dependency_overrides.clear()
+    app.state.scheduled_run_ids = []
+
+    async def fake_executor(run_id):
+        app.state.scheduled_run_ids.append(str(run_id))
+
+    app.state.sop_run_executor = fake_executor
     yield
     app.dependency_overrides.clear()
+    del app.state.scheduled_run_ids
+    del app.state.sop_run_executor
 
 
 def make_session_override(session: FakeSession):
@@ -136,6 +155,41 @@ async def test_start_sop_run_returns_accepted() -> None:
     assert response.status_code == 202
     assert response.json()["status"] == "pending"
     assert session.commits == 1
+    assert app.state.scheduled_run_ids == [response.json()["run_id"]]
+
+
+@pytest.mark.asyncio
+async def test_start_sop_run_returns_404_when_sop_missing() -> None:
+    repository = FakeRunRepository()
+    app.dependency_overrides[get_session] = make_session_override(FakeSession())
+    app.dependency_overrides[get_sop_client] = MissingSopClient
+    app.dependency_overrides[get_run_repository] = lambda: repository
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post("/api/sop/missing/runs?env=dev")
+
+    assert response.status_code == 404
+    assert repository.created is False
+
+
+@pytest.mark.asyncio
+async def test_start_sop_run_returns_502_when_sop_client_fails() -> None:
+    repository = FakeRunRepository()
+    app.dependency_overrides[get_session] = make_session_override(FakeSession())
+    app.dependency_overrides[get_sop_client] = FailingSopClient
+    app.dependency_overrides[get_run_repository] = lambda: repository
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post("/api/sop/release-checklist/runs?env=dev")
+
+    assert response.status_code == 502
+    assert repository.created is False
 
 
 @pytest.mark.asyncio

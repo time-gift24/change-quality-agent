@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Annotated
 from uuid import UUID
@@ -7,9 +8,18 @@ from fastapi.responses import StreamingResponse
 
 from app.api.deps import RunRepositoryDep
 from app.api.v1.run_views import run_to_summary
-from app.schemas.runs import RunDebug, RunDetail
+from app.schemas.runs import RunDebug, RunDetail, RunStatus
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
+
+SSE_POLL_INTERVAL_SECONDS = 0.5
+TERMINAL_EVENT_TYPES = {"done", "error"}
+TERMINAL_RUN_STATUSES = {
+    RunStatus.success.value,
+    RunStatus.error.value,
+    RunStatus.timeout.value,
+    RunStatus.interrupted.value,
+}
 
 
 @router.get("/{run_id}")
@@ -38,11 +48,23 @@ async def get_run_events(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     async def event_stream():
-        # v1 replays durable events. An in-process broadcast can be added later
+        # v1 polls durable events. An in-process broadcast can be added later
         # for lower latency without changing the public SSE envelope.
-        events = await repository.get_events_after(run_id, after=after)
-        for event in events:
-            yield format_sse(event_to_dict(event))
+        cursor = after
+        while True:
+            events = await repository.get_events_after(run_id, after=cursor)
+            for event in events:
+                cursor = max(cursor, int(event.sequence))
+                yield format_sse(event_to_dict(event))
+                if event.type in TERMINAL_EVENT_TYPES:
+                    return
+            if events:
+                continue
+
+            current_run = await repository.get_run(run_id)
+            if current_run is None or current_run.status in TERMINAL_RUN_STATUSES:
+                return
+            await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -54,6 +76,7 @@ def format_sse(event: dict[str, object]) -> str:
 
 def event_to_dict(event) -> dict[str, object]:
     return {
+        "run_id": event.run_id,
         "sequence": event.sequence,
         "type": event.type,
         "node": event.node,
@@ -75,7 +98,7 @@ def _build_debug(run) -> RunDebug:
 
 
 def _raw_last_event(run) -> dict[str, object] | None:
-    events = getattr(run, "events", [])
+    events = getattr(run, "__dict__", {}).get("events", [])
     if not events:
         return None
     latest_event = max(events, key=lambda event: event.sequence)

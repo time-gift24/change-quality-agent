@@ -27,6 +27,23 @@ class Run(Base):
             unique=True,
             postgresql_where=text("status IN ('pending', 'running')"),
         ),
+        Index(
+            "uq_runs_active_sop_subject_env",
+            "subject_type",
+            "subject_id",
+            "env_key",
+            unique=True,
+            postgresql_where=text(
+                "status IN ('pending', 'running') AND subject_type = 'sop'"
+            ),
+        ),
+        Index(
+            "ix_runs_subject_history",
+            "subject_type",
+            "subject_id",
+            "env_key",
+            "created_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -36,6 +53,9 @@ class Run(Base):
     )
     thread_id: Mapped[str] = mapped_column(Text, nullable=False)
     assistant_id: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[str] = mapped_column(Text, nullable=False)
+    env_key: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     active_conflict_key: Mapped[str | None] = mapped_column(Text)
     metadata_: Mapped[dict[str, Any]] = mapped_column(

@@ -27,3 +27,7 @@ GET  /api/runs/{run_id}/events?after=0
 
 SOP fetching is mocked in v1. The real SOP client will be added behind the
 existing `SopClient` interface later.
+
+The shared API contract lives in `api/sop-runs.md`. The v1 in-process runner is
+intended for a single active API worker; worker leases and checkpoint resume are
+deferred until the real runner is introduced.

@@ -43,6 +43,9 @@ async def test_create_run_persists_sop_metadata(session) -> None:
         active_conflict_key="sop:release-checklist:env:dev",
     )
 
+    assert run.subject_type == "sop"
+    assert run.subject_id == "release-checklist"
+    assert run.env_key == "dev"
     assert run.metadata_["subject_type"] == "sop"
     assert run.metadata_["subject_id"] == "release-checklist"
     assert run.metadata_["env_key"] == "dev"
@@ -90,6 +93,24 @@ async def test_terminal_run_does_not_block_new_run(session) -> None:
     )
 
     assert second_run.id != first_run.id
+
+
+async def test_interrupted_run_is_not_overwritten_by_late_terminal(session) -> None:
+    repository = RunRepository(session)
+    run = await repository.create_sop_run(
+        sop_id="release-checklist",
+        env_key="dev",
+        env_snapshot={"key": "dev", "name_zh": "开发", "name_en": "Development"},
+        sop_snapshot={"sop_id": "release-checklist", "payload": {}},
+        active_conflict_key="sop:release-checklist:env:dev",
+    )
+    await repository.mark_running(run.id)
+    await repository.interrupt_active_runs_on_startup()
+
+    late_terminal_run = await repository.mark_terminal(run.id, RunStatus.success)
+
+    assert late_terminal_run.status == RunStatus.interrupted.value
+    assert late_terminal_run.active_conflict_key is None
 
 
 async def test_append_event_increments_sequence(session) -> None:

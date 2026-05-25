@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import RunRepositoryDep, SessionDep, SopClientDep
@@ -9,7 +9,10 @@ from app.core.config import settings
 from app.schemas.runs import ActiveRunConflict, RunStartResponse, RunSummary
 from app.schemas.sop import EnvironmentPublic, SopSnapshot
 from app.services.sop_client import SopClientError, SopNotFoundError
-from app.services.sop_quality import SopQualityService, run_sop_quality_graph
+from app.services.sop_quality import (
+    SopQualityService,
+    run_sop_quality_graph_with_new_session,
+)
 
 router = APIRouter(prefix="/api/sop", tags=["sop"])
 
@@ -41,6 +44,7 @@ async def get_sop_preview(
 async def start_sop_run(
     sop_id: str,
     background_tasks: BackgroundTasks,
+    request: Request,
     session: SessionDep,
     sop_client: SopClientDep,
     repository: RunRepositoryDep,
@@ -49,7 +53,12 @@ async def start_sop_run(
     _get_environment_or_404(env)
 
     def schedule_run(run_id):
-        background_tasks.add_task(run_sop_quality_graph, run_id, repository)
+        executor = getattr(
+            request.app.state,
+            "sop_run_executor",
+            run_sop_quality_graph_with_new_session,
+        )
+        background_tasks.add_task(executor, run_id)
 
     service = SopQualityService(
         settings=settings,
@@ -58,7 +67,12 @@ async def start_sop_run(
         schedule_run=schedule_run,
         commit=session.commit,
     )
-    result = await service.start_run(sop_id, env)
+    try:
+        result = await service.start_run(sop_id, env)
+    except SopNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except SopClientError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY) from exc
 
     if not result.accepted and result.active_run_id is not None:
         conflict = ActiveRunConflict(

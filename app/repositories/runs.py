@@ -40,6 +40,9 @@ class RunRepository:
         run = Run(
             thread_id=str(uuid4()),
             assistant_id=assistant_id,
+            subject_type="sop",
+            subject_id=sop_id,
+            env_key=env_key,
             status=RunStatus.pending.value,
             active_conflict_key=active_conflict_key,
             metadata_={
@@ -82,9 +85,9 @@ class RunRepository:
     ) -> list[Run]:
         statement = (
             select(Run)
-            .where(Run.metadata_["subject_type"].as_string() == "sop")
-            .where(Run.metadata_["subject_id"].as_string() == sop_id)
-            .where(Run.metadata_["env_key"].as_string() == env_key)
+            .where(Run.subject_type == "sop")
+            .where(Run.subject_id == sop_id)
+            .where(Run.env_key == env_key)
             .order_by(Run.created_at.desc())
             .limit(limit)
         )
@@ -108,6 +111,10 @@ class RunRepository:
         error: dict[str, Any] | None = None,
     ) -> Run:
         run = await self._require_run(run_id)
+        await self._session.refresh(run)
+        if run.status not in ACTIVE_STATUSES:
+            return run
+
         run.status = status.value
         run.result_status = result_status
         run.structured_result = structured_result
@@ -201,6 +208,7 @@ class RunRepository:
         return run
 
     async def _next_sequence(self, run_id: UUID) -> int:
+        await self._lock_run(run_id)
         return await self._latest_sequence(run_id) + 1
 
     async def _latest_sequence(self, run_id: UUID) -> int:
@@ -209,3 +217,9 @@ class RunRepository:
         )
         latest_sequence = await self._session.scalar(statement)
         return int(latest_sequence or 0)
+
+    async def _lock_run(self, run_id: UUID) -> None:
+        statement = select(Run.id).where(Run.id == run_id).with_for_update()
+        locked_run_id = await self._session.scalar(statement)
+        if locked_run_id is None:
+            raise KeyError(run_id)
