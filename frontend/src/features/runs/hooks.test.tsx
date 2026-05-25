@@ -124,6 +124,45 @@ describe("run SSE hooks", () => {
     expect(result.current.events.map((item) => item.sequence)).toEqual([1, 2]);
   });
 
+  it("ignores stale open and error callbacks from previous stream sources", async () => {
+    const { result } = renderHook(() => useRunEvents("run-1", 0));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    vi.useFakeTimers();
+
+    act(() => {
+      MockEventSource.instances[0]?.fail();
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(2);
+    const oldSource = MockEventSource.instances[0];
+    const currentSource = MockEventSource.instances[1];
+
+    act(() => {
+      currentSource?.fail();
+    });
+
+    expect(result.current.connectionStatus).toBe("reconnecting");
+
+    act(() => {
+      oldSource?.open();
+      oldSource?.fail();
+    });
+
+    expect(result.current.connectionStatus).toBe("reconnecting");
+    expect(currentSource?.closed).toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(1_000);
+    });
+
+    expect(MockEventSource.instances).toHaveLength(3);
+  });
+
   it("paces reconnect attempts when the stream errors", async () => {
     const { result } = renderHook(() => useRunEvents("run-1", 0));
 
@@ -538,6 +577,10 @@ class MockEventSource {
   }
 
   comment(): void {
+    this.onopen?.(new Event("open"));
+  }
+
+  open(): void {
     this.onopen?.(new Event("open"));
   }
 

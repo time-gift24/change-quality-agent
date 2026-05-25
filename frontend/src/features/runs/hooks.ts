@@ -171,6 +171,9 @@ export function useRunEvents(
       eventSource = null;
     };
 
+    const isCurrentSource = (source: EventSource) =>
+      !isClosed && !isTerminal && eventSource === source;
+
     const connect = () => {
       if (isClosed || isTerminal) {
         return;
@@ -182,6 +185,10 @@ export function useRunEvents(
       eventSource = source;
 
       source.onopen = () => {
+        if (!isCurrentSource(source)) {
+          return;
+        }
+
         setState((current) => ({
           ...current,
           connectionStatus: "open",
@@ -189,7 +196,7 @@ export function useRunEvents(
       };
 
       const handleRunMessage = (message: MessageEvent<string>) => {
-        if (isClosed || isTerminal) {
+        if (!isCurrentSource(source)) {
           return;
         }
 
@@ -205,7 +212,8 @@ export function useRunEvents(
 
         if (event.type === "done" || event.type === "error") {
           isTerminal = true;
-          closeCurrentSource();
+          source.close();
+          eventSource = null;
           onTerminalRef.current?.();
         }
       };
@@ -223,7 +231,7 @@ export function useRunEvents(
       }
 
       source.onerror = (event) => {
-        if (isClosed || isTerminal) {
+        if (!isCurrentSource(source)) {
           return;
         }
 
@@ -231,7 +239,8 @@ export function useRunEvents(
           return;
         }
 
-        closeCurrentSource();
+        source.close();
+        eventSource = null;
         setState((current) => ({
           ...current,
           connectionStatus: "reconnecting",
