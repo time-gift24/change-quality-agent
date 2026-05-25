@@ -1201,6 +1201,18 @@ async def test_get_run_debug_includes_thread_fields():
 
 async def test_events_replay_after_sequence():
     ...
+
+
+async def test_events_use_last_event_id_when_after_is_missing():
+    ...
+
+
+async def test_multiple_sse_subscribers_have_independent_cursors():
+    ...
+
+
+async def test_terminal_run_replays_remaining_events_then_closes_stream():
+    ...
 ```
 
 **Step 2: Run test to verify it fails**
@@ -1226,6 +1238,9 @@ Implement:
 - `GET /api/runs/{run_id}`
 - `GET /api/runs/{run_id}/events?after=0`
 
+The SSE endpoint is an observation channel only. Opening an SSE connection must
+not create a run, schedule LangGraph, or mutate run state.
+
 Format SSE frames:
 
 ```python
@@ -1233,8 +1248,27 @@ def format_sse(event: dict[str, object]) -> str:
     return f"id: {event['sequence']}\nevent: {event['type']}\ndata: {json.dumps(event)}\n\n"
 ```
 
-For v1, use persisted DB replay plus a simple polling loop for new events.
-Document that an in-process broadcast can be added later for lower latency.
+For each SSE connection:
+
+1. Verify the `run_id` exists.
+2. Resolve the starting cursor from `after`; if absent, fall back to the
+   `Last-Event-ID` header; if both are absent, start from `0`.
+3. Query `run_events` with `sequence > cursor` ordered by sequence and emit the
+   replayed frames.
+4. Continue polling for new events with `sequence > last_sequence`.
+5. Keep each subscriber's `last_sequence` in the local generator only. Multiple
+   subscribers must not share cursors or block each other.
+6. Send lightweight SSE comments as heartbeats while waiting, for example
+   `": heartbeat\n\n"`.
+7. If the run is terminal and all persisted events have been replayed, emit the
+   terminal `done` or `error` event if it has not already been emitted, then
+   close that subscriber's stream.
+8. On client disconnect, release that generator without affecting the run or
+   other subscribers.
+
+For v1, use persisted DB replay plus a simple polling loop for new events. An
+in-process broadcast can be added later for lower latency, but the database
+remains the source of truth for replay and reconnect.
 
 **Step 4: Run test to verify it passes**
 
