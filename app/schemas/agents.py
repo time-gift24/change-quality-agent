@@ -2,24 +2,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
-class _ModelConfigPayloadMixin:
-    def __getattribute__(self, name: str) -> Any:
-        if name == "model_config":
-            return super().__getattribute__("model_parameters")
-        return super().__getattribute__(name)
-
-
-class AgentDraftConfig(_ModelConfigPayloadMixin, BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+class AgentDraftConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
 
     system_prompt: str = Field(min_length=1)
     model: str = Field(min_length=1)
     model_parameters: dict[str, Any] = Field(
         default_factory=dict,
-        alias="model_config",
+        validation_alias=AliasChoices("model_config", "model_parameters"),
+        serialization_alias="model_config",
     )
     tool_allowlist: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
@@ -66,14 +60,19 @@ class AgentDetail(AgentSummary):
     draft: AgentDraftConfig | None = None
 
 
-class AgentVersionDetail(_ModelConfigPayloadMixin, AgentVersionSummary):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+class AgentVersionDetail(AgentVersionSummary):
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        serialize_by_alias=True,
+    )
 
     agent_id: UUID
     system_prompt: str
     model_parameters: dict[str, Any] = Field(
         default_factory=dict,
-        alias="model_config",
+        validation_alias=AliasChoices("model_config", "model_parameters"),
+        serialization_alias="model_config",
     )
     tool_allowlist: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
@@ -89,3 +88,9 @@ class AgentTestRunCreate(BaseModel):
     version_id: UUID | None = None
     version_number: int | None = Field(default=None, ge=1)
     messages: list[AgentMessage] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def reject_multiple_version_selectors(self) -> "AgentTestRunCreate":
+        if self.version_id is not None and self.version_number is not None:
+            raise ValueError("Provide either version_id or version_number, not both.")
+        return self
