@@ -1,0 +1,71 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.pyi"
+---
+
+# 测试要求
+
+## 最低测试覆盖率：80%
+
+测试类型（全部需要）：
+
+1. **单元测试** - 单个函数、工具、组件
+2. **集成测试** - API 端点、数据库操作
+3. **端到端测试** - 关键用户流程（根据语言选择框架）
+
+## 测试驱动开发
+
+强制工作流程：
+
+1. 先写测试 (失败)
+2. 运行测试 - 它应该失败
+3. 编写最小实现 (成功)
+4. 运行测试 - 它应该通过
+5. 重构 (改进)
+6. 验证覆盖率 (80%+)
+
+## 测试失败排查
+
+1. 使用 **tdd-guide** 代理
+2. 检查测试隔离性
+3. 验证模拟是否正确
+4. 修复实现，而不是测试（除非测试有误）
+
+## 代理支持
+
+* **tdd-guide** - 主动用于新功能，强制执行测试优先
+
+# Python 测试
+
+> 本文件在 [通用/测试.md](../common/testing.md) 的基础上扩展了 Python 特定的内容。
+
+## 框架
+
+使用 **pytest** 作为测试框架。
+
+## 覆盖率
+
+```bash
+pytest --cov=src --cov-report=term-missing
+```
+
+## 测试组织
+
+使用 `pytest.mark` 进行测试分类：
+
+```python
+import pytest
+
+@pytest.mark.unit
+def test_calculate_total():
+    ...
+
+@pytest.mark.integration
+def test_database_connection():
+    ...
+```
+
+## 参考
+
+查看技能：`python-testing` 以获取详细的 pytest 模式和夹具信息。

@@ -1,0 +1,73 @@
+---
+paths:
+  - "**/*.py"
+  - "**/*.pyi"
+---
+
+# 常见模式
+
+## 骨架项目
+
+当实现新功能时：
+
+1. 搜索经过实战检验的骨架项目
+2. 使用并行代理评估选项：
+   * 安全性评估
+   * 可扩展性分析
+   * 相关性评分
+   * 实施规划
+3. 克隆最佳匹配作为基础
+4. 在已验证的结构内迭代
+
+## 设计模式
+
+### 仓库模式
+
+将数据访问封装在一个一致的接口之后：
+
+* 定义标准操作：findAll, findById, create, update, delete
+* 具体实现处理存储细节（数据库、API、文件等）
+* 业务逻辑依赖于抽象接口，而非存储机制
+* 便于轻松切换数据源，并使用模拟对象简化测试
+
+### API 响应格式
+
+对所有 API 响应使用一致的信封格式：
+
+* 包含一个成功/状态指示器
+* 包含数据载荷（出错时可为空）
+* 包含一个错误消息字段（成功时可为空）
+* 为分页响应包含元数据（总数、页码、限制）
+
+# Python 模式
+
+## 协议（鸭子类型）
+
+```python
+from typing import Protocol
+
+class Repository(Protocol):
+    def find_by_id(self, id: str) -> dict | None: ...
+    def save(self, entity: dict) -> dict: ...
+```
+
+## 数据类作为 DTO
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class CreateUserRequest:
+    name: str
+    email: str
+    age: int | None = None
+```
+
+## 上下文管理器与生成器
+
+* 使用上下文管理器（`with` 语句）进行资源管理
+* 使用生成器进行惰性求值和内存高效迭代
+
+## 参考
+
+查看技能：`python-patterns`，了解包括装饰器、并发和包组织在内的综合模式。
