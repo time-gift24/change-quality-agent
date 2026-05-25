@@ -54,11 +54,16 @@ export function reduceRunEvent(
 
   if (event.type === "error") {
     const nextWithNode = event.node
-      ? updateNode(nextState, event.node, (node) => ({
-          ...node,
-          status: "error",
-          error: eventError(event),
-        }))
+      ? updateNode(
+          nextState,
+          event.node,
+          (node) => ({
+            ...node,
+            status: "error",
+            error: eventError(event),
+          }),
+          event.sequence,
+        )
       : nextState;
 
     return {
@@ -73,37 +78,57 @@ export function reduceRunEvent(
   }
 
   if (event.type === "tasks") {
-    return updateNode(nextState, event.node, (node) => ({
-      ...node,
-      status: taskStatus(event, node.status),
-      error: taskError(event, node.error),
-    }));
+    return updateNode(
+      nextState,
+      event.node,
+      (node) => ({
+        ...node,
+        status: taskStatus(event, node.status),
+        error: taskError(event, node.error),
+      }),
+      event.sequence,
+    );
   }
 
   if (event.type === "messages") {
-    return updateNode(nextState, event.node, (node) => ({
-      ...node,
-      status: node.status === "idle" ? "running" : node.status,
-      streamText: `${node.streamText}${messageDelta(event)}`,
-    }));
+    return updateNode(
+      nextState,
+      event.node,
+      (node) => ({
+        ...node,
+        status: node.status === "idle" ? "running" : node.status,
+        streamText: `${node.streamText}${messageDelta(event)}`,
+      }),
+      event.sequence,
+    );
   }
 
   if (event.type === "updates") {
-    return updateNode(nextState, event.node, (node) => ({
-      ...node,
-      status: "done",
-      value: updateValue(event),
-    }));
+    return updateNode(
+      nextState,
+      event.node,
+      (node) => ({
+        ...node,
+        status: "done",
+        value: updateValue(event),
+      }),
+      event.sequence,
+    );
   }
 
   if (event.type === "custom") {
-    return updateNode(nextState, event.node, (node) => ({
-      ...node,
-      progress: event.payload.progress,
-    }));
+    return updateNode(
+      nextState,
+      event.node,
+      (node) => ({
+        ...node,
+        progress: event.payload.progress,
+      }),
+      event.sequence,
+    );
   }
 
-  return ensureNode(nextState, event.node);
+  return ensureNode(nextState, event.node, event.sequence);
 }
 
 export function getOrderedNodeIds(
@@ -129,6 +154,7 @@ function updateNode(
   state: RunViewState,
   nodeId: string,
   update: (node: NodeRuntime) => NodeRuntime,
+  eventSequence: number,
 ): RunViewState {
   const currentNode = state.nodes[nodeId] ?? createNodeRuntime();
   const nextNode = update(currentNode);
@@ -139,14 +165,18 @@ function updateNode(
       ...state.nodes,
       [nodeId]: {
         ...nextNode,
-        firstSequence: nextNode.firstSequence ?? state.latestSequence,
+        firstSequence: nextNode.firstSequence ?? eventSequence,
       },
     },
   };
 }
 
-function ensureNode(state: RunViewState, nodeId: string): RunViewState {
-  return updateNode(state, nodeId, (node) => node);
+function ensureNode(
+  state: RunViewState,
+  nodeId: string,
+  eventSequence: number,
+): RunViewState {
+  return updateNode(state, nodeId, (node) => node, eventSequence);
 }
 
 function createNodeRuntime(): NodeRuntime {

@@ -97,8 +97,8 @@ describe("run event reducer", () => {
 
   it("orders unknown nodes after registered nodes by first sequence", () => {
     const state = [
-      event({ type: "tasks", node: "late_unknown", sequence: 10 }),
       event({ type: "tasks", node: "early_unknown", sequence: 8 }),
+      event({ type: "tasks", node: "late_unknown", sequence: 10 }),
       event({ type: "tasks", node: "check_steps", sequence: 20 }),
       event({ type: "tasks", node: "load_sop", sequence: 30 }),
     ].reduce(reduceRunEvent, createInitialRunViewState());
@@ -106,6 +106,18 @@ describe("run event reducer", () => {
     expect(
       getOrderedNodeIds(state, ["load_sop", "check_steps", "summarize_result"]),
     ).toEqual(["load_sop", "check_steps", "early_unknown", "late_unknown"]);
+  });
+
+  it("keeps the event sequence that first introduced an unknown node", () => {
+    const state = [
+      event({ type: "tasks", node: "z_late_unknown", sequence: 10 }),
+      event({ type: "tasks", node: "a_early_unknown", sequence: 8 }),
+    ].reduce(reduceRunEvent, createInitialRunViewState());
+
+    expect(state.nodes.a_early_unknown?.firstSequence).toBe(8);
+    expect(
+      getOrderedNodeIds(state, ["load_sop", "check_steps", "summarize_result"]),
+    ).toEqual(["a_early_unknown", "z_late_unknown"]);
   });
 });
 
