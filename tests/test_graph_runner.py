@@ -23,6 +23,7 @@ class FakeRepository:
         self.events = []
         self.terminal_status = None
         self.raw_graph_output = None
+        self.committed = False
 
     async def mark_running(self, run_id):
         assert run_id == self.run.id
@@ -40,6 +41,9 @@ class FakeRepository:
         self.raw_graph_output = kwargs["raw_graph_output"]
         return self.run
 
+    async def commit(self) -> None:
+        self.committed = True
+
 
 @pytest.mark.asyncio
 async def test_graph_runner_writes_done_event() -> None:
@@ -52,3 +56,4 @@ async def test_graph_runner_writes_done_event() -> None:
     assert any(event["event_type"] in {"custom", "updates"} for event in repository.events)
     assert repository.raw_graph_output == {"status": "mock_success"}
     assert repository.terminal_status == RunStatus.success
+    assert repository.committed is True

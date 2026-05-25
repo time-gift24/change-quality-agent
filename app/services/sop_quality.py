@@ -126,4 +126,7 @@ async def run_sop_quality_graph(
         structured_result=None,
         result_status="mock_success",
     )
+    commit = getattr(repository, "commit", None)
+    if commit is not None:
+        await commit()
     return raw_graph_output

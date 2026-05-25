@@ -68,7 +68,10 @@ class RunRepository:
         return run
 
     async def get_run(self, run_id: UUID) -> Run | None:
-        return await self._session.get(Run, run_id)
+        run = await self._session.get(Run, run_id)
+        if run is not None:
+            run.latest_sequence = await self._latest_sequence(run_id)
+        return run
 
     async def list_sop_runs(
         self,
@@ -176,6 +179,9 @@ class RunRepository:
         await self._session.flush()
         return runs
 
+    async def commit(self) -> None:
+        await self._session.commit()
+
     async def _get_active_run_by_conflict_key(
         self,
         active_conflict_key: str,
@@ -195,8 +201,11 @@ class RunRepository:
         return run
 
     async def _next_sequence(self, run_id: UUID) -> int:
+        return await self._latest_sequence(run_id) + 1
+
+    async def _latest_sequence(self, run_id: UUID) -> int:
         statement = select(func.coalesce(func.max(RunEvent.sequence), 0)).where(
             RunEvent.run_id == run_id
         )
         latest_sequence = await self._session.scalar(statement)
-        return int(latest_sequence or 0) + 1
+        return int(latest_sequence or 0)

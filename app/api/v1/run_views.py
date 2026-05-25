@@ -25,7 +25,7 @@ def _latest_sequence(run: Any) -> int:
     if isinstance(explicit_sequence, int):
         return explicit_sequence
 
-    events = getattr(run, "events", [])
+    events = getattr(run, "__dict__", {}).get("events", [])
     if not events:
         return 0
     return max(int(event.sequence) for event in events)
