@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 from uuid import UUID
 
 from pydantic import (
@@ -59,7 +60,10 @@ class McpServerCreate(BaseModel):
     @model_validator(mode="after")
     def validate_transport_fields(self):
         if self.transport == McpTransport.stdio:
-            if not self.command or not self.command.strip():
+            if not self.command:
+                raise ValueError("stdio MCP servers require command")
+            self.command = self.command.strip()
+            if not self.command:
                 raise ValueError("stdio MCP servers require command")
         if self.transport == McpTransport.http:
             if not self.url or not self.url.strip():
@@ -107,6 +111,27 @@ class McpServerSummary(BaseModel):
 
 class McpServerDetail(McpServerSummary):
     tools: list[McpServerTool] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_missing_tool_count(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "tool_count" not in data and "tools" in data:
+                values = dict(data)
+                values["tool_count"] = len(values.get("tools") or [])
+                return values
+            return data
+
+        if hasattr(data, "tools") and not hasattr(data, "tool_count"):
+            values = {
+                field_name: getattr(data, field_name)
+                for field_name in cls.model_fields
+                if field_name != "tool_count" and hasattr(data, field_name)
+            }
+            values["tool_count"] = len(getattr(data, "tools") or [])
+            return values
+
+        return data
 
 
 class McpLifecycleResponse(BaseModel):

@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from app.models.mcp import McpServer, McpServerTool as McpServerToolModel
 from app.schemas.mcp import (
     McpServerCreate,
     McpServerDetail,
@@ -93,3 +94,44 @@ def test_mcp_server_create_rejects_invalid_http_url() -> None:
             transport=McpTransport.http,
             url="not-a-url",
         )
+
+
+def test_mcp_server_detail_derives_tool_count_from_orm_tools() -> None:
+    server = McpServer(
+        id=uuid4(),
+        name="filesystem",
+        transport="stdio",
+        command="uvx",
+        args=["mcp-server-filesystem"],
+        env={},
+        url=None,
+        headers={},
+        enabled=True,
+        desired_state="running",
+        runtime_status="running",
+        last_checked_at=None,
+        last_error=None,
+        tools=[
+            McpServerToolModel(
+                id=uuid4(),
+                name="search",
+                description="Search files",
+                input_schema={"type": "object"},
+                discovered_at=datetime.now(UTC),
+            ),
+        ],
+    )
+
+    detail = McpServerDetail.model_validate(server)
+
+    assert detail.tool_count == 1
+
+
+def test_mcp_server_create_strips_stdio_command() -> None:
+    server = McpServerCreate(
+        name="filesystem",
+        transport=McpTransport.stdio,
+        command=" uvx ",
+    )
+
+    assert server.command == "uvx"
