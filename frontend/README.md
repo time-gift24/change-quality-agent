@@ -10,4 +10,7 @@ Fixed stack:
 - Tailwind CSS v4 via `@tailwindcss/vite`
 
 The implementation plan lives at
-`docs/plans/2026-05-25-langgraph-streaming-frontend-implementation.md`.
+`docs/plans/2026-05-25-runs-frontend-implementation.md`.
+
+Before implementing UI, read `../DESIGN.md` and follow it strictly.
+Streamed markdown output must be rendered with `streamdown`.
