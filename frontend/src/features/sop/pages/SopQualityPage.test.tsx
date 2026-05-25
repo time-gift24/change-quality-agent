@@ -1,0 +1,226 @@
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { runObserverMock } = vi.hoisted(() => ({
+  runObserverMock: vi.fn(),
+}));
+
+vi.mock("../../runs/components/RunObserver", () => ({
+  RunObserver: ({
+    runId,
+    registeredNodeIds,
+  }: {
+    runId: string;
+    registeredNodeIds?: string[];
+  }) => {
+    runObserverMock({ runId, registeredNodeIds });
+
+    return (
+      <section aria-label="Run observer" data-run-id={runId}>
+        Observing {runId}
+        <span data-testid="registered-nodes">
+          {(registeredNodeIds ?? []).join(",")}
+        </span>
+      </section>
+    );
+  },
+}));
+
+import { SopQualityPage } from "./SopQualityPage";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
+
+describe("SopQualityPage", () => {
+  it("loads environments into the selector", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchSequence([
+        jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+          { key: "prod", name_en: "Production", name_zh: "Production" },
+        ]),
+        jsonResponse(sopPreview()),
+        jsonResponse({ runs: [] }),
+      ]),
+    );
+
+    render(<SopQualityPage />);
+
+    expect(await screen.findByRole("option", { name: "Development (dev)" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Production (prod)" }))
+      .toBeInTheDocument();
+  });
+
+  it("fetches preview without creating a run", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+
+      if (url === "/api/sop/environments") {
+        return Promise.resolve(
+          jsonResponse([
+            { key: "dev", name_en: "Development", name_zh: "Development" },
+          ]),
+        );
+      }
+
+      if (url === "/api/sop/release-checklist?env=dev" && !init?.method) {
+        return Promise.resolve(jsonResponse(sopPreview()));
+      }
+
+      if (url === "/api/sop/release-checklist/runs?env=dev" && !init?.method) {
+        return Promise.resolve(jsonResponse({ runs: [] }));
+      }
+
+      return Promise.resolve(jsonResponse({ run_id: "unexpected" }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<SopQualityPage />);
+
+    await screen.findByText("Release checklist");
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/sop/release-checklist/runs?env=dev",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(screen.queryByLabelText("Run observer")).not.toBeInTheDocument();
+  });
+
+  it("starts observing the returned run for a 202 response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist?env=dev": jsonResponse(sopPreview()),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({ runs: [] }),
+        "POST /api/sop/release-checklist/runs?env=dev": jsonResponse(
+          { run_id: "run-202" },
+          { status: 202 },
+        ),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByText("Release checklist");
+    fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
+
+    expect(await screen.findByText("Observing run-202")).toBeInTheDocument();
+    expect(runObserverMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        runId: "run-202",
+        registeredNodeIds: ["load_sop", "check_steps", "summarize_result"],
+      }),
+    );
+    expect(runObserverMock.mock.lastCall?.[0]).not.toHaveProperty("env");
+    expect(runObserverMock.mock.lastCall?.[0]).not.toHaveProperty("env_key");
+  });
+
+  it("switches to the active run id for a 409 response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist?env=dev": jsonResponse(sopPreview()),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({ runs: [] }),
+        "POST /api/sop/release-checklist/runs?env=dev": jsonResponse(
+          { active_run_id: "active-run" },
+          { status: 409, statusText: "Conflict" },
+        ),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByText("Release checklist");
+    fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
+
+    expect(await screen.findByText("Observing active-run")).toBeInTheDocument();
+  });
+
+  it("switches the observer run when a history item is clicked", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist?env=dev": jsonResponse(sopPreview()),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({
+          runs: [
+            { run_id: "newer-run", status: "success", created_at: "2026-05-25T11:00:00Z" },
+            { run_id: "older-run", status: "error", created_at: "2026-05-25T10:00:00Z" },
+          ],
+        }),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /older-run/ }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Run observer")).toHaveAttribute(
+        "data-run-id",
+        "older-run",
+      );
+    });
+  });
+});
+
+function sopPreview() {
+  return {
+    sop_id: "release-checklist",
+    env_key: "dev",
+    raw_payload: {
+      title: "Release checklist",
+      steps: ["Prepare release notes", "Verify rollout plan"],
+    },
+  };
+}
+
+function fetchSequence(responses: Response[]) {
+  return vi.fn(() => {
+    const response = responses.shift();
+
+    if (!response) {
+      throw new Error("Unexpected fetch");
+    }
+
+    return Promise.resolve(response);
+  });
+}
+
+function fetchByRequest(responses: Record<string, Response>) {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    const key = `${method} ${String(input)}`;
+    const response = responses[key];
+
+    if (!response) {
+      throw new Error(`Unexpected fetch: ${key}`);
+    }
+
+    return Promise.resolve(response);
+  });
+}
+
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { "Content-Type": "application/json" },
+    status: 200,
+    ...init,
+  });
+}
