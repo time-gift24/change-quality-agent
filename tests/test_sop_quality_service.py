@@ -51,7 +51,6 @@ def settings() -> Settings:
                 key="dev",
                 name_zh="开发",
                 name_en="Development",
-                sop_client_options={},
             )
         ]
     )

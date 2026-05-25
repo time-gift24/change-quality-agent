@@ -14,8 +14,6 @@ def test_settings_load_config_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path) ->
                 "  - key: staging",
                 "    name_zh: 预发",
                 "    name_en: Staging",
-                "    sop_client_options:",
-                "      base_url: https://staging.example.test",
             ]
         ),
         encoding="utf-8",
@@ -31,9 +29,12 @@ def test_settings_load_config_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path) ->
             key="staging",
             name_zh="预发",
             name_en="Staging",
-            sop_client_options={"base_url": "https://staging.example.test"},
         )
     ]
+
+
+def test_environment_config_has_no_sop_client_options() -> None:
+    assert "sop_client_options" not in EnvironmentConfig.model_fields
 
 
 def test_environment_variables_override_config_yaml(
@@ -60,7 +61,6 @@ def test_environment_lookup_by_key() -> None:
                 key="dev",
                 name_zh="开发",
                 name_en="Development",
-                sop_client_options={"base_url": "https://dev.example.test"},
             )
         ]
     )
