@@ -41,13 +41,24 @@ export async function startSopQualityRun(
       Accept: "application/json",
     },
   });
-  const body = (await response.json()) as StartSopRunResponse;
 
-  if (response.status === 202 && body.run_id) {
+  if (response.status === 202) {
+    const body = await readStartRunBody(response);
+
+    if (!body.run_id) {
+      throw new Error("SOP run response did not include a run id.");
+    }
+
     return { kind: "started", runId: body.run_id };
   }
 
-  if (response.status === 409 && body.active_run_id) {
+  if (response.status === 409) {
+    const body = await readStartRunBody(response);
+
+    if (!body.active_run_id) {
+      throw new ApiError(response.status, response.statusText);
+    }
+
     return { kind: "active", runId: body.active_run_id };
   }
 
@@ -56,6 +67,14 @@ export async function startSopQualityRun(
   }
 
   throw new Error("SOP run response did not include a run id.");
+}
+
+async function readStartRunBody(response: Response): Promise<StartSopRunResponse> {
+  try {
+    return (await response.json()) as StartSopRunResponse;
+  } catch {
+    return {};
+  }
 }
 
 export async function getSopRunHistory(

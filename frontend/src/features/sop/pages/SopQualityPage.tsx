@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { RunObserver } from "../../runs/components/RunObserver";
 import { startSopQualityRun } from "../api";
 import {
+  type SopPreviewRequest,
   useSopEnvironments,
   useSopPreview,
   useSopRunHistory,
@@ -28,11 +29,18 @@ export function SopQualityPage({
   const [selectedEnv, setSelectedEnv] = useState("");
   const [observedRunId, setObservedRunId] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [startMessage, setStartMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [previewRequest, setPreviewRequest] =
+    useState<SopPreviewRequest | null>(null);
+  const activeFormRef = useRef({ selectedEnv, sopId });
+  const startRequestRef = useRef(0);
   const environments = useSopEnvironments();
-  const preview = useSopPreview(sopId, selectedEnv);
+  const preview = useSopPreview(previewRequest);
   const history = useSopRunHistory(sopId, selectedEnv, historyRefreshKey);
+
+  activeFormRef.current = { selectedEnv, sopId };
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
@@ -53,19 +61,75 @@ export function SopQualityPage({
       return;
     }
 
+    const requestId = startRequestRef.current + 1;
+    const requestSopId = sopId;
+    const requestEnv = selectedEnv;
+
+    startRequestRef.current = requestId;
     setStarting(true);
     setStartError(null);
+    setStartMessage(null);
 
     try {
-      const result = await startSopQualityRun(sopId, selectedEnv);
+      const result = await startSopQualityRun(requestSopId, requestEnv);
+
+      if (
+        startRequestRef.current !== requestId ||
+        activeFormRef.current.sopId !== requestSopId ||
+        activeFormRef.current.selectedEnv !== requestEnv
+      ) {
+        return;
+      }
 
       setObservedRunId(result.runId);
       setHistoryRefreshKey((value) => value + 1);
+
+      if (result.kind === "active") {
+        setStartMessage(`An active run already exists. Joined ${result.runId}.`);
+      }
     } catch (error) {
+      if (startRequestRef.current !== requestId) {
+        return;
+      }
+
       setStartError(error instanceof Error ? error.message : "Unable to start run.");
     } finally {
-      setStarting(false);
+      if (startRequestRef.current === requestId) {
+        setStarting(false);
+      }
     }
+  }
+
+  function handlePreview() {
+    if (!sopId || !selectedEnv) {
+      return;
+    }
+
+    setPreviewRequest((current) => ({
+      envKey: selectedEnv,
+      requestId: (current?.requestId ?? 0) + 1,
+      sopId,
+    }));
+  }
+
+  function handleSopIdChange(nextSopId: string) {
+    startRequestRef.current += 1;
+    setSopId(nextSopId);
+    setObservedRunId(null);
+    setPreviewRequest(null);
+    setStartError(null);
+    setStartMessage(null);
+    setStarting(false);
+  }
+
+  function handleEnvironmentChange(nextEnv: string) {
+    startRequestRef.current += 1;
+    setSelectedEnv(nextEnv);
+    setObservedRunId(null);
+    setPreviewRequest(null);
+    setStartError(null);
+    setStartMessage(null);
+    setStarting(false);
   }
 
   return (
@@ -87,7 +151,7 @@ export function SopQualityPage({
           <input
             className="w-full rounded border border-[#d9d9dd] bg-white px-3 py-2 text-sm text-[#212121] outline-none focus:border-[#9b60aa] focus:ring-2 focus:ring-[#9b60aa]/20"
             id="sop-id"
-            onChange={(event) => setSopId(event.target.value)}
+            onChange={(event) => handleSopIdChange(event.target.value)}
             value={sopId}
           />
 
@@ -99,10 +163,7 @@ export function SopQualityPage({
             className="w-full rounded border border-[#d9d9dd] bg-white px-3 py-2 text-sm text-[#212121] outline-none focus:border-[#9b60aa] focus:ring-2 focus:ring-[#9b60aa]/20"
             disabled={environments.loading || environments.data.length === 0}
             id="sop-env"
-            onChange={(event) => {
-              setSelectedEnv(event.target.value);
-              setObservedRunId(null);
-            }}
+            onChange={(event) => handleEnvironmentChange(event.target.value)}
             value={selectedEnv}
           >
             {environments.data.map((environment) => (
@@ -111,6 +172,15 @@ export function SopQualityPage({
               </option>
             ))}
           </select>
+
+          <button
+            className="w-full rounded-lg border border-[#d9d9dd] bg-white px-3 py-2 text-sm font-medium text-[#17171c] disabled:cursor-not-allowed disabled:text-[#93939f]"
+            disabled={!sopId || !selectedEnv || preview.loading}
+            onClick={handlePreview}
+            type="button"
+          >
+            {preview.loading ? "Loading preview" : "Preview SOP"}
+          </button>
 
           <button
             className="w-full rounded-lg bg-[#17171c] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-[#93939f]"
@@ -122,8 +192,20 @@ export function SopQualityPage({
           </button>
 
           {startError ? (
-            <p className="rounded border border-[#b30000]/25 bg-white px-3 py-2 text-sm text-[#b30000]">
+            <p
+              className="rounded border border-[#b30000]/25 bg-white px-3 py-2 text-sm text-[#b30000]"
+              role="alert"
+            >
               {startError}
+            </p>
+          ) : null}
+
+          {startMessage ? (
+            <p
+              className="rounded border border-[#1863dc]/25 bg-white px-3 py-2 text-sm text-[#1863dc]"
+              role="status"
+            >
+              {startMessage}
             </p>
           ) : null}
 

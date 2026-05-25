@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { runObserverMock } = vi.hoisted(() => ({
@@ -46,7 +52,6 @@ describe("SopQualityPage", () => {
           { key: "dev", name_en: "Development", name_zh: "Development" },
           { key: "prod", name_en: "Production", name_zh: "Production" },
         ]),
-        jsonResponse(sopPreview()),
         jsonResponse({ runs: [] }),
       ]),
     );
@@ -85,6 +90,15 @@ describe("SopQualityPage", () => {
 
     render(<SopQualityPage />);
 
+    await screen.findByRole("option", { name: "Development (dev)" });
+    expect(screen.queryByText("Release checklist")).not.toBeInTheDocument();
+    const previewButton = screen.getByRole("button", { name: "Preview SOP" });
+
+    await waitFor(() => {
+      expect(previewButton).toBeEnabled();
+    });
+    fireEvent.click(previewButton);
+
     await screen.findByText("Release checklist");
 
     expect(fetchMock).not.toHaveBeenCalledWith(
@@ -112,7 +126,7 @@ describe("SopQualityPage", () => {
 
     render(<SopQualityPage />);
 
-    await screen.findByText("Release checklist");
+    await screen.findByRole("option", { name: "Development (dev)" });
     fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
 
     expect(await screen.findByText("Observing run-202")).toBeInTheDocument();
@@ -144,10 +158,109 @@ describe("SopQualityPage", () => {
 
     render(<SopQualityPage />);
 
-    await screen.findByText("Release checklist");
+    await screen.findByRole("option", { name: "Development (dev)" });
     fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
 
     expect(await screen.findByText("Observing active-run")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "An active run already exists. Joined active-run.",
+    );
+  });
+
+  it("announces start errors with API status context", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({ runs: [] }),
+        "POST /api/sop/release-checklist/runs?env=dev": new Response("", {
+          status: 500,
+          statusText: "Server Error",
+        }),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByRole("option", { name: "Development (dev)" });
+    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "API request failed: 500 Server Error",
+    );
+  });
+
+  it("clears the observed run when the SOP id changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      fetchByRequest({
+        "GET /api/sop/environments": jsonResponse([
+          { key: "dev", name_en: "Development", name_zh: "Development" },
+        ]),
+        "GET /api/sop/release-checklist/runs?env=dev": jsonResponse({
+          runs: [{ run_id: "old-run", status: "success" }],
+        }),
+        "GET /api/sop/payment-checklist/runs?env=dev": jsonResponse({
+          runs: [],
+        }),
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /old-run/ }));
+    expect(await screen.findByText("Observing old-run")).toBeInTheDocument();
+
+    const sopIdInput = screen.getByLabelText("SOP id");
+    fireEvent.change(sopIdInput, { target: { value: "payment-checklist" } });
+
+    expect(screen.queryByLabelText("Run observer")).not.toBeInTheDocument();
+  });
+
+  it("ignores a stale start response after the SOP id changes", async () => {
+    const startResponse = deferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        const url = String(input);
+
+        if (url === "/api/sop/environments") {
+          return Promise.resolve(
+            jsonResponse([
+              { key: "dev", name_en: "Development", name_zh: "Development" },
+            ]),
+          );
+        }
+
+        if (method === "GET" && url.endsWith("/runs?env=dev")) {
+          return Promise.resolve(jsonResponse({ runs: [] }));
+        }
+
+        if (
+          method === "POST" &&
+          url === "/api/sop/release-checklist/runs?env=dev"
+        ) {
+          return startResponse.promise;
+        }
+
+        throw new Error(`Unexpected fetch: ${method} ${url}`);
+      }),
+    );
+
+    render(<SopQualityPage />);
+
+    await screen.findByRole("option", { name: "Development (dev)" });
+    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.change(screen.getByLabelText("SOP id"), {
+      target: { value: "payment-checklist" },
+    });
+
+    await startResponse.resolve(jsonResponse({ run_id: "stale-run" }, { status: 202 }));
+
+    expect(screen.queryByText("Observing stale-run")).not.toBeInTheDocument();
   });
 
   it("switches the observer run when a history item is clicked", async () => {
@@ -223,4 +336,13 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
     status: 200,
     ...init,
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
 }

@@ -7,6 +7,12 @@ import {
 } from "./api";
 import type { SopEnvironment, SopPreview, SopRunHistoryItem } from "./types";
 
+export type SopPreviewRequest = {
+  envKey: string;
+  requestId: number;
+  sopId: string;
+};
+
 type AsyncState<T> = {
   data: T;
   error: Error | null;
@@ -45,17 +51,19 @@ export function useSopEnvironments(): AsyncState<SopEnvironment[]> {
 }
 
 export function useSopPreview(
-  sopId: string,
-  envKey: string,
+  request: SopPreviewRequest | null,
 ): AsyncState<SopPreview | null> {
   const [state, setState] = useState<AsyncState<SopPreview | null>>({
     data: null,
     error: null,
     loading: false,
   });
+  const sopId = request?.sopId ?? "";
+  const envKey = request?.envKey ?? "";
+  const requestId = request?.requestId ?? 0;
 
   useEffect(() => {
-    if (!sopId || !envKey) {
+    if (!sopId || !envKey || requestId === 0) {
       setState({ data: null, error: null, loading: false });
       return;
     }
@@ -78,7 +86,7 @@ export function useSopPreview(
     return () => {
       cancelled = true;
     };
-  }, [envKey, sopId]);
+  }, [envKey, requestId, sopId]);
 
   return state;
 }
