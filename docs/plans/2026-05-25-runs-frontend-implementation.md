@@ -8,6 +8,13 @@
 
 **Tech Stack:** Vite, React 19, TypeScript, Tailwind CSS v4 with `@tailwindcss/vite`, Streamdown, Vitest, React Testing Library, Playwright.
 
+**Implemented UI contract:** `DESIGN.md` is mandatory for UI work. The app uses
+the restrained workbench shell in `frontend/src/app/App.tsx`, route composition
+in `frontend/src/app/routes.tsx`, frontend-local Streamdown scanning through
+`@source "../../node_modules/streamdown/dist/*.js"`, and `StreamMarkdown` inside
+`RunEventStream` for streamed markdown messages. Generic run UI does not expose
+SOP `env_key`; the SOP page remains a thin wrapper over `RunObserver`.
+
 ---
 
 ### Task 1: Verify Frontend Design Inputs
@@ -41,6 +48,8 @@ Add:
 ```markdown
 Before implementing UI, read `../DESIGN.md` and follow it strictly.
 Streamed markdown output must be rendered with `streamdown`.
+Run message events must be rendered by `RunEventStream` through
+`StreamMarkdown`, which wraps `streamdown`.
 ```
 
 **Step 3: Commit**
@@ -491,6 +500,8 @@ Expected: FAIL.
 
 Compose SOP-specific controls with generic `RunObserver`. Keep SOP `env` in the
 SOP form and history area only. Do not pass `env_key` into generic run UI.
+The page should stay a thin business wrapper; generic run summary, nodes, and
+streaming output remain owned by `RunObserver`.
 
 **Step 4: Verify tests**
 
@@ -588,6 +599,15 @@ Use browser automation to check:
 - streamed markdown appears through Streamdown styling
 - status, node list, and event stream follow `DESIGN.md`
 
+Recorded verification for the implemented frontend:
+
+- `npm run test` passed for 7 files / 49 tests.
+- `npm run build` passed with only the existing Vite chunk-size warning.
+- Dev server served the app at `http://127.0.0.1:5174/`.
+- Browser checks covered desktop and mobile layout, mocked `/api/sop`,
+  `/api/runs`, named SSE events, and Streamdown DOM evidence including
+  headings, strong text, and inline code.
+
 **Step 4: Commit fixes if needed**
 
 ```bash
@@ -611,6 +631,10 @@ Ensure docs mention:
 - `RunEventStream` uses `StreamMarkdown`
 - generic run UI does not expose SOP `env_key`
 - SOP page is a thin wrapper over `RunObserver`
+- implemented stack is Vite + React 19 + TypeScript + Tailwind CSS v4
+- Streamdown is scanned from frontend-local `node_modules`
+- app shell and route composition live under `frontend/src/app`
+- browser verification evidence is recorded above
 
 **Step 2: Commit documentation updates**
 

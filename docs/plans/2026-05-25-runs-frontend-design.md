@@ -10,6 +10,7 @@ The frontend stack is fixed by `frontend/README.md`:
 - React 19
 - TypeScript
 - Tailwind CSS v4 through `@tailwindcss/vite`
+- Streamdown for streamed markdown
 
 The backend exposes SOP entry APIs and generic run observation APIs. The
 frontend should mirror that split: `runs` is the reusable observation substrate,
@@ -24,7 +25,8 @@ design system. The implementation must not invent a separate visual language.
 - Render persisted SSE events from `/api/runs/{run_id}/events`.
 - Use `Streamdown` for streamed markdown text.
 - Keep SOP-specific fields out of generic run UI.
-- Provide a thin SOP quality page that starts or joins runs.
+- Provide a thin SOP quality page wrapper that starts or joins runs and then
+  delegates run observation to `RunObserver`.
 - Preserve reconnect and replay behavior through event sequence cursors.
 
 ## Non-Goals
@@ -99,6 +101,8 @@ frontend/src/
 - normalized run events
 
 It must not read or display `env_key` as a top-level generic run field.
+The generic run UI should remain reusable for future change-quality surfaces,
+so SOP environment context stays in `features/sop`.
 
 `features/sop` owns SOP-specific concerns:
 
@@ -152,7 +156,7 @@ sequence.
 Displays the event timeline:
 
 - `custom` events as concise progress rows
-- `messages` events as streaming markdown
+- `messages` events as streaming markdown rendered through `StreamMarkdown`
 - `updates` events as expandable structured output
 - `error` events as visible failure rows
 - `checkpoints` events collapsed by default
@@ -187,11 +191,12 @@ export function StreamMarkdown({
 ```
 
 Tailwind CSS v4 must scan Streamdown utilities from the frontend global CSS.
-The path depends on dependency placement, but for `frontend/src/styles/globals.css`
-and a frontend-local `node_modules`, use:
+The current implementation uses frontend-local `node_modules`, so
+`frontend/src/styles/globals.css` includes:
 
 ```css
 @source "../../node_modules/streamdown/dist/*.js";
+@import "streamdown/styles.css";
 ```
 
 If dependencies are hoisted to the repository root, adjust the relative path
@@ -209,8 +214,19 @@ SOP-specific page that composes:
 - SOP run history list
 - generic `RunObserver`
 
+It is intentionally a thin wrapper: SOP `env` is only used for preview, start,
+join, and history APIs, and is not passed into `RunObserver` or displayed as
+generic run metadata.
+
 `409 Conflict` should not be treated as a hard page error. It should show a
 short message and switch the observer to `active_run_id`.
+
+## App Shell
+
+The implemented app shell lives in `frontend/src/app/App.tsx` with route
+composition in `frontend/src/app/routes.tsx`. It follows `DESIGN.md` with a
+white workbench canvas, compact title row, thin dividers, and no marketing hero
+or decorative backgrounds.
 
 ## Event Reduction Model
 
@@ -278,6 +294,9 @@ Rules:
 - Hook tests for SSE cursor and terminal handling.
 - Component tests for status, node ordering, and Streamdown rendering.
 - SOP page tests for preview, start, conflict join, and history selection.
+- Browser verification covers desktop and mobile layout, mocked named SSE
+  events, Streamdown-rendered markdown evidence, and visible status/node/event
+  observer regions.
 - Browser smoke test for desktop and mobile layouts.
 
 ## Open Decisions
