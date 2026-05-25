@@ -8,8 +8,10 @@ export function StreamMarkdown({
   isStreaming?: boolean;
 }) {
   return (
-    <Streamdown animated isAnimating={Boolean(isStreaming)}>
-      {children}
-    </Streamdown>
+    <div data-testid="stream-markdown">
+      <Streamdown animated isAnimating={Boolean(isStreaming)}>
+        {children}
+      </Streamdown>
+    </div>
   );
 }

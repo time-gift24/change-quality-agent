@@ -96,6 +96,76 @@ describe("RunEventStream", () => {
 
     expect(within(eventRegion).getByText("checking")).toBeInTheDocument();
     expect(within(eventRegion).getByText("steps")).toBeInTheDocument();
+    expect(within(eventRegion).getByTestId("stream-markdown")).toHaveTextContent(
+      "checking steps",
+    );
+  });
+
+  it("renders custom progress as a concise row", () => {
+    const state = stateFromEvents([
+      event({
+        type: "custom",
+        node: "check_steps",
+        sequence: 1,
+        payload: { progress: "Validated 3 of 5 steps" },
+      }),
+    ]);
+
+    render(<RunEventStream state={state} />);
+
+    expect(screen.getByText("Validated 3 of 5 steps")).toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+  });
+
+  it("renders updates as expandable structured output", () => {
+    const state = stateFromEvents([
+      event({
+        type: "updates",
+        node: "summarize_result",
+        sequence: 1,
+        payload: { value: { score: 92 } },
+      }),
+    ]);
+
+    render(<RunEventStream state={state} />);
+
+    const details = screen.getByText("Details").closest("details");
+
+    expect(details).not.toHaveAttribute("open");
+    expect(screen.getByText(/\"score\": 92/)).toBeInTheDocument();
+  });
+
+  it("renders errors as visible failure rows", () => {
+    const state = stateFromEvents([
+      event({
+        type: "error",
+        node: "check_steps",
+        sequence: 1,
+        payload: { message: "Quality check failed" },
+      }),
+    ]);
+
+    render(<RunEventStream state={state} />);
+
+    expect(screen.getByText("Quality check failed")).toBeInTheDocument();
+  });
+
+  it("renders checkpoints collapsed by default", () => {
+    const state = stateFromEvents([
+      event({
+        type: "checkpoints",
+        node: "check_steps",
+        sequence: 1,
+        payload: { checkpoint_id: "cp-1" },
+      }),
+    ]);
+
+    render(<RunEventStream state={state} />);
+
+    const details = screen.getByText("Details").closest("details");
+
+    expect(details).not.toHaveAttribute("open");
+    expect(screen.getByText(/checkpoint_id/)).toBeInTheDocument();
   });
 });
 

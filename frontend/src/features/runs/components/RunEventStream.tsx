@@ -7,18 +7,7 @@ type RunEventStreamProps = {
 };
 
 export function RunEventStream({ state }: RunEventStreamProps) {
-  const visibleEvents = state.events.filter((event, index) => {
-    if (event.type !== "messages" || !event.node) {
-      return true;
-    }
-
-    return !state.events
-      .slice(index + 1)
-      .some(
-        (nextEvent) =>
-          nextEvent.type === "messages" && nextEvent.node === event.node,
-      );
-  });
+  const visibleEvents = getVisibleEvents(state.events);
 
   return (
     <section
@@ -80,11 +69,15 @@ function EventPayload({
     );
   }
 
-  if (
-    event.type === "custom" ||
-    event.type === "updates" ||
-    event.type === "checkpoints"
-  ) {
+  if (event.type === "custom") {
+    return (
+      <p className="m-0 text-[#212121]">
+        {progressText(event) ?? formatPayload(event.payload)}
+      </p>
+    );
+  }
+
+  if (event.type === "updates" || event.type === "checkpoints") {
     return (
       <details className="text-[#212121]">
         <summary className="cursor-pointer text-[#1863dc]">Details</summary>
@@ -102,10 +95,48 @@ function EventPayload({
   );
 }
 
+function getVisibleEvents(events: RunEvent[]): RunEvent[] {
+  const seenMessageNodes = new Set<string>();
+  const visibleEvents: RunEvent[] = [];
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+
+    if (event.type === "messages" && event.node) {
+      if (seenMessageNodes.has(event.node)) {
+        continue;
+      }
+
+      seenMessageNodes.add(event.node);
+    }
+
+    visibleEvents.push(event);
+  }
+
+  return visibleEvents.reverse();
+}
+
 function stringPayloadValue(event: RunEvent, key: string): string | undefined {
   const value = event.payload[key];
 
   return typeof value === "string" ? value : undefined;
+}
+
+function progressText(event: RunEvent): string | undefined {
+  const progress = event.payload.progress;
+
+  if (typeof progress === "string") {
+    return progress;
+  }
+
+  if (typeof progress === "number" || typeof progress === "boolean") {
+    return String(progress);
+  }
+
+  return (
+    stringPayloadValue(event, "message") ??
+    stringPayloadValue(event, "status")
+  );
 }
 
 function formatPayload(payload: Record<string, unknown>): string {
