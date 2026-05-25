@@ -288,7 +288,6 @@ def test_run_summary_exposes_stable_projection() -> None:
         run_id=run_id,
         subject_type="sop",
         subject_id="release-checklist",
-        env_key="dev",
         status=RunStatus.running,
         current_node="load_sop",
         completed_nodes=[],
@@ -361,7 +360,6 @@ class RunSummary(BaseModel):
     run_id: UUID
     subject_type: str
     subject_id: str
-    env_key: str
     status: RunStatus
     current_node: str | None = None
     completed_nodes: list[str]

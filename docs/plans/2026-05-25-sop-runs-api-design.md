@@ -146,7 +146,6 @@ Returns the stable business projection:
   "run_id": "uuid",
   "subject_type": "sop",
   "subject_id": "payment-release",
-  "env_key": "dev",
   "status": "running",
   "current_node": "check_steps",
   "completed_nodes": ["load_sop"],
@@ -157,6 +156,10 @@ Returns the stable business projection:
   "error_summary": null
 }
 ```
+
+The generic run response intentionally does not expose SOP-specific context
+such as `env_key` at the top level. SOP environment details belong to SOP entry
+APIs, SOP history APIs, and persisted run metadata.
 
 `GET /api/runs/{run_id}?debug=true`
 
