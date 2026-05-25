@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Structure"
+  short_description: "Enforce FastAPI + LangGraph layout"
+  default_prompt: "Use $project-structure to place new Agent API code in the correct project directories."
