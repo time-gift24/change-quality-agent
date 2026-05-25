@@ -133,9 +133,26 @@ function progressText(event: RunEvent): string | undefined {
     return String(progress);
   }
 
+  if (isProgressObject(progress)) {
+    return `${progress.current} / ${progress.total}`;
+  }
+
   return (
     stringPayloadValue(event, "message") ??
     stringPayloadValue(event, "status")
+  );
+}
+
+function isProgressObject(
+  value: unknown,
+): value is { current: string | number; total: string | number } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "current" in value &&
+    "total" in value &&
+    (typeof value.current === "string" || typeof value.current === "number") &&
+    (typeof value.total === "string" || typeof value.total === "number")
   );
 }
 
