@@ -414,8 +414,10 @@ def _optional_str(value: Any) -> str | None:
 
 
 def _stream_error_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    error_type = payload.get("type")
-    message = payload.get("message")
+    error = payload.get("error")
+    source = error if isinstance(error, Mapping) else payload
+    error_type = source.get("type")
+    message = source.get("message")
     return {
         "type": error_type if isinstance(error_type, str) else "StreamError",
         "message": message if isinstance(message, str) else "Stream failed.",

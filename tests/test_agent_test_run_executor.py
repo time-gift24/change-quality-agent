@@ -441,6 +441,44 @@ async def test_run_agent_test_marks_error_when_stream_yields_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_agent_test_preserves_normalized_stream_error_details() -> None:
+    version = FakeVersion()
+    run = FakeRun(version)
+    run_repository = FakeRunRepository(run)
+    runtime = FakeEventStreamingRuntime(
+        [
+            {
+                "type": "error",
+                "node": "agent",
+                "payload": {
+                    "error": {"type": "RuntimeError", "message": "boom"},
+                    "raw": {"type": "RuntimeError", "message": "boom"},
+                },
+            },
+        ]
+    )
+
+    result = await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=FakeAgentRepository(version),
+        runtime=runtime,
+    )
+
+    assert result == {
+        "status": "error",
+        "error": {"type": "RuntimeError", "message": "boom"},
+    }
+    assert run_repository.terminal == (
+        RunStatus.error,
+        {
+            "error": {"type": "RuntimeError", "message": "boom"},
+            "result_status": "error",
+        },
+    )
+
+
+@pytest.mark.asyncio
 async def test_run_agent_test_commits_running_start_before_runtime() -> None:
     order: list[str] = []
     version = FakeVersion(version_number=7)
