@@ -17,10 +17,7 @@ import {
   type RunViewState,
 } from "../reducer";
 import type { RunEvent, RunSummary } from "../types";
-import { RunEventStream } from "./RunEventStream";
-import { RunNodeList } from "./RunNodeList";
-import { RunObserver } from "./RunObserver";
-import { RunStatusBar } from "./RunStatusBar";
+import { RunObserver, RunObserverView } from "./RunObserver";
 
 const registeredNodeIds = ["load_sop", "check_steps", "summarize_result"];
 
@@ -36,172 +33,130 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", MockEventSource);
 });
 
-describe("RunStatusBar", () => {
-  it("displays status, subject type, and subject id", () => {
-    render(<RunStatusBar summary={summary()} />);
+describe("RunObserverView", () => {
+  it("renders a human prompt for the SOP subject", () => {
+    const state = stateFromEvents([]);
 
-    expect(screen.getByText("running")).toBeInTheDocument();
-    expect(screen.getByText("sop")).toBeInTheDocument();
-    expect(screen.getByText("payment-release")).toBeInTheDocument();
+    render(
+      <RunObserverView
+        summary={summary()}
+        state={state}
+        registeredNodeIds={registeredNodeIds}
+      />,
+    );
+
+    expect(
+      screen.getByText(/请对 SOP `payment-release` 执行一次质量检查。/),
+    ).toBeInTheDocument();
   });
 
-  it("does not display env_key", () => {
-    const summaryWithEnv = {
-      ...summary(),
-      env_key: "production",
-    } as RunSummary & { env_key: string };
-
-    render(<RunStatusBar summary={summaryWithEnv} />);
-
-    expect(screen.queryByText("production")).not.toBeInTheDocument();
-    expect(screen.queryByText("env_key")).not.toBeInTheDocument();
-  });
-});
-
-describe("RunNodeList", () => {
-  it("renders known nodes in registry order and unknown nodes by first event sequence", () => {
+  it("renders each node's streamText as an assistant turn in registered order", () => {
     const state = stateFromEvents([
-      event({ node: "custom_lint", sequence: 1 }),
-      event({ node: "summarize_result", sequence: 2 }),
-      event({ node: "check_steps", sequence: 3 }),
-      event({ node: "early_custom", sequence: 0 }),
-      event({ node: "load_sop", sequence: 4 }),
+      event({
+        type: "messages",
+        node: "summarize_result",
+        sequence: 1,
+        payload: { delta: "all clear" },
+      }),
+      event({
+        type: "messages",
+        node: "load_sop",
+        sequence: 2,
+        payload: { delta: "loaded" },
+      }),
     ]);
 
     render(
-      <RunNodeList state={state} registeredNodeIds={registeredNodeIds} />,
+      <RunObserverView
+        summary={summary()}
+        state={state}
+        registeredNodeIds={registeredNodeIds}
+      />,
     );
 
-    const nodeItems = screen.getAllByRole("listitem").map((item) => {
-      const nodeName = within(item).getByTestId("run-node-id");
+    const turns = screen.getAllByLabelText(/Assistant turn /);
 
-      return nodeName.textContent;
-    });
-
-    expect(nodeItems).toEqual([
-      "load_sop",
-      "check_steps",
-      "summarize_result",
-      "early_custom",
-      "custom_lint",
+    expect(turns.map((turn) => turn.getAttribute("aria-label"))).toEqual([
+      "Assistant turn load_sop",
+      "Assistant turn summarize_result",
     ]);
+    expect(within(turns[0]).getByTestId("stream-markdown")).toHaveTextContent(
+      "loaded",
+    );
+    expect(within(turns[1]).getByTestId("stream-markdown")).toHaveTextContent(
+      "all clear",
+    );
   });
-});
 
-describe("RunEventStream", () => {
-  it("renders accumulated node stream text as markdown", () => {
+  it("shows a typing indicator while the node is streaming with no text yet", () => {
+    const state = stateFromEvents([
+      event({
+        type: "tasks",
+        node: "load_sop",
+        sequence: 1,
+        payload: { status: "started" },
+      }),
+    ]);
+
+    render(
+      <RunObserverView
+        summary={summary({ status: "running" })}
+        state={{ ...state, isRunning: true }}
+        registeredNodeIds={registeredNodeIds}
+      />,
+    );
+
+    const turn = screen.getByLabelText("Assistant turn load_sop");
+    expect(within(turn).getByLabelText("streaming")).toBeInTheDocument();
+  });
+
+  it("renders node-level errors inline in the assistant turn", () => {
     const state = stateFromEvents([
       event({
         type: "messages",
-        node: "check_steps",
+        node: "load_sop",
         sequence: 1,
-        payload: { delta: "**checking** " },
+        payload: { delta: "Loading from upstream..." },
       }),
       event({
-        type: "messages",
-        node: "check_steps",
+        type: "tasks",
+        node: "load_sop",
         sequence: 2,
-        payload: { delta: "steps" },
+        payload: { status: "failed", error: "SOP upstream returned 502." },
       }),
     ]);
 
-    render(<RunEventStream state={state} />);
-
-    const eventRegion = screen.getByLabelText("Run events");
-
-    expect(within(eventRegion).getByText("checking")).toBeInTheDocument();
-    expect(within(eventRegion).getByText("steps")).toBeInTheDocument();
-    expect(within(eventRegion).getByTestId("stream-markdown")).toHaveTextContent(
-      "checking steps",
+    render(
+      <RunObserverView
+        summary={summary({ status: "error" })}
+        state={state}
+        registeredNodeIds={registeredNodeIds}
+      />,
     );
+
+    const turn = screen.getByLabelText("Assistant turn load_sop");
+    expect(
+      within(turn).getByText("SOP upstream returned 502."),
+    ).toBeInTheDocument();
+    expect(within(turn).getByText("失败")).toBeInTheDocument();
   });
 
-  it("renders custom progress as a concise row", () => {
-    const state = stateFromEvents([
-      event({
-        type: "custom",
-        node: "check_steps",
-        sequence: 1,
-        payload: { progress: "Validated 3 of 5 steps" },
-      }),
-    ]);
+  it("renders run-level error_summary as a separate assistant error turn", () => {
+    render(
+      <RunObserverView
+        summary={summary({ status: "error", error_summary: "graph aborted" })}
+        state={stateFromEvents([])}
+        registeredNodeIds={registeredNodeIds}
+      />,
+    );
 
-    render(<RunEventStream state={state} />);
-
-    expect(screen.getByText("Validated 3 of 5 steps")).toBeInTheDocument();
-    expect(screen.queryByText("Details")).not.toBeInTheDocument();
-  });
-
-  it("renders object custom progress as a concise row", () => {
-    const state = stateFromEvents([
-      event({
-        type: "custom",
-        node: "check_steps",
-        sequence: 1,
-        payload: { progress: { current: 2, total: 3 } },
-      }),
-    ]);
-
-    render(<RunEventStream state={state} />);
-
-    expect(screen.getByText("2 / 3")).toBeInTheDocument();
-    expect(screen.queryByText(/\"current\"/)).not.toBeInTheDocument();
-  });
-
-  it("renders updates as expandable structured output", () => {
-    const state = stateFromEvents([
-      event({
-        type: "updates",
-        node: "summarize_result",
-        sequence: 1,
-        payload: { value: { score: 92 } },
-      }),
-    ]);
-
-    render(<RunEventStream state={state} />);
-
-    const details = screen.getByText("Details").closest("details");
-
-    expect(details).not.toHaveAttribute("open");
-    expect(screen.getByText(/\"score\": 92/)).toBeInTheDocument();
-  });
-
-  it("renders errors as visible failure rows", () => {
-    const state = stateFromEvents([
-      event({
-        type: "error",
-        node: "check_steps",
-        sequence: 1,
-        payload: { message: "Quality check failed" },
-      }),
-    ]);
-
-    render(<RunEventStream state={state} />);
-
-    expect(screen.getByText("Quality check failed")).toBeInTheDocument();
-  });
-
-  it("renders checkpoints collapsed by default", () => {
-    const state = stateFromEvents([
-      event({
-        type: "checkpoints",
-        node: "check_steps",
-        sequence: 1,
-        payload: { checkpoint_id: "cp-1" },
-      }),
-    ]);
-
-    render(<RunEventStream state={state} />);
-
-    const details = screen.getByText("Details").closest("details");
-
-    expect(details).not.toHaveAttribute("open");
-    expect(screen.getByText(/checkpoint_id/)).toBeInTheDocument();
+    const errorTurn = screen.getByLabelText("Assistant turn error");
+    expect(within(errorTurn).getByText("graph aborted")).toBeInTheDocument();
   });
 });
 
 describe("RunObserver", () => {
-  it("subscribes by run id and shows reconnecting without clearing previous events", async () => {
+  it("subscribes by run id and keeps streamed text across reconnect", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(jsonResponse(summary({ latest_sequence: 0 })));
@@ -218,7 +173,10 @@ describe("RunObserver", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/runs/run-1", expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/runs/run-1",
+      expect.any(Object),
+    );
     expect(MockEventSource.instances[0]?.url).toBe(
       "/api/runs/run-1/events?after=0",
     );
@@ -236,10 +194,9 @@ describe("RunObserver", () => {
       MockEventSource.instances[0]?.fail();
     });
 
-    expect(screen.getByText("reconnecting")).toBeInTheDocument();
-    expect(screen.getByLabelText("Run events")).toHaveTextContent(
-      "Previously streamed text",
-    );
+    expect(
+      screen.getByTestId("stream-markdown"),
+    ).toHaveTextContent("Previously streamed text");
   });
 });
 

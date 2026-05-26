@@ -1,7 +1,6 @@
 import { ApiError, requestJson } from "../../lib/apiClient";
 import type {
   SopEnvironment,
-  SopPreview,
   SopRunHistoryItem,
   StartSopRunResult,
 } from "./types";
@@ -22,13 +21,6 @@ export async function getSopEnvironments(): Promise<SopEnvironment[]> {
     await requestJson<SopEnvironmentsResponse>("/api/sop/environments");
 
   return Array.isArray(response) ? response : response.environments;
-}
-
-export function getSopPreview(
-  sopId: string,
-  envKey: string,
-): Promise<SopPreview> {
-  return requestJson<SopPreview>(buildSopUrl(sopId, envKey));
 }
 
 export async function startSopQualityRun(
@@ -81,17 +73,7 @@ export async function getSopRunHistory(
   sopId: string,
   envKey: string,
 ): Promise<SopRunHistoryItem[]> {
-  const response = await requestJson<{ runs: SopRunHistoryItem[] }>(
-    buildSopRunsUrl(sopId, envKey),
-  );
-
-  return response.runs;
-}
-
-function buildSopUrl(sopId: string, envKey: string): string {
-  return `/api/sop/${encodeURIComponent(sopId)}?env=${encodeURIComponent(
-    envKey,
-  )}`;
+  return requestJson<SopRunHistoryItem[]>(buildSopRunsUrl(sopId, envKey));
 }
 
 function buildSopRunsUrl(sopId: string, envKey: string): string {

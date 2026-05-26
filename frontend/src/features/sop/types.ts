@@ -6,15 +6,9 @@ export type SopEnvironment = {
   name_zh: string;
 };
 
-export type SopPreview = {
-  sop_id?: string;
-  env_key?: string;
-  raw_payload?: unknown;
-  [key: string]: unknown;
-};
-
 export type SopRunHistoryItem = {
   run_id: string;
+  subject_id?: string | null;
   status?: RunStatus | string | null;
   created_at?: string | null;
 };

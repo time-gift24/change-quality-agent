@@ -7,9 +7,15 @@ import {
   reduceRunEvent,
   type RunViewState,
 } from "./reducer";
-import type { RunEvent, RunSummary } from "./types";
+import type { RunEvent, RunStatus, RunSummary } from "./types";
 
 const RECONNECT_DELAY_MS = 1_000;
+const TERMINAL_RUN_STATUSES: RunStatus[] = [
+  "success",
+  "error",
+  "timeout",
+  "interrupted",
+];
 const RUN_EVENT_NAMES: RunEvent["type"][] = [
   "tasks",
   "messages",
@@ -22,6 +28,7 @@ const RUN_EVENT_NAMES: RunEvent["type"][] = [
 
 type UseRunEventsOptions = {
   enabled?: boolean;
+  summaryIsTerminal?: boolean;
   onTerminal?: () => void;
 };
 
@@ -71,9 +78,7 @@ export function useRun(runId: string): UseRunResult {
       }
 
       setSummary(nextSummary);
-      setEventsInitialAfter((current) =>
-        current === undefined ? nextSummary.latest_sequence : current,
-      );
+      setEventsInitialAfter((current) => (current === undefined ? 0 : current));
     } catch (error) {
       if (
         summaryRequestRef.current !== requestId ||
@@ -118,8 +123,12 @@ export function useRun(runId: string): UseRunResult {
       : undefined;
   const streamEnabled =
     visibleSummary !== null && streamInitialAfter !== undefined;
+  const summaryIsTerminal =
+    visibleSummary !== null &&
+    TERMINAL_RUN_STATUSES.includes(visibleSummary.status);
   const events = useRunEvents(runId, streamInitialAfter, {
     enabled: streamEnabled,
+    summaryIsTerminal,
     onTerminal: () => {
       void refreshSummary();
     },
@@ -141,13 +150,15 @@ export function useRunEvents(
   initialAfter?: number,
   options: UseRunEventsOptions = {},
 ): RunViewState {
-  const { enabled = true, onTerminal } = options;
+  const { enabled = true, summaryIsTerminal = false, onTerminal } = options;
   const onTerminalRef = useRef(onTerminal);
+  const summaryIsTerminalRef = useRef(summaryIsTerminal);
   const [state, setState] = useState<RunViewState>(() =>
     initialState(initialAfter),
   );
 
   onTerminalRef.current = onTerminal;
+  summaryIsTerminalRef.current = summaryIsTerminal;
 
   useEffect(() => {
     if (!enabled) {
@@ -241,6 +252,17 @@ export function useRunEvents(
 
         source.close();
         eventSource = null;
+
+        if (summaryIsTerminalRef.current) {
+          isTerminal = true;
+          setState((current) => ({
+            ...current,
+            connectionStatus: "closed",
+          }));
+          onTerminalRef.current?.();
+          return;
+        }
+
         setState((current) => ({
           ...current,
           connectionStatus: "reconnecting",

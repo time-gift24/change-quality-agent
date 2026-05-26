@@ -291,7 +291,7 @@ describe("run SSE hooks", () => {
     });
 
     expect(result.current.summary?.run_id).toBe("run-b");
-    expect(result.current.events.latestSequence).toBe(7);
+    expect(result.current.events.latestSequence).toBe(0);
   });
 
   it("does not expose stale run data during the runId switch render", async () => {
@@ -407,7 +407,7 @@ describe("run SSE hooks", () => {
 
     expect(result.current.summary?.run_id).toBe("run-b");
     expect(result.current.events.events).toEqual([]);
-    expect(result.current.events.latestSequence).toBe(10);
+    expect(result.current.events.latestSequence).toBe(0);
   });
 
   it("terminal done closes stream and triggers summary refresh", async () => {
@@ -425,7 +425,7 @@ describe("run SSE hooks", () => {
       expect(MockEventSource.instances).toHaveLength(1);
     });
     expect(MockEventSource.instances[0]?.url).toBe(
-      "/api/runs/run-1/events?after=2",
+      "/api/runs/run-1/events?after=0",
     );
 
     act(() => {
