@@ -291,7 +291,7 @@ def _agent_version_snapshot(agent_version: Any) -> dict[str, Any]:
     snapshot: dict[str, Any] = {
         "id": str(agent_version.id),
         "version_number": agent_version.version_number,
-        "model": agent_version.model,
+        "provider_id": str(agent_version.provider_id),
     }
     if hasattr(agent_version, "tool_allowlist"):
         snapshot["tool_allowlist"] = list(agent_version.tool_allowlist)

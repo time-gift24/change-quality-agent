@@ -32,13 +32,14 @@ class FakeVersion:
         *,
         agent_id,
         version_number: int = 1,
+        provider_id=None,
         published_at: datetime = BASE_TIME,
     ) -> None:
         self.id = uuid4()
         self.agent_id = agent_id
         self.version_number = version_number
         self.system_prompt = "You are careful."
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = provider_id or uuid4()
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -289,6 +290,8 @@ async def test_list_agents_returns_summaries_without_deleted_by_default() -> Non
     body = response.json()
     assert [agent["key"] for agent in body] == ["release-reviewer"]
     assert body[0]["latest_version"]["version_number"] == 1
+    assert body[0]["latest_version"]["provider_id"] == str(version.provider_id)
+    assert "model" not in body[0]["latest_version"]
     assert "draft" not in body[0]
     assert repository.list_include_deleted == [False]
 
@@ -381,6 +384,10 @@ async def test_publish_agent_returns_created_version_detail() -> None:
     assert response.status_code == 201
     body = response.json()
     assert body["version_number"] == 1
+    assert body["provider_id"] == str(
+        repository.versions["release-reviewer"][0].provider_id
+    )
+    assert "model" not in body
     assert body["model_config"] == {"temperature": 0}
     assert "model_parameters" not in body
     assert session.commits == 1
@@ -424,7 +431,13 @@ async def test_list_versions_returns_descending_summaries() -> None:
         response = await client.get("/api/agents/release-reviewer/versions")
 
     assert response.status_code == 200
-    assert [version["version_number"] for version in response.json()] == [2, 1]
+    body = response.json()
+    assert [version["version_number"] for version in body] == [2, 1]
+    assert [version["provider_id"] for version in body] == [
+        str(repository.versions[agent.key][1].provider_id),
+        str(repository.versions[agent.key][0].provider_id),
+    ]
+    assert all("model" not in version for version in body)
 
 
 @pytest.mark.asyncio
@@ -442,8 +455,11 @@ async def test_get_version_returns_detail_or_404() -> None:
         missing = await client.get("/api/agents/release-reviewer/versions/99")
 
     assert found.status_code == 200
-    assert found.json()["version_number"] == 3
-    assert found.json()["model_config"] == {"temperature": 0}
+    body = found.json()
+    assert body["version_number"] == 3
+    assert body["provider_id"] == str(repository.versions[agent.key][0].provider_id)
+    assert "model" not in body
+    assert body["model_config"] == {"temperature": 0}
     assert missing.status_code == 404
 
 

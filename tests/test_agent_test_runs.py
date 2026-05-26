@@ -39,12 +39,13 @@ class FakeVersion:
         *,
         agent_id=None,
         version_number: int = 1,
+        provider_id=None,
     ) -> None:
         self.id = uuid4()
         self.agent_id = agent_id or uuid4()
         self.version_number = version_number
         self.system_prompt = "You are careful."
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = provider_id or uuid4()
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -183,12 +184,30 @@ async def test_create_agent_test_run_persists_agent_test_payload() -> None:
         "agent_version": {
             "id": str(version.id),
             "version_number": 7,
-            "model": "openai:gpt-5-mini",
+            "provider_id": str(version.provider_id),
             "tool_allowlist": ["search_sop"],
             "mcp_server_ids": ["change-docs"],
         },
     }
     assert run.created_by == "qa@example.com"
+
+
+@pytest.mark.asyncio
+async def test_create_agent_test_run_snapshots_provider_id() -> None:
+    provider_id = uuid4()
+    session = FakeSession()
+    repository = RunRepository(session)
+    version = FakeVersion(provider_id=provider_id)
+
+    run = await repository.create_agent_test_run(
+        agent_key="release-reviewer",
+        agent_version=version,
+        messages=[{"role": "user", "content": "Can this deploy?"}],
+        input_preview="Can this deploy?",
+    )
+
+    assert run.subject_snapshot["agent_version"]["provider_id"] == str(provider_id)
+    assert "model" not in run.subject_snapshot["agent_version"]
 
 
 @pytest.mark.asyncio

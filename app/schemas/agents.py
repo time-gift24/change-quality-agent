@@ -42,7 +42,7 @@ class AgentVersionSummary(BaseModel):
 
     id: UUID
     version_number: int
-    model: str
+    provider_id: UUID
     published_at: datetime
 
 
