@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
+import { WorkspaceSidebar } from "../../../app/WorkspaceSidebar";
 import { RunObserver } from "../../runs/components/RunObserver";
 import { startSopQualityRun } from "../api";
 import { useRecentSopRuns, useSopEnvironments } from "../hooks";
@@ -36,6 +38,8 @@ export function ChatPage({
 
   const environments = useSopEnvironments();
   const history = useRecentSopRuns(selectedEnv, historyRefreshKey);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
@@ -120,17 +124,23 @@ export function ChatPage({
   }
 
   return (
-    <div className="flex min-h-screen bg-canvas text-ink bg-aurora">
-      <Sidebar
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen((value) => !value)}
-        history={history.data}
-        loading={history.loading}
-        error={history.error}
-        observedRunId={observedRunId}
-        onSelect={handleSelectHistory}
+    <div className="flex min-h-screen flex-1 text-ink">
+      <WorkspaceSidebar
+        activeKey="sop"
+        onNavigateMcp={() => navigate("/mcp")}
+        onNavigateSop={() => navigate("/sop")}
         onNewConversation={handleNewConversation}
-      />
+        onToggle={() => setSidebarOpen((value) => !value)}
+        open={sidebarOpen}
+      >
+        <HistoryPanel
+          error={history.error}
+          history={history.data}
+          loading={history.loading}
+          observedRunId={observedRunId}
+          onSelect={handleSelectHistory}
+        />
+      </WorkspaceSidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <main
@@ -166,121 +176,78 @@ export function ChatPage({
   );
 }
 
-function Sidebar({
-  open,
-  onToggle,
+function HistoryPanel({
   history,
   loading,
   error,
   observedRunId,
   onSelect,
-  onNewConversation,
 }: {
-  open: boolean;
-  onToggle: () => void;
   history: SopRunHistoryItem[];
   loading: boolean;
   error: Error | null;
   observedRunId: string | null;
   onSelect: (runId: string) => void;
-  onNewConversation: () => void;
 }) {
   const [recentOpen, setRecentOpen] = useState(true);
 
   return (
-    <aside
-      aria-label="历史对话"
-      className={`flex shrink-0 flex-col border-r border-hairline bg-canvas/60 backdrop-blur-sm transition-[width] duration-200 ${
-        open ? "w-64" : "w-14"
-      }`}
-    >
-      <div className="flex h-14 shrink-0 items-center gap-2 px-3">
+    <div className="flex h-full flex-col">
+      <div className="mt-2 px-3">
         <button
-          aria-label={open ? "收起侧边栏" : "展开侧边栏"}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-mute transition-colors hover:bg-canvas-soft hover:text-ink"
-          onClick={onToggle}
+          aria-expanded={recentOpen}
+          aria-label="切换最近质检SOP"
+          className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-mute transition-colors hover:text-body"
+          onClick={() => setRecentOpen((value) => !value)}
           type="button"
         >
-          <SidebarIcon />
+          <span>最近质检SOP</span>
+          <ChevronIcon open={recentOpen} />
         </button>
-        {open ? (
-          <span className="text-base font-semibold tracking-tight text-ink">
-            质量检查
-          </span>
-        ) : null}
       </div>
 
-      {open ? (
-        <>
-          <div className="px-3 pt-2">
-            <button
-              aria-label="发起新SOP质检"
-              className="flex h-8 w-full items-center gap-2 rounded-xl px-2 text-xs font-medium text-body transition-colors hover:bg-canvas-soft hover:text-ink"
-              onClick={onNewConversation}
-              type="button"
-            >
-              <PencilIcon />
-              <span>发起新SOP质检</span>
-            </button>
-          </div>
-
-          <div className="mt-4 px-3">
-            <button
-              aria-expanded={recentOpen}
-              aria-label="切换最近质检SOP"
-              className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-mute transition-colors hover:text-body"
-              onClick={() => setRecentOpen((value) => !value)}
-              type="button"
-            >
-              <span>最近质检SOP</span>
-              <ChevronIcon open={recentOpen} />
-            </button>
-          </div>
-
-          {recentOpen ? (
-            <div className="mt-1 flex-1 overflow-y-auto px-2 pb-4">
-              {error ? (
-                <p className="px-2 py-1 text-xs text-error-deep" role="alert">
-                  {error.message}
-                </p>
-              ) : null}
-              {loading ? (
-                <p className="px-2 py-1 text-xs text-mute">加载中...</p>
-              ) : null}
-              {!loading && history.length === 0 && !error ? (
-                <p className="px-2 py-1 text-xs text-mute">暂无历史。</p>
-              ) : null}
-              <ul className="space-y-0.5">
-                {history.map((run) => {
-                  const active = observedRunId === run.run_id;
-                  return (
-                    <li key={run.run_id}>
-                      <button
-                        aria-pressed={active}
-                        className={`group flex w-full items-center gap-2 truncate rounded-full px-3 py-2 text-left text-xs transition-colors ${
-                          active
-                            ? "border border-primary/40 bg-canvas text-ink shadow-sm"
-                            : "border border-transparent text-body hover:bg-canvas-soft"
-                        }`}
-                        onClick={() => onSelect(run.run_id)}
-                        title={run.subject_id ?? run.run_id}
-                        type="button"
-                      >
-                        <span className="block flex-1 truncate">
-                          {historyTitle(run)}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ) : (
-            <div className="flex-1" />
-          )}
-        </>
-      ) : null}
-    </aside>
+      {recentOpen ? (
+        <div className="mt-1 flex-1 overflow-y-auto px-2 pb-4">
+          {error ? (
+            <p className="px-2 py-1 text-xs text-error-deep" role="alert">
+              {error.message}
+            </p>
+          ) : null}
+          {loading ? (
+            <p className="px-2 py-1 text-xs text-mute">加载中...</p>
+          ) : null}
+          {!loading && history.length === 0 && !error ? (
+            <p className="px-2 py-1 text-xs text-mute">暂无历史。</p>
+          ) : null}
+          <ul className="space-y-0.5">
+            {history.map((run) => {
+              const active = observedRunId === run.run_id;
+              return (
+                <li key={run.run_id}>
+                  <button
+                    aria-pressed={active}
+                    className={`group flex w-full items-center gap-2 truncate rounded-full px-3 py-2 text-left text-xs transition-colors ${
+                      active
+                        ? "border border-primary/40 bg-canvas text-ink shadow-sm"
+                        : "border border-transparent text-body hover:bg-canvas-soft"
+                    }`}
+                    onClick={() => onSelect(run.run_id)}
+                    title={run.subject_id ?? run.run_id}
+                    type="button"
+                  >
+                    <span className="block flex-1 truncate">
+                      {historyTitle(run)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
+    </div>
   );
 }
 
@@ -437,42 +404,6 @@ function RunCanvas({
         <RunObserver runId={runId} registeredNodeIds={registeredNodeIds} />
       </div>
     </div>
-  );
-}
-
-function SidebarIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <rect x="3" y="4" width="18" height="16" rx="3" />
-      <path d="M9 4v16" />
-    </svg>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="1.8"
-      viewBox="0 0 24 24"
-    >
-      <path d="M16 3l5 5-12 12H4v-5z" />
-      <path d="M14 5l5 5" />
-    </svg>
   );
 }
 

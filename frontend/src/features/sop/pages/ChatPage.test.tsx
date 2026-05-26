@@ -1,11 +1,38 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import { App } from "../../../app/App";
 import { ChatPage } from "./ChatPage";
+
+vi.mock("../../../app/routing/useAuthz", () => ({
+  useAuthz: () => ({ isAdmin: true }),
+}));
+
+vi.mock("../../mcp/pages/McpPage", () => ({
+  McpPage: () => (
+    <div role="region" aria-label="MCP 管理 mock">
+      <h1>MCP 管理</h1>
+    </div>
+  ),
+}));
+
+function renderChatPage() {
+  return render(
+    <MemoryRouter>
+      <ChatPage />
+    </MemoryRouter>,
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -24,7 +51,7 @@ describe("ChatPage", () => {
   it("loads seeded mock history without pre-filling the SOP input", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    render(<ChatPage />);
+    renderChatPage();
 
     expect(await screen.findByPlaceholderText("输入 SOP ID")).toHaveValue("");
     expect(
@@ -35,7 +62,7 @@ describe("ChatPage", () => {
   it("uses a concise SOP ID placeholder", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    render(<ChatPage />);
+    renderChatPage();
 
     expect(await screen.findByPlaceholderText("输入 SOP ID")).toBeInTheDocument();
     expect(
@@ -46,7 +73,7 @@ describe("ChatPage", () => {
   it("renders the environment select as a polished native control", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    render(<ChatPage />);
+    renderChatPage();
 
     const select = await screen.findByLabelText("环境");
 
@@ -59,7 +86,7 @@ describe("ChatPage", () => {
   it("places the recent history chevron on the right side", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    render(<ChatPage />);
+    renderChatPage();
 
     const button = await screen.findByRole("button", {
       name: "切换最近质检SOP",
@@ -73,6 +100,69 @@ describe("ChatPage", () => {
       label.compareDocumentPosition(chevron!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("shows the MCP 管理 entry inside the same sidebar as 发起新SOP质检", async () => {
+    vi.stubGlobal("fetch", fetchByRequest());
+
+    renderChatPage();
+
+    const sidebar = await screen.findByRole("complementary", {
+      name: "工作台侧边栏",
+    });
+    const nav = await within(sidebar).findByRole("navigation", {
+      name: "工作台导航",
+    });
+
+    expect(
+      within(nav).getByRole("button", { name: "发起新SOP质检" }),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByRole("button", { name: "MCP 管理" }),
+    ).toBeInTheDocument();
+  });
+
+  it("collapses and expands the sidebar while keeping both nav entries visible", async () => {
+    vi.stubGlobal("fetch", fetchByRequest());
+
+    renderChatPage();
+
+    const collapse = await screen.findByRole("button", {
+      name: "收起侧边栏",
+    });
+    fireEvent.click(collapse);
+
+    expect(
+      screen.getByRole("button", { name: "展开侧边栏" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "MCP 管理" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "发起新SOP质检" }),
+    ).toBeInTheDocument();
+
+    const aside = screen.getByRole("complementary", { name: "工作台侧边栏" });
+    expect(aside.className).toContain("w-14");
+
+    fireEvent.click(screen.getByRole("button", { name: "展开侧边栏" }));
+    expect(aside.className).toContain("w-64");
+  });
+
+  it("navigates to /mcp when MCP 管理 is clicked in the sidebar", async () => {
+    window.history.pushState({}, "", "/sop");
+    render(<App />);
+
+    const sidebar = await screen.findByRole("complementary", {
+      name: "工作台侧边栏",
+    });
+    fireEvent.click(
+      within(sidebar).getByRole("button", { name: "MCP 管理" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "MCP 管理" }),
+    ).toBeInTheDocument();
   });
 });
 
