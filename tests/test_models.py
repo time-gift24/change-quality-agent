@@ -1,4 +1,5 @@
 from app.models.mcp import McpServer, McpServerTool
+from app.models.provider_credentials import ProviderCredential
 from app.models.runs import Run, RunEvent
 
 
@@ -34,3 +35,18 @@ def test_mcp_server_model_has_status_columns() -> None:
 
 def test_mcp_server_tool_model_table_name() -> None:
     assert McpServerTool.__tablename__ == "mcp_server_tools"
+
+
+def test_provider_credential_model_table_name() -> None:
+    assert ProviderCredential.__tablename__ == "provider_credentials"
+
+
+def test_provider_credential_model_has_scope_and_secret_columns() -> None:
+    columns = ProviderCredential.__table__.columns
+
+    assert "credential_type" in columns
+    assert "scope" in columns
+    assert "owner_user_id" in columns
+    assert "api_key_ciphertext" in columns
+    assert "api_key_hint" in columns
+    assert "is_active" in columns

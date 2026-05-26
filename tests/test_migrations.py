@@ -29,3 +29,15 @@ def test_alembic_revision_ids_are_unique() -> None:
         revisions[revision] = path
 
     assert duplicates == []
+
+
+def test_provider_credentials_migration_exists() -> None:
+    path = MIGRATIONS_DIR / "20260526_0004_create_provider_credentials.py"
+
+    assert path.exists()
+
+    migration = path.read_text(encoding="utf-8")
+    assert 'revision: str = "20260526_0004"' in migration
+    assert (
+        'down_revision: str | Sequence[str] | None = "20260526_0003"' in migration
+    )
