@@ -48,7 +48,7 @@ class FakeRepository:
 
 
 @pytest.mark.asyncio
-async def test_graph_runner_writes_done_event() -> None:
+async def test_graph_runner_streams_message_before_update_and_done() -> None:
     run = FakeRun()
     repository = FakeRepository(run)
 
@@ -57,9 +57,11 @@ async def test_graph_runner_writes_done_event() -> None:
     assert repository.marked_running is True
     assert [event["event_type"] for event in repository.events] == [
         "custom",
+        "messages",
         "updates",
         "done",
     ]
+    assert repository.events[1]["payload"]["delta"]
     assert repository.raw_graph_output == {"status": "mock_success"}
     assert repository.terminal_status == RunStatus.success
     assert repository.committed is True
@@ -67,10 +69,11 @@ async def test_graph_runner_writes_done_event() -> None:
 
 @pytest.mark.asyncio
 async def test_graph_runner_persists_error_event(monkeypatch) -> None:
-    async def fail_graph(*, run_id, sop_snapshot):
+    async def fail_stream(*, run_id, sop_snapshot):
         raise ValueError("invalid SOP payload")
+        yield
 
-    monkeypatch.setattr("app.services.sop_quality.run_mock_sop_quality_graph", fail_graph)
+    monkeypatch.setattr("app.services.sop_quality.stream_mock_sop_quality_graph", fail_stream)
     run = FakeRun()
     repository = FakeRepository(run)
 

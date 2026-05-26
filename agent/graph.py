@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -33,3 +34,25 @@ async def run_mock_sop_quality_graph(
         }
     )
     return {"status": result["status"]}
+
+
+async def stream_mock_sop_quality_graph(
+    *,
+    run_id: str,
+    sop_snapshot: dict[str, Any],
+) -> AsyncIterator[dict[str, Any]]:
+    yield {
+        "type": "messages",
+        "payload": {"delta": "Validating SOP snapshot."},
+        "node": "validate_sop",
+    }
+    raw_graph_output = await run_mock_sop_quality_graph(
+        run_id=run_id,
+        sop_snapshot=sop_snapshot,
+    )
+    yield {
+        "type": "updates",
+        "payload": {"status": raw_graph_output["status"]},
+        "node": "validate_sop",
+        "raw_graph_output": raw_graph_output,
+    }

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.graph import run_mock_sop_quality_graph
+from agent.graph import stream_mock_sop_quality_graph
 from app.core.config import Settings
 from app.core.database import async_session
 from app.repositories.runs import ActiveRunExistsError, RunRepository
@@ -110,17 +110,21 @@ async def run_sop_quality_graph(
             payload={"message": "Started mock SOP quality graph."},
             node="start",
         )
-        raw_graph_output = await run_mock_sop_quality_graph(
+        raw_graph_output: dict[str, Any] | None = None
+        async for event in stream_mock_sop_quality_graph(
             run_id=str(run_id),
             sop_snapshot=run.subject_snapshot,
-        )
-        await repository.append_event(
-            run_id,
-            event_type="updates",
-            thread_id=run.thread_id,
-            payload={"status": raw_graph_output["status"]},
-            node="validate_sop",
-        )
+        ):
+            raw_graph_output = event.get("raw_graph_output", raw_graph_output)
+            await repository.append_event(
+                run_id,
+                event_type=event["type"],
+                thread_id=run.thread_id,
+                payload=event["payload"],
+                node=event.get("node"),
+            )
+        if raw_graph_output is None:
+            raw_graph_output = {"status": "mock_success"}
         await repository.append_event(
             run_id,
             event_type="done",
