@@ -76,6 +76,15 @@ export async function getSopRunHistory(
   return requestJson<SopRunHistoryItem[]>(buildSopRunsUrl(sopId, envKey));
 }
 
+export async function getRecentSopRuns(
+  envKey: string,
+  limit = 50,
+): Promise<SopRunHistoryItem[]> {
+  return requestJson<SopRunHistoryItem[]>(
+    `/api/sop/recent/runs?env=${encodeURIComponent(envKey)}&limit=${limit}`,
+  );
+}
+
 function buildSopRunsUrl(sopId: string, envKey: string): string {
   return `/api/sop/${encodeURIComponent(sopId)}/runs?env=${encodeURIComponent(
     envKey,

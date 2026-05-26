@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { RunObserver } from "../../runs/components/RunObserver";
 import { startSopQualityRun } from "../api";
-import { useSopEnvironments, useSopRunHistory } from "../hooks";
+import { useRecentSopRuns, useSopEnvironments } from "../hooks";
 import type { SopRunHistoryItem } from "../types";
 
 type ChatPageProps = {
-  defaultHistorySopId?: string;
   initialSopId?: string;
   registeredNodeIds?: string[];
 };
-
-const DEFAULT_HISTORY_SOP_ID = "release-checklist";
 
 const DEFAULT_REGISTERED_NODE_IDS = [
   "load_sop",
@@ -20,11 +17,10 @@ const DEFAULT_REGISTERED_NODE_IDS = [
 ];
 
 export function ChatPage({
-  defaultHistorySopId = DEFAULT_HISTORY_SOP_ID,
   initialSopId = "",
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
 }: ChatPageProps) {
-  const [sopId, setSopId] = useState(initialSopId || defaultHistorySopId);
+  const [sopId, setSopId] = useState(initialSopId);
   const [pendingSopId, setPendingSopId] = useState(initialSopId);
   const [selectedEnv, setSelectedEnv] = useState("");
   const [observedRunId, setObservedRunId] = useState<string | null>(null);
@@ -39,7 +35,7 @@ export function ChatPage({
   observedRunIdRef.current = observedRunId;
 
   const environments = useSopEnvironments();
-  const history = useSopRunHistory(sopId, selectedEnv, historyRefreshKey);
+  const history = useRecentSopRuns(selectedEnv, historyRefreshKey);
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
@@ -113,7 +109,7 @@ export function ChatPage({
     setStartError(null);
     setStartMessage(null);
     setStarting(false);
-    setSopId(initialSopId || defaultHistorySopId);
+    setSopId(initialSopId);
     setPendingSopId(initialSopId);
   }
 

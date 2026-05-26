@@ -97,6 +97,17 @@ async def start_sop_run(
     )
 
 
+@router.get("/recent/runs")
+async def list_recent_sop_runs(
+    repository: RunRepositoryDep,
+    env: Annotated[str, Query()],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[RunSummary]:
+    _get_environment_or_404(env)
+    runs = await repository.list_recent_sop_runs(env_key=env, limit=limit)
+    return [run_to_summary(run) for run in runs]
+
+
 @router.get("/{sop_id}/runs")
 async def list_sop_runs(
     sop_id: str,
