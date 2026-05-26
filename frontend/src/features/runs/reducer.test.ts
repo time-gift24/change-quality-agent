@@ -65,6 +65,32 @@ describe("run event reducer", () => {
     expect(state.nodes.check_steps?.value).toEqual(value);
   });
 
+  it("does not let updates overwrite a failed node status", () => {
+    const failed = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "tasks",
+        node: "check_steps",
+        sequence: 1,
+        payload: { status: "failed", error: "validation failed" },
+      }),
+    );
+
+    const state = reduceRunEvent(
+      failed,
+      event({
+        type: "updates",
+        node: "check_steps",
+        sequence: 2,
+        payload: { value: { checked_steps: 2 } },
+      }),
+    );
+
+    expect(state.nodes.check_steps?.status).toBe("error");
+    expect(state.nodes.check_steps?.error).toBe("validation failed");
+    expect(state.nodes.check_steps?.value).toEqual({ checked_steps: 2 });
+  });
+
   it("stores custom progress on the producing node", () => {
     const progress = { current: 2, total: 3 };
     const state = reduceRunEvent(
@@ -93,6 +119,31 @@ describe("run event reducer", () => {
 
     expect(state.isRunning).toBe(false);
     expect(state.latestSequence).toBe(6);
+  });
+
+  it("marks still-running nodes done when the run finishes", () => {
+    const running = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 5,
+        payload: { delta: "checking..." },
+      }),
+    );
+
+    const state = reduceRunEvent(
+      running,
+      event({
+        type: "done",
+        node: null,
+        sequence: 6,
+        payload: { status: "success" },
+      }),
+    );
+
+    expect(state.nodes.check_steps?.status).toBe("done");
+    expect(state.isRunning).toBe(false);
   });
 
   it("orders unknown nodes after registered nodes by first sequence", () => {
@@ -143,6 +194,31 @@ describe("run event reducer", () => {
 
     expect(recovered.nodes.check_steps?.status).toBe("done");
     expect(recovered.nodes.check_steps?.error).toBeUndefined();
+  });
+
+  it("keeps an existing task error when a repeated failure omits the message", () => {
+    const failed = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "tasks",
+        node: "check_steps",
+        sequence: 1,
+        payload: { status: "failed", error: "original failure" },
+      }),
+    );
+
+    const repeated = reduceRunEvent(
+      failed,
+      event({
+        type: "tasks",
+        node: "check_steps",
+        sequence: 2,
+        payload: { status: "failed" },
+      }),
+    );
+
+    expect(repeated.nodes.check_steps?.status).toBe("error");
+    expect(repeated.nodes.check_steps?.error).toBe("original failure");
   });
 });
 

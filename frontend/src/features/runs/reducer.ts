@@ -47,6 +47,7 @@ export function reduceRunEvent(
   if (event.type === "done") {
     return {
       ...nextState,
+      nodes: settleRunningNodes(nextState.nodes),
       isRunning: false,
       connectionStatus: "closed",
     };
@@ -87,7 +88,7 @@ export function reduceRunEvent(
         return {
           ...node,
           status: nextStatus,
-          error: taskError(event, nextStatus),
+          error: taskError(event, nextStatus, node.error),
         };
       },
       event.sequence,
@@ -113,7 +114,7 @@ export function reduceRunEvent(
       event.node,
       (node) => ({
         ...node,
-        status: "done",
+        status: isFailureStatus(node.status) ? node.status : "done",
         value: updateValue(event),
       }),
       event.sequence,
@@ -190,6 +191,21 @@ function createNodeRuntime(): NodeRuntime {
   };
 }
 
+function settleRunningNodes(
+  nodes: Record<string, NodeRuntime>,
+): Record<string, NodeRuntime> {
+  return Object.fromEntries(
+    Object.entries(nodes).map(([nodeId, node]) => [
+      nodeId,
+      node.status === "running" ? { ...node, status: "done" } : node,
+    ]),
+  );
+}
+
+function isFailureStatus(status: NodeRuntimeStatus): boolean {
+  return status === "error" || status === "interrupted";
+}
+
 function taskStatus(
   event: RunEvent,
   fallback: NodeRuntimeStatus,
@@ -224,12 +240,13 @@ function taskStatus(
 function taskError(
   event: RunEvent,
   status: NodeRuntimeStatus,
+  fallback?: string,
 ): string | undefined {
   if (status !== "error" && status !== "interrupted") {
     return undefined;
   }
 
-  return stringPayloadValue(event, "error");
+  return stringPayloadValue(event, "error") ?? fallback;
 }
 
 function eventError(event: RunEvent): string | undefined {
