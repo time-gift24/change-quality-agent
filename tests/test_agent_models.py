@@ -1,3 +1,6 @@
+from sqlalchemy import inspect
+from sqlalchemy.orm import configure_mappers
+
 from app.models.agents import Agent, AgentVersion
 
 
@@ -33,3 +36,20 @@ def test_agent_version_has_expected_indexes() -> None:
         "agent_id",
         "published_at",
     ]
+
+
+def test_agent_relationship_mappers_configure_for_circular_foreign_keys() -> None:
+    configure_mappers()
+
+    agent_relationships = inspect(Agent).relationships
+
+    versions = agent_relationships["versions"]
+    latest_version = agent_relationships["latest_version"]
+
+    assert (Agent.__table__.c.id, AgentVersion.__table__.c.agent_id) in (
+        versions.synchronize_pairs
+    )
+    assert (AgentVersion.__table__.c.id, Agent.__table__.c.latest_version_id) in (
+        latest_version.synchronize_pairs
+    )
+    assert latest_version.post_update is True
