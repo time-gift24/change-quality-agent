@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.mcp_servers import McpServerRepository
+from app.repositories.provider_credentials import ProviderCredentialRepository
 from app.repositories.runs import RunRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
@@ -45,6 +46,18 @@ def get_mcp_repository(session: SessionDep) -> McpServerRepository:
 
 
 McpRepositoryDep = Annotated[McpServerRepository, Depends(get_mcp_repository)]
+
+
+def get_provider_credential_repository(
+    session: SessionDep,
+) -> ProviderCredentialRepository:
+    return ProviderCredentialRepository(session)
+
+
+ProviderCredentialRepositoryDep = Annotated[
+    ProviderCredentialRepository,
+    Depends(get_provider_credential_repository),
+]
 
 
 def require_mcp_admin(
