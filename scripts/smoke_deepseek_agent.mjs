@@ -1,5 +1,9 @@
 import { spawn } from "node:child_process";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(scriptDir, "..");
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://127.0.0.1:5173";
 const USER_ID = process.env.SMOKE_USER_ID ?? "local-user";
@@ -30,9 +34,12 @@ function sleep(ms) {
 }
 
 async function main() {
+  logStep("Applying database migrations");
+  await runCommand("uv", ["run", "alembic", "upgrade", "head"]);
+
   logStep("Starting local backend and frontend with make dev");
   devProcess = spawn("make", ["dev"], {
-    cwd: process.cwd(),
+    cwd: repoRoot,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
@@ -205,14 +212,46 @@ async function requestJson(url, options) {
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const text = await response.text();
-  const data = text ? parseJson(text, options.stage) : null;
   if (response.status !== options.expectedStatus) {
     throw new Error(
       `${options.stage} failed: expected ${options.expectedStatus}, got ` +
         `${response.status}. Body: ${text}`,
     );
   }
+  const data = text ? parseJson(text, options.stage) : null;
   return data;
+}
+
+function runCommand(command, args) {
+  return new Promise((resolveRun, reject) => {
+    const child = spawn(command, args, {
+      cwd: repoRoot,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+      process.stdout.write(`[${command}] ${chunk}`);
+    });
+    child.stderr.on("data", (chunk) => {
+      output += chunk;
+      process.stderr.write(`[${command}] ${chunk}`);
+    });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolveRun();
+        return;
+      }
+      reject(
+        new Error(
+          `${command} ${args.join(" ")} failed: code=${code} signal=${signal}\n` +
+            output,
+        ),
+      );
+    });
+  });
 }
 
 function parseJson(text, stage) {
