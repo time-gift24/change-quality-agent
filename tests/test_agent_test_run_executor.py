@@ -1,6 +1,8 @@
+import json
 from uuid import UUID, uuid4
 
 import pytest
+from langchain_core.messages import AIMessage
 
 from agent.react_runtime import AgentRunResult
 from app.schemas.runs import RunStatus
@@ -154,6 +156,37 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
         },
     )
     assert run_repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_sanitizes_raw_graph_output_before_persistence() -> None:
+    version = FakeVersion()
+    run = FakeRun(version)
+    run_repository = FakeRunRepository(run)
+    agent_repository = FakeAgentRepository(version)
+    result = AgentRunResult(
+        messages=[{"role": "assistant", "content": "Review passed."}],
+        raw_output={
+            "messages": [AIMessage(content="Review passed.")],
+            "nested": {"message": AIMessage(content="Nested review details.")},
+        },
+    )
+    runtime = FakeRuntime(result=result)
+
+    await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=agent_repository,
+        runtime=runtime,
+    )
+
+    assert run_repository.terminal is not None
+    status, terminal_kwargs = run_repository.terminal
+    assert status == RunStatus.success
+    raw_graph_output = terminal_kwargs["raw_graph_output"]
+    json.dumps(raw_graph_output)
+    assert raw_graph_output["messages"][0]["content"] == "Review passed."
+    assert raw_graph_output["nested"]["message"]["content"] == "Nested review details."
 
 
 @pytest.mark.asyncio

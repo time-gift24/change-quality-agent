@@ -1,6 +1,9 @@
+import importlib.util
+import json
 from uuid import uuid4
 
 import pytest
+from langchain_core.messages import AIMessage
 
 from agent.react_runtime import AgentRuntime
 
@@ -32,6 +35,12 @@ class FakeAgent:
     async def ainvoke(self, payload):
         self.inputs.append(payload)
         return self.output
+
+
+def test_openai_provider_integration_is_available_without_network() -> None:
+    spec = importlib.util.find_spec("langchain_openai")
+
+    assert spec is not None
 
 
 @pytest.mark.asyncio
@@ -68,6 +77,28 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
     assert agent.inputs == [{"messages": input_messages}]
     assert result.messages == raw_output["messages"]
     assert result.raw_output == raw_output
+
+
+@pytest.mark.asyncio
+async def test_runtime_returns_json_serializable_raw_output_for_langchain_messages() -> None:
+    raw_output = {
+        "messages": [AIMessage(content="Review passed.")],
+        "nested": {"message": AIMessage(content="Nested review details.")},
+    }
+    runtime = AgentRuntime(
+        create_agent=lambda **_: FakeAgent(raw_output),
+        tool_resolver=FakeResolver(),
+    )
+
+    result = await runtime.run(
+        version=FakeVersion(),
+        messages=[{"role": "user", "content": "Can this deploy?"}],
+    )
+
+    json.dumps(result.raw_output)
+    assert result.messages[0]["content"] == "Review passed."
+    assert result.raw_output["messages"][0]["content"] == "Review passed."
+    assert result.raw_output["nested"]["message"]["content"] == "Nested review details."
 
 
 @pytest.mark.asyncio

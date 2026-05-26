@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.react_runtime import AgentRuntime
+from agent.react_runtime import AgentRuntime, to_jsonable
 from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
@@ -199,11 +199,13 @@ async def run_agent_test(
             version=version,
             messages=list(run.subject_snapshot.get("messages", [])),
         )
+        result_messages = to_jsonable(result.messages)
+        raw_graph_output = to_jsonable(result.raw_output)
         await run_repository.append_event(
             run_id,
             event_type="messages",
             thread_id=run.thread_id,
-            payload={"messages": result.messages},
+            payload={"messages": result_messages},
             node="agent",
         )
         await run_repository.append_event(
@@ -215,12 +217,12 @@ async def run_agent_test(
         await run_repository.mark_terminal(
             run_id,
             RunStatus.success,
-            structured_result={"messages": result.messages},
-            raw_graph_output=result.raw_output,
+            structured_result={"messages": result_messages},
+            raw_graph_output=raw_graph_output,
             result_status="success",
         )
         await _commit_if_available(run_repository)
-        return {"status": "success", "messages": result.messages}
+        return {"status": "success", "messages": result_messages}
     except Exception as exc:
         error = {"type": type(exc).__name__, "message": str(exc)}
         await _append_error_event(run_repository, run, error)

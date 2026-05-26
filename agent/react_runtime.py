@@ -1,4 +1,5 @@
 import inspect
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -46,7 +47,7 @@ class AgentRuntime:
             system_prompt=version.system_prompt,
         )
         raw_output = await self._invoke(agent, {"messages": messages})
-        output = dict(raw_output) if isinstance(raw_output, Mapping) else {}
+        output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
         return AgentRunResult(
             messages=_extract_messages(output),
             raw_output=output,
@@ -70,6 +71,43 @@ class AgentRuntime:
         return result
 
 
+def to_jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+
+    if isinstance(value, Mapping):
+        return {_json_key(key): to_jsonable(item) for key, item in value.items()}
+
+    if isinstance(value, list | tuple | set | frozenset):
+        return [to_jsonable(item) for item in value]
+
+    model_dump = getattr(value, "model_dump", None)
+    if model_dump is not None:
+        try:
+            return to_jsonable(model_dump(mode="json"))
+        except TypeError:
+            return to_jsonable(model_dump())
+
+    to_dict = getattr(value, "dict", None)
+    if to_dict is not None:
+        return to_jsonable(to_dict())
+
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+
+    try:
+        json.dumps(value)
+    except TypeError:
+        return str(value)
+    return value
+
+
+def _json_key(key: Any) -> str:
+    if isinstance(key, str):
+        return key
+    return str(to_jsonable(key))
+
+
 def _extract_messages(output: dict[str, Any]) -> list[dict[str, Any]]:
     messages = output.get("messages", [])
     if not isinstance(messages, list):
@@ -78,18 +116,7 @@ def _extract_messages(output: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _message_to_dict(message: Any) -> dict[str, Any]:
-    if isinstance(message, Mapping):
-        return dict(message)
-
-    model_dump = getattr(message, "model_dump", None)
-    if model_dump is not None:
-        try:
-            return dict(model_dump(mode="json"))
-        except TypeError:
-            return dict(model_dump())
-
-    to_dict = getattr(message, "dict", None)
-    if to_dict is not None:
-        return dict(to_dict())
-
-    return {"content": str(message)}
+    converted = to_jsonable(message)
+    if isinstance(converted, Mapping):
+        return dict(converted)
+    return {"content": str(converted)}
