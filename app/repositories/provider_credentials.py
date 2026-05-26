@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID
 
 from sqlalchemy import select
@@ -12,6 +12,12 @@ class ProviderCredentialNameExistsError(Exception):
     pass
 
 
+class ProviderCredentialImmutableFieldError(ValueError):
+    def __init__(self, field: str) -> None:
+        self.field = field
+        super().__init__(f"Provider credential field cannot be updated: {field}")
+
+
 class ProviderCredentialNotFoundError(Exception):
     def __init__(self, provider_id: UUID) -> None:
         self.provider_id = provider_id
@@ -19,6 +25,20 @@ class ProviderCredentialNotFoundError(Exception):
 
 
 class ProviderCredentialRepository:
+    _MUTABLE_PROVIDER_FIELDS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "name",
+            "provider",
+            "base_url",
+            "api_key_ciphertext",
+            "api_key_hint",
+            "model",
+            "metadata_",
+            "is_active",
+            "updated_by",
+        }
+    )
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -144,6 +164,10 @@ class ProviderCredentialRepository:
         provider: ProviderCredential,
         values: dict[str, Any],
     ) -> None:
+        immutable_fields = set(values) - self._MUTABLE_PROVIDER_FIELDS
+        if immutable_fields:
+            raise ProviderCredentialImmutableFieldError(sorted(immutable_fields)[0])
+
         for key, value in values.items():
             setattr(provider, key, value)
         await self._flush_mapping_name_conflict()
@@ -162,5 +186,7 @@ class ProviderCredentialRepository:
         try:
             await self._session.flush()
         except IntegrityError as exc:
+            # SQLAlchemy marks the transaction failed after a flush error; this
+            # repository owns that flush boundary and maps it to a domain error.
             await self._session.rollback()
             raise ProviderCredentialNameExistsError from exc

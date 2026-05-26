@@ -1,4 +1,6 @@
 import os
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
@@ -6,19 +8,20 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.database import Base
 from app.repositories.provider_credentials import (
+    ProviderCredentialImmutableFieldError,
     ProviderCredentialNameExistsError,
     ProviderCredentialNotFoundError,
     ProviderCredentialRepository,
 )
 
-pytestmark = [
-    pytest.mark.asyncio,
-    pytest.mark.db,
-    pytest.mark.skipif(
+
+def repository_db_test(test):
+    test = pytest.mark.asyncio(test)
+    test = pytest.mark.db(test)
+    return pytest.mark.skipif(
         not os.getenv("TEST_DATABASE_URL"),
         reason="set TEST_DATABASE_URL to run repository integration tests",
-    ),
-]
+    )(test)
 
 
 @pytest_asyncio.fixture
@@ -74,6 +77,45 @@ def global_provider_values(name: str, *, is_active: bool = True) -> dict[str, ob
     }
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["id", "scope", "owner_user_id", "credential_type"])
+async def test_update_provider_rejects_immutable_fields_without_database(
+    field: str,
+) -> None:
+    repository = object.__new__(ProviderCredentialRepository)
+    repository._flush_mapping_name_conflict = AsyncMock()
+    provider = SimpleNamespace(
+        id="provider-1",
+        scope="user",
+        owner_user_id="user-1",
+        credential_type="llm_provider",
+        name="personal-openai",
+    )
+
+    with pytest.raises(ProviderCredentialImmutableFieldError, match=field):
+        await repository._update_provider(provider, {field: "changed"})
+
+    repository._flush_mapping_name_conflict.assert_not_awaited()
+    assert provider.id == "provider-1"
+    assert provider.scope == "user"
+    assert provider.owner_user_id == "user-1"
+    assert provider.credential_type == "llm_provider"
+
+
+@pytest.mark.asyncio
+async def test_update_provider_rejects_unknown_fields_without_database() -> None:
+    repository = object.__new__(ProviderCredentialRepository)
+    repository._flush_mapping_name_conflict = AsyncMock()
+    provider = SimpleNamespace(name="personal-openai")
+
+    with pytest.raises(ProviderCredentialImmutableFieldError, match="unknown_field"):
+        await repository._update_provider(provider, {"unknown_field": "changed"})
+
+    repository._flush_mapping_name_conflict.assert_not_awaited()
+    assert not hasattr(provider, "unknown_field")
+
+
+@repository_db_test
 async def test_user_provider_crud_is_scoped_to_owner(session) -> None:
     repository = ProviderCredentialRepository(session)
     provider = await repository.create_llm_provider(
@@ -88,6 +130,7 @@ async def test_user_provider_crud_is_scoped_to_owner(session) -> None:
     assert other_user is None
 
 
+@repository_db_test
 async def test_list_user_llm_providers_returns_only_active_records_for_owner(
     session,
 ) -> None:
@@ -106,6 +149,7 @@ async def test_list_user_llm_providers_returns_only_active_records_for_owner(
     assert [provider.id for provider in providers] == [active.id]
 
 
+@repository_db_test
 async def test_list_global_llm_providers_returns_only_active_global_records(
     session,
 ) -> None:
@@ -123,6 +167,7 @@ async def test_list_global_llm_providers_returns_only_active_global_records(
     assert [provider.id for provider in providers] == [global_provider.id]
 
 
+@repository_db_test
 async def test_soft_delete_user_llm_provider_hides_record_from_user_reads(
     session,
 ) -> None:
@@ -143,6 +188,7 @@ async def test_soft_delete_user_llm_provider_hides_record_from_user_reads(
     assert await repository.list_user_llm_providers("user-1") == []
 
 
+@repository_db_test
 async def test_update_user_llm_provider_changes_only_provided_fields(session) -> None:
     repository = ProviderCredentialRepository(session)
     provider = await repository.create_llm_provider(
@@ -164,6 +210,7 @@ async def test_update_user_llm_provider_changes_only_provided_fields(session) ->
     assert updated.updated_by == "editor"
 
 
+@repository_db_test
 async def test_update_user_llm_provider_rejects_wrong_owner(session) -> None:
     repository = ProviderCredentialRepository(session)
     provider = await repository.create_llm_provider(
@@ -178,6 +225,7 @@ async def test_update_user_llm_provider_rejects_wrong_owner(session) -> None:
         )
 
 
+@repository_db_test
 async def test_global_llm_provider_update_and_soft_delete_are_scoped_to_global(
     session,
 ) -> None:
@@ -206,6 +254,7 @@ async def test_global_llm_provider_update_and_soft_delete_are_scoped_to_global(
     assert await repository.get_global_llm_provider(user_provider.id) is None
 
 
+@repository_db_test
 async def test_update_and_delete_raise_not_found_for_missing_scoped_records(
     session,
 ) -> None:
@@ -224,6 +273,7 @@ async def test_update_and_delete_raise_not_found_for_missing_scoped_records(
         )
 
 
+@repository_db_test
 async def test_create_llm_provider_maps_duplicate_names(session) -> None:
     repository = ProviderCredentialRepository(session)
     await repository.create_llm_provider(**user_provider_values("user-1", "duplicate"))
