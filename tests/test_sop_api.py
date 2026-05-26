@@ -66,6 +66,7 @@ class FakeRunRepository:
         self.conflict_run_id = conflict_run_id
         self.created = False
         self.history = [FakeRun()]
+        self.recent_kwargs = None
 
     async def create_sop_run(self, **kwargs):
         self.created = True
@@ -74,6 +75,10 @@ class FakeRunRepository:
         return FakeRun()
 
     async def list_sop_runs(self, **kwargs):
+        return self.history
+
+    async def list_recent_sop_runs(self, **kwargs):
+        self.recent_kwargs = kwargs
         return self.history
 
     async def mark_running(self, run_id):
@@ -223,3 +228,19 @@ async def test_list_sop_run_history() -> None:
 
     assert response.status_code == 200
     assert response.json()[0]["subject_type"] == "sop"
+
+
+@pytest.mark.asyncio
+async def test_list_recent_sop_runs_by_environment() -> None:
+    repository = FakeRunRepository()
+    app.dependency_overrides[get_run_repository] = lambda: repository
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/sop/recent/runs?env=dev&limit=10")
+
+    assert response.status_code == 200
+    assert response.json()[0]["subject_id"] == "release-checklist"
+    assert repository.recent_kwargs == {"env_key": "dev", "limit": 10}

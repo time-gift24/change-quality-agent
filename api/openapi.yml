@@ -107,6 +107,35 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/ValidationError"
+  /api/sop/recent/runs:
+    get:
+      tags:
+        - sop
+      summary: List recent SOP runs for one environment
+      operationId: listRecentSopRuns
+      parameters:
+        - $ref: "#/components/parameters/EnvironmentKey"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Recent SOP runs for the environment, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RunSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
   /api/runs/{run_id}:
     get:
       tags:

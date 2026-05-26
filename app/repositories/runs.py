@@ -93,6 +93,21 @@ class RunRepository:
         )
         return list((await self._session.scalars(statement)).all())
 
+    async def list_recent_sop_runs(
+        self,
+        *,
+        env_key: str,
+        limit: int = 20,
+    ) -> list[Run]:
+        statement = (
+            select(Run)
+            .where(Run.subject_type == "sop")
+            .where(Run.env_key == env_key)
+            .order_by(Run.created_at.desc())
+            .limit(limit)
+        )
+        return list((await self._session.scalars(statement)).all())
+
     async def mark_running(self, run_id: UUID) -> Run:
         run = await self._require_run(run_id)
         run.status = RunStatus.running.value
