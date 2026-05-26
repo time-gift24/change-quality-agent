@@ -1,9 +1,17 @@
+from collections.abc import Generator
 import logging
 
 from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.main import app
+
+
+@pytest.fixture
+def app_routes_snapshot() -> Generator[None, None, None]:
+    routes = list(app.router.routes)
+    yield
+    app.router.routes = routes
 
 
 @pytest.mark.asyncio
@@ -56,6 +64,7 @@ async def test_access_log_can_be_disabled(
 @pytest.mark.asyncio
 async def test_access_log_records_request_exceptions(
     caplog: pytest.LogCaptureFixture,
+    app_routes_snapshot: None,
 ) -> None:
     @app.get("/__test_error")
     async def test_error() -> None:
