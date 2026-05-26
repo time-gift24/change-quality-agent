@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.core.config import settings
 from app.main import app
 from app.repositories.provider_credentials import (
     ProviderCredentialImmutableFieldError,
@@ -130,7 +131,8 @@ class FakeProviderCredentialRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "app_environment", "local")
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()

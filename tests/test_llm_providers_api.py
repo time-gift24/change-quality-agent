@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.core.config import settings
 from app.main import app
 from app.repositories.provider_credentials import (
     ProviderCredentialImmutableFieldError,
@@ -140,7 +141,8 @@ class FakeProviderCredentialRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "app_environment", "local")
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
@@ -172,6 +174,25 @@ async def test_list_llm_providers_requires_user_header() -> None:
         base_url="http://test",
     ) as client:
         response = await client.get("/api/llm-providers")
+
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_llm_provider_routes_ignore_fake_headers_outside_local(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_environment", "production")
+    override_repository(FakeProviderCredentialRepository())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.get(
+            "/api/llm-providers",
+            headers={"x-user-id": "user-123"},
+        )
 
     assert response.status_code == 401
 

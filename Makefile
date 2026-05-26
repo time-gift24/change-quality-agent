@@ -1,19 +1,23 @@
 SERVICE ?= change-quality-agent
 HOST ?= 127.0.0.1
 PORT ?= 8000
+FRONTEND_HOST ?= 127.0.0.1
+FRONTEND_PORT ?= 5173
 LOG_LINES ?= 200
 LOG_SINCE ?= 1 hour ago
 JOURNAL_VACUUM_SIZE ?= 1G
 JOURNAL_VACUUM_TIME ?= 14d
 
-.PHONY: help test dev run logs logs-follow logs-since logs-disk-usage logs-vacuum-size logs-vacuum-time service-status service-restart
+.PHONY: help test dev dev-api dev-frontend run logs logs-follow logs-since logs-disk-usage logs-vacuum-size logs-vacuum-time service-status service-restart
 
 help:
 	@echo "Change Quality Agent targets"
 	@echo ""
 	@echo "Local development:"
 	@echo "  make test              Run the pytest suite"
-	@echo "  make dev               Run FastAPI dev server with reload"
+	@echo "  make dev               Run local backend and frontend dev servers"
+	@echo "  make dev-api           Run local FastAPI dev server with fake auth"
+	@echo "  make dev-frontend      Run Vite frontend dev server"
 	@echo "  make run               Run FastAPI production-style server"
 	@echo ""
 	@echo "systemd/journald logs (override SERVICE=<unit>):"
@@ -34,7 +38,20 @@ test:
 
 
 dev:
-	LOG_LEVEL=$${LOG_LEVEL:-INFO} ACCESS_LOG_ENABLED=$${ACCESS_LOG_ENABLED:-true} uv run fastapi dev --host $(HOST) --port $(PORT)
+	@$(MAKE) --no-print-directory dev-api & \
+	api_pid=$$!; \
+	$(MAKE) --no-print-directory dev-frontend & \
+	frontend_pid=$$!; \
+	trap 'kill $$api_pid $$frontend_pid 2>/dev/null || true' INT TERM EXIT; \
+	wait $$api_pid $$frontend_pid
+
+
+dev-api:
+	APP_ENVIRONMENT=local LOG_LEVEL=$${LOG_LEVEL:-INFO} ACCESS_LOG_ENABLED=$${ACCESS_LOG_ENABLED:-true} uv run fastapi dev --host $(HOST) --port $(PORT)
+
+
+dev-frontend:
+	cd frontend && npm run dev -- --host $(FRONTEND_HOST) --port $(FRONTEND_PORT)
 
 
 run:

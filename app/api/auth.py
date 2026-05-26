@@ -3,6 +3,8 @@ from typing import Awaitable, Callable
 
 from fastapi import HTTPException, Request, Response, status
 
+from app.core.config import settings
+
 
 @dataclass(frozen=True)
 class CurrentUser:
@@ -18,6 +20,10 @@ async def fake_auth_middleware(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
+    if settings.app_environment != "local":
+        request.state.current_user = None
+        return await call_next(request)
+
     user_id = request.headers.get("x-user-id")
     role = request.headers.get("x-user-role") or "user"
     request.state.current_user = (

@@ -10,6 +10,12 @@ from app.api.auth import (
     get_current_user,
     require_admin_user,
 )
+from app.core.config import settings
+
+
+@pytest.fixture(autouse=True)
+def enable_local_fake_auth(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "app_environment", "local")
 
 
 def create_probe_app() -> FastAPI:
@@ -81,6 +87,29 @@ async def test_fake_auth_middleware_defaults_role_to_user() -> None:
     assert response.json() == {
         "user_id": "user-123",
         "role": "user",
+        "is_admin": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_fake_auth_middleware_ignores_headers_outside_local(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "app_environment", "production")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=create_probe_app()),
+        base_url="http://test",
+    ) as client:
+        response = await client.get(
+            "/state",
+            headers={"x-user-id": "admin-123", "x-user-role": "admin"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "user_id": None,
+        "role": None,
         "is_admin": False,
     }
 
