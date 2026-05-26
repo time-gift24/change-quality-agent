@@ -141,6 +141,77 @@ describe("mcp hooks", () => {
     expect(updateMcpServer).toHaveBeenCalledTimes(1);
     expect(getMcpServer).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps pending true while concurrent mutations are still running", async () => {
+    const first = deferred<McpServerDetail>();
+    const second = deferred<McpServerDetail>();
+
+    vi.mocked(createMcpServer)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const { result } = renderHook(() => useMcpMutations());
+
+    let firstPromise: Promise<McpServerDetail>;
+    let secondPromise: Promise<McpServerDetail>;
+
+    act(() => {
+      firstPromise = result.current.createServer({
+        command: "echo",
+        name: "Server 1",
+        transport: "stdio",
+      });
+      secondPromise = result.current.createServer({
+        command: "echo",
+        name: "Server 2",
+        transport: "stdio",
+      });
+    });
+
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => {
+      first.resolve(buildDetail({ id: "srv-1", name: "Server 1" }));
+      await firstPromise;
+    });
+
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => {
+      second.resolve(buildDetail({ id: "srv-2", name: "Server 2" }));
+      await secondPromise;
+    });
+
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("resolves mutation when onSuccess callback fails and exposes callback error", async () => {
+    const callbackError = new Error("refresh failed");
+    const apiResult = buildDetail({ id: "srv-1", name: "Server 1" });
+    const onSuccess = vi.fn(async () => {
+      throw callbackError;
+    });
+
+    vi.mocked(createMcpServer).mockResolvedValueOnce(apiResult);
+
+    const { result } = renderHook(() => useMcpMutations({ onSuccess }));
+
+    let resolved: McpServerDetail | null = null;
+
+    await act(async () => {
+      resolved = await result.current.createServer({
+        command: "echo",
+        name: "Server 1",
+        transport: "stdio",
+      });
+    });
+
+    expect(resolved).toEqual(apiResult);
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error?.message).toBe("refresh failed");
+  });
 });
 
 function buildSummary(overrides: Partial<McpServerSummary> = {}): McpServerSummary {
@@ -169,4 +240,21 @@ function buildDetail(overrides: Partial<McpServerDetail> = {}): McpServerDetail 
     tools: [],
     ...overrides,
   };
+}
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => {};
+  let reject: (reason?: unknown) => void = () => {};
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
 }

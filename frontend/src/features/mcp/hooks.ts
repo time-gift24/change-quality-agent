@@ -182,7 +182,7 @@ export function useMcpMutations(
   options: UseMcpMutationsOptions = {},
 ): UseMcpMutationsResult {
   const { onSuccess } = options;
-  const [pending, setPending] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const [error, setError] = useState<Error | null>(null);
 
   const runMutation = useCallback(
@@ -190,18 +190,33 @@ export function useMcpMutations(
       action: () => Promise<TResult>,
       mutationOptions?: MutationOptions<TResult>,
     ): Promise<TResult> => {
-      setPending(true);
+      setPendingCount((current) => current + 1);
       setError(null);
 
       try {
         const result = await action();
+        let callbackError: Error | null = null;
 
         if (onSuccess) {
-          await onSuccess();
+          try {
+            await onSuccess();
+          } catch (mutationSuccessError) {
+            callbackError = asError(mutationSuccessError);
+          }
         }
 
         if (mutationOptions?.onSuccess) {
-          await mutationOptions.onSuccess(result);
+          try {
+            await mutationOptions.onSuccess(result);
+          } catch (mutationSuccessError) {
+            if (!callbackError) {
+              callbackError = asError(mutationSuccessError);
+            }
+          }
+        }
+
+        if (callbackError) {
+          setError(callbackError);
         }
 
         return result;
@@ -210,7 +225,7 @@ export function useMcpMutations(
         setError(nextError);
         throw nextError;
       } finally {
-        setPending(false);
+        setPendingCount((current) => Math.max(0, current - 1));
       }
     },
     [onSuccess],
@@ -276,7 +291,7 @@ export function useMcpMutations(
     createServer,
     deleteServer,
     error,
-    pending,
+    pending: pendingCount > 0,
     restartServer,
     startServer,
     stopServer,
