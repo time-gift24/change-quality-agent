@@ -70,6 +70,53 @@ class RunRepository:
             raise
         return run
 
+    async def create_agent_test_run(
+        self,
+        *,
+        agent_key: str,
+        agent_version: Any,
+        messages: list[dict[str, Any]],
+        input_preview: str,
+        created_by: str | None = None,
+        assistant_id: str = "react-agent-test-v1",
+    ) -> Run:
+        agent_id = str(agent_version.agent_id)
+        agent_version_id = str(agent_version.id)
+        version_number = agent_version.version_number
+        run = Run(
+            thread_id=str(uuid4()),
+            assistant_id=assistant_id,
+            subject_type="agent_test",
+            subject_id=agent_key,
+            env_key=None,
+            status=RunStatus.pending.value,
+            active_conflict_key=None,
+            metadata_={
+                "subject_type": "agent_test",
+                "subject_id": agent_key,
+                "agent_id": agent_id,
+                "agent_key": agent_key,
+                "agent_version_id": agent_version_id,
+                "agent_version_number": version_number,
+                "run_kind": "agent_test",
+                "input_preview": input_preview,
+            },
+            kwargs={
+                "agent_key": agent_key,
+                "agent_version_id": agent_version_id,
+                "agent_version_number": version_number,
+            },
+            completed_nodes=[],
+            subject_snapshot={
+                "messages": [dict(message) for message in messages],
+                "agent_version": _agent_version_snapshot(agent_version),
+            },
+            created_by=created_by,
+        )
+        self._session.add(run)
+        await self._session.flush()
+        return run
+
     async def get_run(self, run_id: UUID) -> Run | None:
         run = await self._session.get(Run, run_id)
         if run is not None:
@@ -238,3 +285,16 @@ class RunRepository:
         locked_run_id = await self._session.scalar(statement)
         if locked_run_id is None:
             raise KeyError(run_id)
+
+
+def _agent_version_snapshot(agent_version: Any) -> dict[str, Any]:
+    snapshot: dict[str, Any] = {
+        "id": str(agent_version.id),
+        "version_number": agent_version.version_number,
+        "model": agent_version.model,
+    }
+    if hasattr(agent_version, "tool_allowlist"):
+        snapshot["tool_allowlist"] = list(agent_version.tool_allowlist)
+    if hasattr(agent_version, "mcp_server_ids"):
+        snapshot["mcp_server_ids"] = list(agent_version.mcp_server_ids)
+    return snapshot

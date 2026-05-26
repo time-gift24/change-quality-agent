@@ -3,8 +3,15 @@ from pathlib import Path
 import yaml
 
 
+CONTRACT_PATH = Path(__file__).resolve().parents[1] / "api" / "openapi.yml"
+
+
+def load_contract() -> dict:
+    return yaml.safe_load(CONTRACT_PATH.read_text())
+
+
 def test_openapi_includes_mcp_server_routes() -> None:
-    spec = yaml.safe_load(Path("api/openapi.yml").read_text())
+    spec = load_contract()
     paths = spec["paths"]
 
     expected_paths = {
@@ -37,11 +44,120 @@ def test_openapi_includes_mcp_server_routes() -> None:
         "in": "header",
         "name": "X-MCP-Admin-Token",
     }
-    assert paths["/api/mcp/servers"]["get"]["security"] == [
-        {"McpAdminToken": []}
-    ]
+    assert paths["/api/mcp/servers"]["get"]["security"] == [{"McpAdminToken": []}]
 
     lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
         "responses"
     ]
     assert "502" in lifecycle_responses
+
+
+def test_agents_tag_and_paths_are_documented() -> None:
+    contract = load_contract()
+
+    tag_descriptions = {tag["name"]: tag["description"] for tag in contract["tags"]}
+    assert tag_descriptions["agents"] == (
+        "ReAct agent definitions, versions, and test runs."
+    )
+
+    paths = contract["paths"]
+    expected_operations = {
+        ("/api/agents", "get"): {"200", "422"},
+        ("/api/agents", "post"): {"201", "409", "422"},
+        ("/api/agents/{agent_key}", "get"): {"200", "404", "422"},
+        ("/api/agents/{agent_key}", "delete"): {"204", "404", "422"},
+        ("/api/agents/{agent_key}/draft", "patch"): {"200", "404", "422"},
+        ("/api/agents/{agent_key}/publish", "post"): {
+            "201",
+            "400",
+            "404",
+            "422",
+        },
+        ("/api/agents/{agent_key}/versions", "get"): {"200", "404", "422"},
+        ("/api/agents/{agent_key}/versions/{version_number}", "get"): {
+            "200",
+            "404",
+            "422",
+        },
+        ("/api/agents/{agent_key}/test-runs", "post"): {"202", "400", "404", "422"},
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["tags"] == ["agents"]
+        assert statuses <= set(operation["responses"])
+
+
+def test_agents_parameters_are_reusable_and_referenced() -> None:
+    contract = load_contract()
+    parameters = contract["components"]["parameters"]
+
+    assert parameters["AgentKey"] == {
+        "name": "agent_key",
+        "in": "path",
+        "required": True,
+        "schema": {"type": "string"},
+        "example": "release-reviewer",
+    }
+    assert parameters["AgentVersionNumber"] == {
+        "name": "version_number",
+        "in": "path",
+        "required": True,
+        "schema": {"type": "integer", "minimum": 1},
+        "example": 1,
+    }
+
+    paths = contract["paths"]
+    agent_key_ref = {"$ref": "#/components/parameters/AgentKey"}
+    version_ref = {"$ref": "#/components/parameters/AgentVersionNumber"}
+    assert agent_key_ref in paths["/api/agents/{agent_key}"]["get"]["parameters"]
+    assert agent_key_ref in paths["/api/agents/{agent_key}/draft"]["patch"][
+        "parameters"
+    ]
+    assert version_ref in paths["/api/agents/{agent_key}/versions/{version_number}"][
+        "get"
+    ]["parameters"]
+
+
+def test_agent_schemas_use_api_json_field_names() -> None:
+    schemas = load_contract()["components"]["schemas"]
+
+    for schema_name in (
+        "AgentDraftConfig",
+        "AgentCreate",
+        "AgentDraftUpdate",
+        "AgentSummary",
+        "AgentDetail",
+        "AgentVersionSummary",
+        "AgentVersionDetail",
+        "AgentMessage",
+        "AgentTestRunCreate",
+    ):
+        assert schema_name in schemas
+
+    draft_properties = schemas["AgentDraftConfig"]["properties"]
+    assert "model_config" in draft_properties
+    assert "model_parameters" not in draft_properties
+    assert schemas["AgentCreate"]["properties"]["draft"] == {
+        "$ref": "#/components/schemas/AgentDraftConfig"
+    }
+    assert schemas["AgentTestRunCreate"]["properties"]["messages"]["items"] == {
+        "$ref": "#/components/schemas/AgentMessage"
+    }
+
+    version_properties = schemas["AgentVersionDetail"]["properties"]
+    assert "model_config" in version_properties
+    assert "model_parameters" not in version_properties
+
+
+def test_agent_test_runs_response_reuses_run_start_response() -> None:
+    contract = load_contract()
+
+    responses = contract["paths"]["/api/agents/{agent_key}/test-runs"]["post"][
+        "responses"
+    ]
+    response_schema = responses["202"]["content"]["application/json"]["schema"]
+    assert response_schema == {"$ref": "#/components/schemas/RunStartResponse"}
+    assert responses["400"]["description"] == (
+        "Agent is disabled or requested agent version was not found."
+    )

@@ -2,448 +2,690 @@ openapi: 3.0.3
 info:
   title: Change Quality Agent API
   version: 0.1.0
-  description: >
-    API contract for SOP quality runs, run history, and generic run observation.
+  description: 'API contract for SOP quality runs, run history, and generic run observation.
     SOP fetching is mocked in v1.
+
+    '
 servers:
-  - url: /
+- url: /
 tags:
-  - name: sop
-    description: SOP entry points and SOP-scoped run history.
-  - name: runs
-    description: Generic run observation APIs.
-  - name: mcp
-    description: MCP server configuration and runtime management APIs.
+- name: sop
+  description: SOP entry points and SOP-scoped run history.
+- name: runs
+  description: Generic run observation APIs.
+- name: mcp
+  description: MCP server configuration and runtime management APIs.
+- name: agents
+  description: ReAct agent definitions, versions, and test runs.
 paths:
   /api/sop/environments:
     get:
       tags:
-        - sop
+      - sop
       summary: List configured SOP environments
       operationId: listSopEnvironments
       responses:
-        "200":
+        '200':
           description: Configured public environments.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/EnvironmentPublic"
+                  $ref: '#/components/schemas/EnvironmentPublic'
   /api/sop/{sop_id}:
     get:
       tags:
-        - sop
+      - sop
       summary: Preview a mocked SOP snapshot
       operationId: getSopPreview
       parameters:
-        - $ref: "#/components/parameters/SopId"
-        - $ref: "#/components/parameters/EnvironmentKey"
+      - $ref: '#/components/parameters/SopId'
+      - $ref: '#/components/parameters/EnvironmentKey'
       responses:
-        "200":
+        '200':
           description: Mocked SOP snapshot.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SopSnapshot"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/SopSnapshot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/sop/{sop_id}/runs:
     post:
       tags:
-        - sop
+      - sop
       summary: Start a quality run for a mocked SOP snapshot
       operationId: startSopRun
       parameters:
-        - $ref: "#/components/parameters/SopId"
-        - $ref: "#/components/parameters/EnvironmentKey"
+      - $ref: '#/components/parameters/SopId'
+      - $ref: '#/components/parameters/EnvironmentKey'
       responses:
-        "202":
+        '202':
           description: Run accepted and scheduled.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RunStartResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
+                $ref: '#/components/schemas/RunStartResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
           description: An active run already exists for this SOP and environment.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ActiveRunConflict"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/ActiveRunConflict'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     get:
       tags:
-        - sop
+      - sop
       summary: List SOP run history
       operationId: listSopRuns
       parameters:
-        - $ref: "#/components/parameters/SopId"
-        - $ref: "#/components/parameters/EnvironmentKey"
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+      - $ref: '#/components/parameters/SopId'
+      - $ref: '#/components/parameters/EnvironmentKey'
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
       responses:
-        "200":
+        '200':
           description: SOP run history, newest first.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/RunSummary"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                  $ref: '#/components/schemas/RunSummary'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/sop/recent/runs:
     get:
       tags:
-        - sop
+      - sop
       summary: List recent SOP runs for one environment
       operationId: listRecentSopRuns
       parameters:
-        - $ref: "#/components/parameters/EnvironmentKey"
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
+      - $ref: '#/components/parameters/EnvironmentKey'
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
       responses:
-        "200":
+        '200':
           description: Recent SOP runs for the environment, newest first.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/RunSummary"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                  $ref: '#/components/schemas/RunSummary'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/runs/{run_id}:
     get:
       tags:
-        - runs
+      - runs
       summary: Get generic run details
-      description: >
-        Generic run details intentionally do not expose SOP-specific fields such
-        as env_key at the top level.
+      description: 'Generic run details intentionally do not expose SOP-specific fields
+        such as env_key at the top level.
+
+        '
       operationId: getRun
       parameters:
-        - $ref: "#/components/parameters/RunId"
-        - name: debug
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
+      - $ref: '#/components/parameters/RunId'
+      - name: debug
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
       responses:
-        "200":
+        '200':
           description: Generic run details.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/RunDetail"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/RunDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/runs/{run_id}/events:
     get:
       tags:
-        - runs
+      - runs
       summary: Stream persisted run events
-      description: >
-        Server-Sent Events stream. The server first replays persisted events
-        with sequence greater than after, then polls persisted events until it
-        sends terminal done or error.
+      description: 'Server-Sent Events stream. The server first replays persisted
+        events with sequence greater than after, then polls persisted events until
+        it sends terminal done or error.
+
+        '
       operationId: streamRunEvents
       parameters:
-        - $ref: "#/components/parameters/RunId"
-        - name: after
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
+      - $ref: '#/components/parameters/RunId'
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
       responses:
-        "200":
-          description: >
-            SSE frames using id as sequence, event as event type, and data as a
-            JSON RunEvent envelope.
+        '200':
+          description: 'SSE frames using id as sequence, event as event type, and
+            data as a JSON RunEvent envelope.
+
+            '
           content:
             text/event-stream:
               schema:
                 type: string
-                example: |
-                  id: 3
+                example: 'id: 3
+
                   event: done
+
                   data: {"run_id":"2f4f9c1c-5f97-4c9c-89d2-9e7e3b6a1a11","sequence":3,"type":"done","node":null,"thread_id":"thread-id","checkpoint_id":null,"task_id":null,"payload":{"status":"done"},"created_at":"2026-05-25T00:00:00Z"}
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+
+                  '
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers:
     get:
       tags:
-        - mcp
+      - mcp
       summary: List MCP servers
       operationId: listMcpServers
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       responses:
-        "200":
+        '200':
           description: MCP servers with redacted config values.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/McpServerSummary"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
+                  $ref: '#/components/schemas/McpServerSummary'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     post:
       tags:
-        - mcp
+      - mcp
       summary: Create an MCP server configuration
       operationId: createMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/McpServerCreate"
+              $ref: '#/components/schemas/McpServerCreate'
       responses:
-        "201":
+        '201':
           description: Created MCP server with redacted config values.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpServerDetail"
-        "409":
+                $ref: '#/components/schemas/McpServerDetail'
+        '409':
           description: An MCP server with this name already exists.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers/{server_id}:
     get:
       tags:
-        - mcp
+      - mcp
       summary: Get MCP server details
       operationId: getMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "200":
+        '200':
           description: MCP server details and latest tool snapshot.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpServerDetail"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/McpServerDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     patch:
       tags:
-        - mcp
+      - mcp
       summary: Update an MCP server configuration
       operationId: updateMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/McpServerUpdate"
+              $ref: '#/components/schemas/McpServerUpdate'
       responses:
-        "200":
+        '200':
           description: Updated MCP server with redacted config values.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpServerDetail"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "409":
+                $ref: '#/components/schemas/McpServerDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
           description: Running MCP servers must be stopped before config updates.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     delete:
       tags:
-        - mcp
+      - mcp
       summary: Delete an MCP server configuration
       operationId: deleteMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "204":
+        '204':
           description: MCP server deleted.
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers/{server_id}/start:
     post:
       tags:
-        - mcp
+      - mcp
       summary: Start an MCP server
       operationId: startMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "200":
+        '200':
           description: Runtime status after start attempt.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpLifecycleResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/McpLifecycleResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers/{server_id}/stop:
     post:
       tags:
-        - mcp
+      - mcp
       summary: Stop an MCP server
       operationId: stopMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "200":
+        '200':
           description: Runtime status after stop attempt.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpLifecycleResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/McpLifecycleResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers/{server_id}/restart:
     post:
       tags:
-        - mcp
+      - mcp
       summary: Restart an MCP server
       operationId: restartMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "200":
+        '200':
           description: Runtime status after restart attempt.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpLifecycleResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/McpLifecycleResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/mcp/servers/{server_id}/check:
     post:
       tags:
-        - mcp
+      - mcp
       summary: Check an MCP server and refresh tools
       operationId: checkMcpServer
       security:
-        - McpAdminToken: []
+      - McpAdminToken: []
       parameters:
-        - $ref: "#/components/parameters/McpServerId"
+      - $ref: '#/components/parameters/McpServerId'
       responses:
-        "200":
+        '200':
           description: Runtime status after check attempt.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/McpLifecycleResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "502":
-          $ref: "#/components/responses/BadGateway"
-        "403":
-          $ref: "#/components/responses/Forbidden"
-        "503":
-          $ref: "#/components/responses/ServiceUnavailable"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: '#/components/schemas/McpLifecycleResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents:
+    get:
+      tags:
+      - agents
+      summary: List ReAct agents
+      operationId: listAgents
+      parameters:
+      - name: include_deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Agent summaries, newest first according to repository ordering.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentSummary'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags:
+      - agents
+      summary: Create a ReAct agent draft
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreate'
+      responses:
+        '201':
+          description: Agent created with its initial draft configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
+        '409':
+          description: Agent key already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}:
+    get:
+      tags:
+      - agents
+      summary: Get a ReAct agent
+      operationId: getAgent
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      responses:
+        '200':
+          description: Agent detail including the current draft, when present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - agents
+      summary: Delete a ReAct agent
+      operationId: deleteAgent
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      responses:
+        '204':
+          description: Agent deleted.
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}/draft:
+    patch:
+      tags:
+      - agents
+      summary: Update a ReAct agent draft
+      operationId: updateAgentDraft
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentDraftUpdate'
+      responses:
+        '200':
+          description: Updated agent detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}/publish:
+    post:
+      tags:
+      - agents
+      summary: Publish a ReAct agent draft
+      operationId: publishAgent
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      responses:
+        '201':
+          description: Published agent version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentVersionDetail'
+        '400':
+          description: Agent draft is invalid and cannot be published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}/versions:
+    get:
+      tags:
+      - agents
+      summary: List published ReAct agent versions
+      operationId: listAgentVersions
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      responses:
+        '200':
+          description: Published versions for the agent.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentVersionSummary'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}/versions/{version_number}:
+    get:
+      tags:
+      - agents
+      summary: Get a published ReAct agent version
+      operationId: getAgentVersion
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentVersionNumber'
+      responses:
+        '200':
+          description: Published agent version detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentVersionDetail'
+        '404':
+          description: Agent or version not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_key}/test-runs:
+    post:
+      tags:
+      - agents
+      summary: Start a ReAct agent test run
+      operationId: startAgentTestRun
+      parameters:
+      - $ref: '#/components/parameters/AgentKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentTestRunCreate'
+      responses:
+        '202':
+          description: Agent test run accepted and scheduled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStartResponse'
+        '400':
+          description: Agent is disabled or requested agent version was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     McpAdminToken:
@@ -479,60 +721,75 @@ components:
       schema:
         type: string
       example: dev
+    AgentKey:
+      name: agent_key
+      in: path
+      required: true
+      schema:
+        type: string
+      example: release-reviewer
+    AgentVersionNumber:
+      name: version_number
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      example: 1
   responses:
     NotFound:
       description: Unknown environment, SOP, or run.
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: '#/components/schemas/ErrorResponse'
     BadGateway:
       description: Upstream dependency or lifecycle failure before completion.
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
       description: Missing or invalid MCP admin token.
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: '#/components/schemas/ErrorResponse'
     ServiceUnavailable:
       description: MCP runtime is not configured or not enabled.
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: '#/components/schemas/ErrorResponse'
     ValidationError:
       description: Request validation error.
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ValidationErrorResponse"
+            $ref: '#/components/schemas/ValidationErrorResponse'
   schemas:
     EnvironmentPublic:
       type: object
       required:
-        - key
-        - name_zh
-        - name_en
+      - key
+      - name_zh
+      - name_en
       properties:
         key:
           type: string
           example: dev
         name_zh:
           type: string
-          example: 开发
+          example: "\u5F00\u53D1"
         name_en:
           type: string
           example: Development
     SopSnapshot:
       type: object
       required:
-        - sop_id
-        - env_key
-        - payload
+      - sop_id
+      - env_key
+      - payload
       properties:
         sop_id:
           type: string
@@ -552,25 +809,25 @@ components:
     RunStatus:
       type: string
       enum:
-        - pending
-        - running
-        - success
-        - error
-        - timeout
-        - interrupted
+      - pending
+      - running
+      - success
+      - error
+      - timeout
+      - interrupted
     RunStartResponse:
       type: object
       required:
-        - run_id
-        - status
-        - status_url
-        - events_url
+      - run_id
+      - status
+      - status_url
+      - events_url
       properties:
         run_id:
           type: string
           format: uuid
         status:
-          $ref: "#/components/schemas/RunStatus"
+          $ref: '#/components/schemas/RunStatus'
         status_url:
           type: string
         events_url:
@@ -578,10 +835,10 @@ components:
     ActiveRunConflict:
       type: object
       required:
-        - message
-        - active_run_id
-        - status_url
-        - events_url
+      - message
+      - active_run_id
+      - status_url
+      - events_url
       properties:
         message:
           type: string
@@ -595,12 +852,12 @@ components:
     RunSummary:
       type: object
       required:
-        - run_id
-        - subject_type
-        - subject_id
-        - status
-        - completed_nodes
-        - latest_sequence
+      - run_id
+      - subject_type
+      - subject_id
+      - status
+      - completed_nodes
+      - latest_sequence
       properties:
         run_id:
           type: string
@@ -612,7 +869,7 @@ components:
           type: string
           example: release-checklist
         status:
-          $ref: "#/components/schemas/RunStatus"
+          $ref: '#/components/schemas/RunStatus'
         current_node:
           type: string
           nullable: true
@@ -640,7 +897,7 @@ components:
     RunDebug:
       type: object
       required:
-        - thread_id
+      - thread_id
       properties:
         thread_id:
           type: string
@@ -657,38 +914,38 @@ components:
           additionalProperties: true
         raw_last_event:
           allOf:
-            - $ref: "#/components/schemas/RunEvent"
+          - $ref: '#/components/schemas/RunEvent'
           nullable: true
     RunDetail:
       allOf:
-        - $ref: "#/components/schemas/RunSummary"
-        - type: object
-          required:
-            - debug
-          properties:
-            debug:
-              allOf:
-                - $ref: "#/components/schemas/RunDebug"
-              nullable: true
+      - $ref: '#/components/schemas/RunSummary'
+      - type: object
+        required:
+        - debug
+        properties:
+          debug:
+            allOf:
+            - $ref: '#/components/schemas/RunDebug'
+            nullable: true
     RunEventType:
       type: string
       enum:
-        - tasks
-        - messages
-        - updates
-        - custom
-        - checkpoints
-        - error
-        - done
+      - tasks
+      - messages
+      - updates
+      - custom
+      - checkpoints
+      - error
+      - done
     RunEvent:
       type: object
       required:
-        - run_id
-        - sequence
-        - type
-        - thread_id
-        - payload
-        - created_at
+      - run_id
+      - sequence
+      - type
+      - thread_id
+      - payload
+      - created_at
       properties:
         run_id:
           type: string
@@ -697,7 +954,7 @@ components:
           type: integer
           minimum: 1
         type:
-          $ref: "#/components/schemas/RunEventType"
+          $ref: '#/components/schemas/RunEventType'
         node:
           type: string
           nullable: true
@@ -718,33 +975,33 @@ components:
     McpTransport:
       type: string
       enum:
-        - stdio
-        - http
+      - stdio
+      - http
     McpDesiredState:
       type: string
       enum:
-        - running
-        - stopped
+      - running
+      - stopped
     McpRuntimeStatus:
       type: string
       enum:
-        - unknown
-        - starting
-        - running
-        - stopping
-        - stopped
-        - error
+      - unknown
+      - starting
+      - running
+      - stopping
+      - stopped
+      - error
     McpServerCreate:
       type: object
       required:
-        - name
-        - transport
+      - name
+      - transport
       properties:
         name:
           type: string
           example: filesystem
         transport:
-          $ref: "#/components/schemas/McpTransport"
+          $ref: '#/components/schemas/McpTransport'
         command:
           type: string
           nullable: true
@@ -755,7 +1012,7 @@ components:
             type: string
           default: []
           example:
-            - mcp-server-filesystem
+          - mcp-server-filesystem
         env:
           type: object
           additionalProperties:
@@ -777,7 +1034,7 @@ components:
           default: false
         desired_state:
           allOf:
-            - $ref: "#/components/schemas/McpDesiredState"
+          - $ref: '#/components/schemas/McpDesiredState'
           default: stopped
     McpServerUpdate:
       type: object
@@ -805,12 +1062,12 @@ components:
         enabled:
           type: boolean
         desired_state:
-          $ref: "#/components/schemas/McpDesiredState"
+          $ref: '#/components/schemas/McpDesiredState'
     McpServerTool:
       type: object
       required:
-        - name
-        - input_schema
+      - name
+      - input_schema
       properties:
         name:
           type: string
@@ -829,16 +1086,16 @@ components:
     McpServerSummary:
       type: object
       required:
-        - id
-        - name
-        - transport
-        - args
-        - env
-        - headers
-        - enabled
-        - desired_state
-        - runtime_status
-        - tool_count
+      - id
+      - name
+      - transport
+      - args
+      - env
+      - headers
+      - enabled
+      - desired_state
+      - runtime_status
+      - tool_count
       properties:
         id:
           type: string
@@ -846,7 +1103,7 @@ components:
         name:
           type: string
         transport:
-          $ref: "#/components/schemas/McpTransport"
+          $ref: '#/components/schemas/McpTransport'
         command:
           type: string
           nullable: true
@@ -859,7 +1116,7 @@ components:
           additionalProperties:
             type: string
           example:
-            TOKEN: "********"
+            TOKEN: '********'
         url:
           type: string
           nullable: true
@@ -868,13 +1125,13 @@ components:
           additionalProperties:
             type: string
           example:
-            Authorization: "********"
+            Authorization: '********'
         enabled:
           type: boolean
         desired_state:
-          $ref: "#/components/schemas/McpDesiredState"
+          $ref: '#/components/schemas/McpDesiredState'
         runtime_status:
-          $ref: "#/components/schemas/McpRuntimeStatus"
+          $ref: '#/components/schemas/McpRuntimeStatus'
         last_checked_at:
           type: string
           format: date-time
@@ -887,30 +1144,30 @@ components:
           minimum: 0
     McpServerDetail:
       allOf:
-        - $ref: "#/components/schemas/McpServerSummary"
-        - type: object
-          required:
-            - tools
-          properties:
-            tools:
-              type: array
-              items:
-                $ref: "#/components/schemas/McpServerTool"
+      - $ref: '#/components/schemas/McpServerSummary'
+      - type: object
+        required:
+        - tools
+        properties:
+          tools:
+            type: array
+            items:
+              $ref: '#/components/schemas/McpServerTool'
     McpLifecycleResponse:
       type: object
       required:
-        - server_id
-        - desired_state
-        - runtime_status
-        - tool_count
+      - server_id
+      - desired_state
+      - runtime_status
+      - tool_count
       properties:
         server_id:
           type: string
           format: uuid
         desired_state:
-          $ref: "#/components/schemas/McpDesiredState"
+          $ref: '#/components/schemas/McpDesiredState'
         runtime_status:
-          $ref: "#/components/schemas/McpRuntimeStatus"
+          $ref: '#/components/schemas/McpRuntimeStatus'
         last_checked_at:
           type: string
           format: date-time
@@ -924,17 +1181,250 @@ components:
     ErrorResponse:
       type: object
       required:
-        - detail
+      - detail
       properties:
         detail:
           type: string
     ValidationErrorResponse:
       type: object
       required:
-        - detail
+      - detail
       properties:
         detail:
           type: array
           items:
             type: object
             additionalProperties: true
+    AgentDraftConfig:
+      type: object
+      required:
+      - system_prompt
+      - model
+      properties:
+        system_prompt:
+          type: string
+          minLength: 1
+        model:
+          type: string
+          minLength: 1
+        model_config:
+          type: object
+          additionalProperties: true
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        mcp_server_ids:
+          type: array
+          items:
+            type: string
+    AgentCreate:
+      type: object
+      required:
+      - key
+      - display_name
+      - draft
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]*$
+          example: release-reviewer
+        display_name:
+          type: string
+          minLength: 1
+          example: Release Reviewer
+        description:
+          type: string
+          nullable: true
+          example: Checks release quality.
+        draft:
+          $ref: '#/components/schemas/AgentDraftConfig'
+    AgentDraftUpdate:
+      type: object
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          nullable: true
+          example: Release Reviewer
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+          nullable: true
+        draft:
+          allOf:
+          - $ref: '#/components/schemas/AgentDraftConfig'
+          nullable: true
+    AgentVersionSummary:
+      type: object
+      required:
+      - id
+      - version_number
+      - model
+      - published_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+          minimum: 1
+        model:
+          type: string
+          example: openai:gpt-5-mini
+        published_at:
+          type: string
+          format: date-time
+    AgentSummary:
+      type: object
+      required:
+      - id
+      - key
+      - display_name
+      - enabled
+      - has_draft
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          example: release-reviewer
+        display_name:
+          type: string
+          example: Release Reviewer
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        has_draft:
+          type: boolean
+        latest_version:
+          allOf:
+          - $ref: '#/components/schemas/AgentVersionSummary'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AgentDetail:
+      type: object
+      required:
+      - id
+      - key
+      - display_name
+      - enabled
+      - has_draft
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          example: release-reviewer
+        display_name:
+          type: string
+          example: Release Reviewer
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        has_draft:
+          type: boolean
+        latest_version:
+          allOf:
+          - $ref: '#/components/schemas/AgentVersionSummary'
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        draft:
+          allOf:
+          - $ref: '#/components/schemas/AgentDraftConfig'
+          nullable: true
+    AgentVersionDetail:
+      type: object
+      required:
+      - id
+      - version_number
+      - model
+      - published_at
+      - agent_id
+      - system_prompt
+      properties:
+        id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+          minimum: 1
+        model:
+          type: string
+          example: openai:gpt-5-mini
+        published_at:
+          type: string
+          format: date-time
+        agent_id:
+          type: string
+          format: uuid
+        system_prompt:
+          type: string
+        model_config:
+          type: object
+          additionalProperties: true
+        tool_allowlist:
+          type: array
+          items:
+            type: string
+        mcp_server_ids:
+          type: array
+          items:
+            type: string
+        published_by:
+          type: string
+          nullable: true
+    AgentMessage:
+      type: object
+      required:
+      - role
+      - content
+      properties:
+        role:
+          type: string
+          pattern: ^(user|assistant|system)$
+          example: user
+        content:
+          type: string
+          minLength: 1
+          example: Can this deploy?
+    AgentTestRunCreate:
+      type: object
+      required:
+      - messages
+      properties:
+        version_id:
+          type: string
+          format: uuid
+          nullable: true
+        version_number:
+          type: integer
+          minimum: 1
+          nullable: true
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AgentMessage'

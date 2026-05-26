@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import async_session, get_session
+from app.repositories.agents import AgentRepository
 from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.runs import RunRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe
@@ -27,6 +28,13 @@ def get_run_repository(session: SessionDep) -> RunRepository:
 
 
 RunRepositoryDep = Annotated[RunRepository, Depends(get_run_repository)]
+
+
+def get_agent_repository(session: SessionDep) -> AgentRepository:
+    return AgentRepository(session)
+
+
+AgentRepositoryDep = Annotated[AgentRepository, Depends(get_agent_repository)]
 
 
 def get_mcp_repository(session: SessionDep) -> McpServerRepository:
