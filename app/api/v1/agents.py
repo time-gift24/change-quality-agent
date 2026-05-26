@@ -127,7 +127,12 @@ async def start_agent_test_run(
         commit=session.commit,
     )
     try:
-        result = await service.start_test_run(agent_key, payload)
+        current_user = getattr(request.state, "current_user", None)
+        result = await service.start_test_run(
+            agent_key,
+            payload,
+            current_user=current_user,
+        )
     except AgentDisabledError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
     except AgentNotFoundError as exc:

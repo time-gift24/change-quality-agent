@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.core.config import settings
 from app.core.database import get_session
 from app.main import app
 from app.repositories.agents import (
@@ -12,6 +13,7 @@ from app.repositories.agents import (
     AgentKeyExistsError,
     AgentNotFoundError,
 )
+from app.schemas.runs import RunStatus
 from app.schemas.agents import AgentDraftConfig
 
 
@@ -32,13 +34,14 @@ class FakeVersion:
         *,
         agent_id,
         version_number: int = 1,
+        provider_id=None,
         published_at: datetime = BASE_TIME,
     ) -> None:
         self.id = uuid4()
         self.agent_id = agent_id
         self.version_number = version_number
         self.system_prompt = "You are careful."
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = provider_id or uuid4()
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -65,6 +68,22 @@ class FakeAgent:
         self.created_at = BASE_TIME
         self.updated_at = BASE_TIME
         self.deleted_at = None
+
+
+class FakeRun:
+    def __init__(self) -> None:
+        self.id = uuid4()
+        self.status = RunStatus.pending.value
+
+
+class FakeRunRepository:
+    def __init__(self) -> None:
+        self.created_kwargs: dict[str, object] | None = None
+        self.run = FakeRun()
+
+    async def create_agent_test_run(self, **kwargs):
+        self.created_kwargs = kwargs
+        return self.run
 
 
 class FakeAgentRepository:
@@ -156,6 +175,13 @@ class FakeAgentRepository:
                 return version
         return None
 
+    async def get_version_by_id(self, version_id):
+        for versions in self.versions.values():
+            for version in versions:
+                if version.id == version_id:
+                    return version
+        return None
+
     async def soft_delete(self, key: str):
         agent = self.agents.get(key)
         if agent is None:
@@ -166,16 +192,19 @@ class FakeAgentRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "app_environment", "local")
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
+    if hasattr(app.state, "agent_test_run_executor"):
+        delattr(app.state, "agent_test_run_executor")
 
 
 def draft_payload() -> dict[str, object]:
     return {
         "system_prompt": "You are careful.",
-        "model": "openai:gpt-5-mini",
+        "provider_id": str(uuid4()),
         "model_config": {"temperature": 0},
         "tool_allowlist": ["search_sop"],
         "mcp_server_ids": ["change-docs"],
@@ -204,11 +233,19 @@ def make_session_override(session: FakeSession):
     return override_session
 
 
-def override_dependencies(repository: FakeAgentRepository, session: FakeSession):
+def override_dependencies(
+    repository: FakeAgentRepository,
+    session: FakeSession | None = None,
+    run_repository: FakeRunRepository | None = None,
+):
+    session = session or FakeSession()
     app.dependency_overrides[get_session] = make_session_override(session)
     get_agent_repository = getattr(deps, "get_agent_repository", None)
     if get_agent_repository is not None:
         app.dependency_overrides[get_agent_repository] = lambda: repository
+    get_run_repository = getattr(deps, "get_run_repository", None)
+    if get_run_repository is not None and run_repository is not None:
+        app.dependency_overrides[get_run_repository] = lambda: run_repository
 
 
 @pytest.mark.asyncio
@@ -216,20 +253,42 @@ async def test_create_agent_returns_detail_and_commits() -> None:
     repository = FakeAgentRepository()
     session = FakeSession()
     override_dependencies(repository, session)
+    payload = create_payload()
+    provider_id = payload["draft"]["provider_id"]
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.post("/api/agents", json=create_payload())
+        response = await client.post("/api/agents", json=payload)
 
     assert response.status_code == 201
     body = response.json()
     assert body["key"] == "release-reviewer"
     assert body["has_draft"] is True
+    assert body["draft"]["provider_id"] == provider_id
     assert body["draft"]["model_config"] == {"temperature": 0}
     assert body["latest_version"] is None
     assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_create_agent_rejects_stale_model_field() -> None:
+    repository = FakeAgentRepository()
+    session = FakeSession()
+    override_dependencies(repository, session)
+    payload = create_payload()
+    payload["draft"]["model"] = "openai:gpt-5-mini"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post("/api/agents", json=payload)
+
+    assert response.status_code == 422
+    assert session.commits == 0
+    assert repository.agents == {}
 
 
 @pytest.mark.asyncio
@@ -267,6 +326,8 @@ async def test_list_agents_returns_summaries_without_deleted_by_default() -> Non
     body = response.json()
     assert [agent["key"] for agent in body] == ["release-reviewer"]
     assert body[0]["latest_version"]["version_number"] == 1
+    assert body[0]["latest_version"]["provider_id"] == str(version.provider_id)
+    assert "model" not in body[0]["latest_version"]
     assert "draft" not in body[0]
     assert repository.list_include_deleted == [False]
 
@@ -359,6 +420,10 @@ async def test_publish_agent_returns_created_version_detail() -> None:
     assert response.status_code == 201
     body = response.json()
     assert body["version_number"] == 1
+    assert body["provider_id"] == str(
+        repository.versions["release-reviewer"][0].provider_id
+    )
+    assert "model" not in body
     assert body["model_config"] == {"temperature": 0}
     assert "model_parameters" not in body
     assert session.commits == 1
@@ -402,7 +467,13 @@ async def test_list_versions_returns_descending_summaries() -> None:
         response = await client.get("/api/agents/release-reviewer/versions")
 
     assert response.status_code == 200
-    assert [version["version_number"] for version in response.json()] == [2, 1]
+    body = response.json()
+    assert [version["version_number"] for version in body] == [2, 1]
+    assert [version["provider_id"] for version in body] == [
+        str(repository.versions[agent.key][1].provider_id),
+        str(repository.versions[agent.key][0].provider_id),
+    ]
+    assert all("model" not in version for version in body)
 
 
 @pytest.mark.asyncio
@@ -420,8 +491,11 @@ async def test_get_version_returns_detail_or_404() -> None:
         missing = await client.get("/api/agents/release-reviewer/versions/99")
 
     assert found.status_code == 200
-    assert found.json()["version_number"] == 3
-    assert found.json()["model_config"] == {"temperature": 0}
+    body = found.json()
+    assert body["version_number"] == 3
+    assert body["provider_id"] == str(repository.versions[agent.key][0].provider_id)
+    assert "model" not in body
+    assert body["model_config"] == {"temperature": 0}
     assert missing.status_code == 404
 
 
@@ -437,6 +511,40 @@ async def test_get_version_rejects_non_positive_version_number() -> None:
         response = await client.get("/api/agents/release-reviewer/versions/0")
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_start_agent_test_run_accepts_optional_user_context() -> None:
+    agent = FakeAgent()
+    version = FakeVersion(agent_id=agent.id)
+    agent.latest_version = version
+    repository = FakeAgentRepository(agents=[agent])
+    repository.versions[agent.key].append(version)
+    run_repository = FakeRunRepository()
+    override_dependencies(repository=repository, run_repository=run_repository)
+
+    async def fake_executor(run_id) -> None:
+        return None
+
+    app.state.agent_test_run_executor = fake_executor
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/agents/release-reviewer/test-runs",
+            headers={"x-user-id": "user-123"},
+            json={"messages": [{"role": "user", "content": "Can this deploy?"}]},
+        )
+
+    assert response.status_code == 202
+    assert run_repository.created_kwargs is not None
+    assert run_repository.created_kwargs["current_user"] == {
+        "user_id": "user-123",
+        "role": "user",
+    }
+    assert run_repository.created_kwargs["created_by"] == "user-123"
 
 
 @pytest.mark.asyncio

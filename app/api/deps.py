@@ -5,15 +5,19 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import CurrentUser, get_current_user, require_admin_user
 from app.core.config import settings
 from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.mcp_servers import McpServerRepository
+from app.repositories.provider_credentials import ProviderCredentialRepository
 from app.repositories.runs import RunRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
+AdminUserDep = Annotated[CurrentUser, Depends(require_admin_user)]
 
 
 def get_sop_client() -> SopClient:
@@ -42,6 +46,18 @@ def get_mcp_repository(session: SessionDep) -> McpServerRepository:
 
 
 McpRepositoryDep = Annotated[McpServerRepository, Depends(get_mcp_repository)]
+
+
+def get_provider_credential_repository(
+    session: SessionDep,
+) -> ProviderCredentialRepository:
+    return ProviderCredentialRepository(session)
+
+
+ProviderCredentialRepositoryDep = Annotated[
+    ProviderCredentialRepository,
+    Depends(get_provider_credential_repository),
+]
 
 
 def require_mcp_admin(

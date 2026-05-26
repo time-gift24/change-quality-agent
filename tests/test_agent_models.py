@@ -12,6 +12,14 @@ def test_agent_version_table_name() -> None:
     assert AgentVersion.__tablename__ == "agent_versions"
 
 
+def test_agent_version_model_uses_provider_id_instead_of_model() -> None:
+    columns = AgentVersion.__table__.columns
+
+    assert "provider_id" in columns
+    assert columns["provider_id"].nullable is False
+    assert "model" not in columns
+
+
 def test_agent_key_has_named_unique_index() -> None:
     indexes = {index.name: index for index in Agent.__table__.indexes}
 

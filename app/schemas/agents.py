@@ -6,10 +6,14 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 
 class AgentDraftConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+        extra="forbid",
+    )
 
     system_prompt: str = Field(min_length=1)
-    model: str = Field(min_length=1)
+    provider_id: UUID
     model_parameters: dict[str, Any] = Field(
         default_factory=dict,
         validation_alias=AliasChoices("model_config", "model_parameters"),
@@ -38,7 +42,7 @@ class AgentVersionSummary(BaseModel):
 
     id: UUID
     version_number: int
-    model: str
+    provider_id: UUID
     published_at: datetime
 
 

@@ -1,0 +1,21 @@
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class PreparedApiKey:
+    ciphertext: str
+    hint: str
+
+
+def api_key_hint(api_key: str) -> str:
+    if len(api_key) <= 12:
+        return "********"
+    return f"{api_key[:3]}...{api_key[-4:]}"
+
+
+def prepare_api_key(api_key: str) -> PreparedApiKey:
+    # v1 stores the raw API key in the ciphertext column until encryption/KMS lands.
+    return PreparedApiKey(
+        ciphertext=api_key,
+        hint=api_key_hint(api_key),
+    )

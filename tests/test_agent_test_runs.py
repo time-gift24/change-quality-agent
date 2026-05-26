@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.api.auth import CurrentUser
 from app.core.database import get_session
 from app.main import app
 from app.repositories.agents import AgentDisabledError, AgentVersionNotFoundError
@@ -39,12 +40,13 @@ class FakeVersion:
         *,
         agent_id=None,
         version_number: int = 1,
+        provider_id=None,
     ) -> None:
         self.id = uuid4()
         self.agent_id = agent_id or uuid4()
         self.version_number = version_number
         self.system_prompt = "You are careful."
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = provider_id or uuid4()
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -183,12 +185,49 @@ async def test_create_agent_test_run_persists_agent_test_payload() -> None:
         "agent_version": {
             "id": str(version.id),
             "version_number": 7,
-            "model": "openai:gpt-5-mini",
+            "provider_id": str(version.provider_id),
             "tool_allowlist": ["search_sop"],
             "mcp_server_ids": ["change-docs"],
         },
     }
     assert run.created_by == "qa@example.com"
+
+
+@pytest.mark.asyncio
+async def test_create_agent_test_run_snapshots_provider_id() -> None:
+    provider_id = uuid4()
+    session = FakeSession()
+    repository = RunRepository(session)
+    version = FakeVersion(provider_id=provider_id)
+
+    run = await repository.create_agent_test_run(
+        agent_key="release-reviewer",
+        agent_version=version,
+        messages=[{"role": "user", "content": "Can this deploy?"}],
+        input_preview="Can this deploy?",
+    )
+
+    assert run.subject_snapshot["agent_version"]["provider_id"] == str(provider_id)
+    assert "model" not in run.subject_snapshot["agent_version"]
+
+
+@pytest.mark.asyncio
+async def test_create_agent_test_run_persists_current_user_context() -> None:
+    session = FakeSession()
+    repository = RunRepository(session)
+    version = FakeVersion()
+    current_user = {"user_id": "user-123", "role": "user"}
+
+    run = await repository.create_agent_test_run(
+        agent_key="release-reviewer",
+        agent_version=version,
+        messages=[{"role": "user", "content": "Can this deploy?"}],
+        input_preview="Can this deploy?",
+        current_user=current_user,
+    )
+
+    assert run.metadata_["current_user"] == current_user
+    assert run.subject_snapshot["current_user"] == current_user
 
 
 @pytest.mark.asyncio
@@ -230,6 +269,33 @@ async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
     ]
+    assert run_repository.created_kwargs["created_by"] is None
+
+
+@pytest.mark.asyncio
+async def test_start_test_run_persists_optional_user_context() -> None:
+    version = FakeVersion(version_number=3)
+    repository = FakeAgentRepository(agent=FakeAgent(latest_version=version))
+    run_repository = FakeRunRepository()
+    service = AgentService(
+        repository=repository,
+        run_repository=run_repository,
+        schedule_test_run=lambda run_id: None,
+        commit=lambda: None,
+    )
+
+    await service.start_test_run(
+        "release-reviewer",
+        AgentTestRunCreate(messages=[{"role": "user", "content": "Can this deploy?"}]),
+        current_user=CurrentUser(user_id="user-123", role="user"),
+    )
+
+    assert run_repository.created_kwargs is not None
+    assert run_repository.created_kwargs["current_user"] == {
+        "user_id": "user-123",
+        "role": "user",
+    }
+    assert run_repository.created_kwargs["created_by"] == "user-123"
 
 
 @pytest.mark.asyncio

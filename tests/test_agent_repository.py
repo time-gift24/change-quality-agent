@@ -2,6 +2,7 @@ import os
 from datetime import UTC, datetime
 from inspect import signature
 from typing import Any
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -90,12 +91,12 @@ def test_dump_draft_config_rejects_invalid_raw_draft() -> None:
 def draft_config(
     *,
     system_prompt: str = "You are careful.",
-    model: str = "openai:gpt-5-mini",
+    provider_id=None,
     temperature: float = 0,
 ) -> AgentDraftConfig:
     return AgentDraftConfig(
         system_prompt=system_prompt,
-        model=model,
+        provider_id=provider_id or uuid4(),
         model_config={"temperature": temperature},
         tool_allowlist=["search_sop"],
         mcp_server_ids=["change-docs"],
@@ -334,6 +335,28 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     listed_agents = await repository.list_agents()
     assert "latest_version" not in inspect(listed_agents[0]).unloaded
     assert listed_agents[0].latest_version.version_number == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.db
+@requires_test_database
+async def test_publish_agent_copies_provider_id_from_draft(session) -> None:
+    agents = repository_types()
+    provider_id = uuid4()
+    repository = agents.AgentRepository(session)
+    await repository.create_agent(
+        key="release-reviewer",
+        display_name="Release Reviewer",
+        description=None,
+        draft=draft_config(
+            system_prompt="Review releases.",
+            provider_id=provider_id,
+        ),
+    )
+
+    version = await repository.publish_agent("release-reviewer")
+
+    assert version.provider_id == provider_id
 
 
 @pytest.mark.asyncio

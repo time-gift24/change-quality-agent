@@ -31,6 +31,7 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/"
         "change_quality_agent"
     )
+    app_environment: str = "production"
     log_level: str = "INFO"
     access_log_enabled: bool = True
     environments: list[EnvironmentConfig] = Field(

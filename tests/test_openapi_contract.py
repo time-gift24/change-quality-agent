@@ -150,6 +150,37 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     assert "model_parameters" not in version_properties
 
 
+def test_agent_version_schemas_use_provider_id_instead_of_model() -> None:
+    schemas = load_contract()["components"]["schemas"]
+
+    for schema_name in ("AgentVersionSummary", "AgentVersionDetail"):
+        schema = schemas[schema_name]
+
+        assert "provider_id" in schema["required"]
+        assert "model" not in schema["required"]
+        assert "provider_id" in schema["properties"]
+        assert "model" not in schema["properties"]
+        assert schema["properties"]["provider_id"] == {
+            "type": "string",
+            "format": "uuid",
+        }
+
+
+def test_agent_draft_schema_uses_provider_id_instead_of_model() -> None:
+    schema = load_contract()["components"]["schemas"]["AgentDraftConfig"]
+
+    assert schema["additionalProperties"] is False
+    assert "provider_id" in schema["required"]
+    assert "model" not in schema["properties"]
+    assert schema["properties"]["provider_id"] == {
+        "type": "string",
+        "format": "uuid",
+    }
+    assert schema["properties"]["model_config"]["default"] == {}
+    assert schema["properties"]["tool_allowlist"]["default"] == []
+    assert schema["properties"]["mcp_server_ids"]["default"] == []
+
+
 def test_agent_test_runs_response_reuses_run_start_response() -> None:
     contract = load_contract()
 
@@ -161,3 +192,118 @@ def test_agent_test_runs_response_reuses_run_start_response() -> None:
     assert responses["400"]["description"] == (
         "Agent is disabled or requested agent version was not found."
     )
+
+
+def test_llm_provider_paths_are_documented() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    admin_security = [{"FakeUserHeaders": [], "FakeUserRole": []}]
+
+    expected_operations = {
+        ("/api/llm-providers", "get"): {"200", "401", "422"},
+        ("/api/llm-providers", "post"): {"201", "401", "409", "422"},
+        ("/api/llm-providers/{provider_id}", "get"): {"200", "401", "404", "422"},
+        ("/api/llm-providers/{provider_id}", "patch"): {
+            "200",
+            "401",
+            "404",
+            "409",
+            "422",
+        },
+        ("/api/llm-providers/{provider_id}", "delete"): {
+            "204",
+            "401",
+            "404",
+            "422",
+        },
+        ("/api/admin/llm-providers", "get"): {"200", "401", "403", "422"},
+        ("/api/admin/llm-providers", "post"): {"201", "401", "403", "409", "422"},
+        ("/api/admin/llm-providers/{provider_id}", "get"): {
+            "200",
+            "401",
+            "403",
+            "404",
+            "422",
+        },
+        ("/api/admin/llm-providers/{provider_id}", "patch"): {
+            "200",
+            "401",
+            "403",
+            "404",
+            "409",
+            "422",
+        },
+        ("/api/admin/llm-providers/{provider_id}", "delete"): {
+            "204",
+            "401",
+            "403",
+            "404",
+            "422",
+        },
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert statuses <= set(operation["responses"])
+
+    assert paths["/api/llm-providers"]["get"]["security"] == [
+        {"FakeUserHeaders": []}
+    ]
+    assert paths["/api/llm-providers/{provider_id}"]["patch"]["parameters"] == [
+        {"$ref": "#/components/parameters/ProviderId"}
+    ]
+    assert paths["/api/admin/llm-providers/{provider_id}"]["delete"][
+        "parameters"
+    ] == [{"$ref": "#/components/parameters/ProviderId"}]
+    for path, methods in paths.items():
+        if not path.startswith("/api/admin/llm-providers"):
+            continue
+        for operation in methods.values():
+            assert operation["security"] == admin_security
+
+    security_schemes = contract["components"]["securitySchemes"]
+    assert security_schemes["FakeUserHeaders"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-User-Id",
+    }
+    assert security_schemes["FakeUserRole"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-User-Role",
+    }
+
+
+def test_llm_provider_schemas_do_not_expose_secrets() -> None:
+    schemas = load_contract()["components"]["schemas"]
+
+    assert {"LlmProviderCreate", "LlmProviderUpdate", "LlmProviderDetail"} <= set(
+        schemas
+    )
+    assert "api_key" in schemas["LlmProviderCreate"]["properties"]
+    assert "api_key" in schemas["LlmProviderUpdate"]["properties"]
+    update_properties = schemas["LlmProviderUpdate"]["properties"]
+    for field_name in ["name", "api_key", "metadata", "is_active"]:
+        assert update_properties[field_name].get("nullable") is not True
+        assert "default" not in update_properties[field_name]
+    for field_name in ["provider", "base_url", "model"]:
+        assert update_properties[field_name]["nullable"] is True
+
+    detail_schema = schemas["LlmProviderDetail"]
+    assert {
+        "id",
+        "name",
+        "provider",
+        "base_url",
+        "api_key_hint",
+        "model",
+        "metadata",
+        "is_active",
+        "created_at",
+        "updated_at",
+    } <= set(detail_schema["required"])
+
+    detail_properties = detail_schema["properties"]
+    assert "api_key_hint" in detail_properties
+    assert "api_key" not in detail_properties
+    assert "api_key_ciphertext" not in detail_properties

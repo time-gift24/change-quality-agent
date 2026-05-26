@@ -164,7 +164,7 @@ class AgentRepository:
             agent_id=agent.id,
             version_number=await self._next_version_number(agent.id),
             system_prompt=draft.system_prompt,
-            model=draft.model,
+            provider_id=draft.provider_id,
             model_config=dict(draft.model_parameters),
             tool_allowlist=list(draft.tool_allowlist),
             mcp_server_ids=list(draft.mcp_server_ids),
