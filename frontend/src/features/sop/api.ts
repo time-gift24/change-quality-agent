@@ -1,4 +1,8 @@
-import { ApiError, requestJson } from "../../lib/apiClient";
+import {
+  ApiError,
+  apiErrorFromResponse,
+  requestJson,
+} from "../../lib/apiClient";
 import type {
   SopEnvironment,
   SopRunHistoryItem,
@@ -14,6 +18,7 @@ type SopEnvironmentsResponse =
 type StartSopRunResponse = {
   run_id?: string;
   active_run_id?: string;
+  message?: string;
 };
 
 export async function getSopEnvironments(): Promise<SopEnvironment[]> {
@@ -48,14 +53,14 @@ export async function startSopQualityRun(
     const body = await readStartRunBody(response);
 
     if (!body.active_run_id) {
-      throw new ApiError(response.status, response.statusText);
+      throw new ApiError(response.status, response.statusText, body.message);
     }
 
     return { kind: "active", runId: body.active_run_id };
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, response.statusText);
+    throw await apiErrorFromResponse(response);
   }
 
   throw new Error("SOP run response did not include a run id.");

@@ -11,14 +11,18 @@ export async function requestJson<T>(
   });
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      response.statusText,
-      await readErrorDetail(response),
-    );
+    throw await apiErrorFromResponse(response);
   }
 
   return (await response.json()) as T;
+}
+
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+  return new ApiError(
+    response.status,
+    response.statusText,
+    await readErrorDetail(response),
+  );
 }
 
 export class ApiError extends Error {

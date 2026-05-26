@@ -10,16 +10,14 @@ Fixed stack:
 - Tailwind CSS v4 via `@tailwindcss/vite`
 - Streamdown for streamed markdown
 
-The implementation plan lives at
-`docs/plans/2026-05-25-runs-frontend-implementation.md`.
+The frontend architecture summary lives at `../docs/frontend.md`.
 
 Before implementing UI, read `../DESIGN.md` and follow it strictly. It is the
 mandatory UI contract for this frontend.
 
 Implementation notes:
 
-- The app shell lives in `src/app/App.tsx`; route composition lives in
-  `src/app/routes.tsx`.
+- The app shell lives in `src/app/App.tsx` and mounts the SOP quality page.
 - Tailwind scans frontend-local Streamdown classes via
   `@source "../../node_modules/streamdown/dist/*.js"` in
   `src/styles/globals.css`.

@@ -79,7 +79,7 @@ function fetchByRequest() {
       );
     }
 
-    if (url === "/api/sop/release-checklist/runs?env=dev") {
+    if (url === "/api/sop/recent/runs?env=dev&limit=50") {
       return Promise.resolve(
         jsonResponse([
           {
