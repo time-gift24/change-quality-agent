@@ -127,6 +127,8 @@ def test_llm_provider_detail_does_not_expose_real_keys():
 
 def test_api_key_hint_masks_long_and_short_secrets():
     assert api_key_hint("sk-test123456") == "sk-...3456"
+    assert api_key_hint("12345678") == "********"
+    assert api_key_hint("123456789012") == "********"
     assert api_key_hint("short") == "********"
 
 

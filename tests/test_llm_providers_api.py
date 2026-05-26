@@ -307,7 +307,7 @@ async def test_patch_llm_provider_with_api_key_updates_secret_fields() -> None:
     assert response.status_code == 200
     assert repository.updated_kwargs == {
         "api_key_ciphertext": "sk-new654321",
-        "api_key_hint": "sk-...4321",
+        "api_key_hint": "********",
         "updated_by": "user-123",
     }
     assert repository.commits == 1

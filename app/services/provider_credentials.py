@@ -8,7 +8,7 @@ class PreparedApiKey:
 
 
 def api_key_hint(api_key: str) -> str:
-    if len(api_key) < 8:
+    if len(api_key) <= 12:
         return "********"
     return f"{api_key[:3]}...{api_key[-4:]}"
 
