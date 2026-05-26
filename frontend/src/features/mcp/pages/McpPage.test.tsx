@@ -9,6 +9,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../app/App";
@@ -253,14 +254,58 @@ describe("McpPage", () => {
     expect(deleteServer).not.toHaveBeenCalled();
   });
 
-  it("stores the MCP admin token for the current browser session", () => {
+  it("stores the MCP admin token and refetches the selected server data", async () => {
     render(<McpPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Alpha Server" }),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("MCP Admin Token"), {
       target: { value: "token-from-ui" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存 Token" }));
 
+    await waitFor(() => expect(refetchServers).toHaveBeenCalledTimes(1));
+    expect(refetchDetail).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.getItem("mcp-admin-token")).toBe("token-from-ui");
+  });
+
+  it("reloads failed list data after saving a non-empty admin token", async () => {
+    vi.mocked(useMcpServers).mockImplementation(() => {
+      const [state, setState] = useState({
+        data: [] as McpServerSummary[],
+        error: new ApiError(403, "Forbidden", "missing token") as Error | null,
+        loading: false,
+      });
+
+      return {
+        ...state,
+        refetch: async () => {
+          refetchServers();
+          setState({ data: servers, error: null, loading: false });
+        },
+      };
+    });
+    vi.mocked(useMcpServerDetail).mockReturnValue({
+      data: null,
+      error: null,
+      loading: false,
+      refetch: refetchDetail,
+    });
+
+    render(<McpPage />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("missing token");
+    expect(screen.queryByText("Alpha Server")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("MCP Admin Token"), {
+      target: { value: "token-from-ui" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Token" }));
+
+    await waitFor(() => expect(refetchServers).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Alpha Server")).toBeInTheDocument();
     expect(window.sessionStorage.getItem("mcp-admin-token")).toBe("token-from-ui");
   });
 

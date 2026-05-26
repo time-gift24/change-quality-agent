@@ -143,10 +143,20 @@ export function McpPage() {
     mutationFailure?.error ?? mutations.error,
   );
 
-  function handleSaveAdminToken(): void {
+  async function handleSaveAdminToken(): Promise<void> {
     setMcpAdminToken(adminTokenInput);
     setAdminTokenInput(getMcpAdminToken());
     setAdminTokenSaved(true);
+
+    if (!getMcpAdminToken()) {
+      return;
+    }
+
+    await serversState.refetch();
+
+    if (selectedServerId) {
+      await detailState.refetch();
+    }
   }
 
   async function handleCreate(payload: McpServerCreate): Promise<void> {
@@ -242,7 +252,9 @@ export function McpPage() {
         </div>
         <button
           className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-body transition hover:border-primary hover:text-primary"
-          onClick={handleSaveAdminToken}
+          onClick={() => {
+            void handleSaveAdminToken();
+          }}
           type="button"
         >
           保存 Token
