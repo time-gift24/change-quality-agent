@@ -23,6 +23,11 @@ export function McpServerDetail({
   onEditServer,
   onDeleteServer,
 }: McpServerDetailProps) {
+  const configTabId = server ? `mcp-config-tab-${server.id}` : "mcp-config-tab";
+  const toolsTabId = server ? `mcp-tools-tab-${server.id}` : "mcp-tools-tab";
+  const configPanelId = server ? `mcp-config-panel-${server.id}` : "mcp-config-panel";
+  const toolsPanelId = server ? `mcp-tools-panel-${server.id}` : "mcp-tools-panel";
+
   return (
     <section
       aria-label="MCP 服务详情"
@@ -78,12 +83,14 @@ export function McpServerDetail({
           <div className="border-b border-hairline px-4 pt-3">
             <div aria-label="详情标签" className="flex gap-2" role="tablist">
               <button
+                aria-controls={configPanelId}
                 aria-selected={activeTab === "configuration"}
                 className={`rounded-t-lg px-3 py-1.5 text-sm ${
                   activeTab === "configuration"
                     ? "bg-primary-soft text-primary-deep"
                     : "text-body hover:text-ink"
                 }`}
+                id={configTabId}
                 onClick={() => onTabChange("configuration")}
                 role="tab"
                 type="button"
@@ -91,12 +98,14 @@ export function McpServerDetail({
                 配置
               </button>
               <button
+                aria-controls={toolsPanelId}
                 aria-selected={activeTab === "tools"}
                 className={`rounded-t-lg px-3 py-1.5 text-sm ${
                   activeTab === "tools"
                     ? "bg-primary-soft text-primary-deep"
                     : "text-body hover:text-ink"
                 }`}
+                id={toolsTabId}
                 onClick={() => onTabChange("tools")}
                 role="tab"
                 type="button"
@@ -115,34 +124,49 @@ export function McpServerDetail({
             ) : null}
 
             {!loading && !error && activeTab === "configuration" ? (
-              <dl className="grid grid-cols-1 gap-3 text-sm text-body md:grid-cols-2">
-                <InfoItem label="ID" value={server.id} />
-                <InfoItem label="Transport" value={server.transport} />
-                <InfoItem label="Command" value={server.command ?? "-"} />
-                <InfoItem label="URL" value={server.url ?? "-"} />
-                <InfoItem label="Enabled" value={server.enabled ? "true" : "false"} />
-                <InfoItem label="Args" value={server.args.length > 0 ? server.args.join(" ") : "-"} />
-              </dl>
+              <div
+                aria-labelledby={configTabId}
+                id={configPanelId}
+                role="tabpanel"
+              >
+                <dl className="grid grid-cols-1 gap-3 text-sm text-body md:grid-cols-2">
+                  <InfoItem label="ID" value={server.id} />
+                  <InfoItem label="Transport" value={server.transport} />
+                  <InfoItem label="Command" value={server.command ?? "-"} />
+                  <InfoItem label="URL" value={server.url ?? "-"} />
+                  <InfoItem label="Enabled" value={server.enabled ? "true" : "false"} />
+                  <InfoItem label="Args" value={server.args.length > 0 ? server.args.join(" ") : "-"} />
+                </dl>
+              </div>
             ) : null}
 
             {!loading && !error && activeTab === "tools" ? (
-              <ul aria-label="工具快照列表" className="space-y-2" role="list">
-                {server.tools.length === 0 ? (
-                  <li className="rounded-lg border border-hairline bg-canvas-soft px-3 py-2 text-xs text-mute">
-                    暂无工具快照。
-                  </li>
-                ) : (
-                  server.tools.map((tool) => (
-                    <li
-                      className="rounded-lg border border-hairline bg-canvas-soft px-3 py-2"
-                      key={tool.name}
-                    >
-                      <p className="text-sm font-medium text-ink">{tool.name}</p>
-                      <p className="mt-1 text-xs text-body">{tool.description ?? "无描述"}</p>
+              <div
+                aria-labelledby={toolsTabId}
+                id={toolsPanelId}
+                role="tabpanel"
+              >
+                <ul aria-label="工具快照列表" className="space-y-2" role="list">
+                  {server.tools.length === 0 ? (
+                    <li className="rounded-lg border border-hairline bg-canvas-soft px-3 py-2 text-xs text-mute">
+                      暂无工具快照。
                     </li>
-                  ))
-                )}
-              </ul>
+                  ) : (
+                    server.tools.map((tool) => (
+                      <li
+                        className="rounded-lg border border-hairline bg-canvas-soft px-3 py-2"
+                        key={tool.name}
+                      >
+                        <p className="text-sm font-medium text-ink">{tool.name}</p>
+                        <p className="mt-1 text-xs text-body">{tool.description ?? "无描述"}</p>
+                        <pre className="mt-2 overflow-x-auto rounded-md border border-hairline bg-canvas px-2 py-1 text-2xs text-body">
+                          <code>{JSON.stringify(tool.input_schema, null, 2)}</code>
+                        </pre>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
             ) : null}
           </div>
         </>

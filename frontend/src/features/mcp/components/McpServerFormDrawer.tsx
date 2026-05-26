@@ -1,4 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 
 import type {
   McpDesiredState,
@@ -38,6 +44,12 @@ export function McpServerFormDrawer({
   const [desiredState, setDesiredState] = useState<McpDesiredState>(
     DEFAULT_DESIRED_STATE,
   );
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const commandInputRef = useRef<HTMLInputElement | null>(null);
+  const urlInputRef = useRef<HTMLInputElement | null>(null);
+  const titleId = useId();
+  const validationId = useId();
 
   useEffect(() => {
     if (!open) {
@@ -51,6 +63,7 @@ export function McpServerFormDrawer({
       setUrl(server.url ?? "");
       setEnabled(server.enabled);
       setDesiredState(server.desired_state);
+      setValidationMessage(null);
       return;
     }
 
@@ -60,7 +73,33 @@ export function McpServerFormDrawer({
     setUrl("");
     setEnabled(true);
     setDesiredState(DEFAULT_DESIRED_STATE);
+    setValidationMessage(null);
   }, [mode, open, server]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    nameInputRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, open]);
 
   if (!open) {
     return null;
@@ -73,6 +112,20 @@ export function McpServerFormDrawer({
     if (!nextName) {
       return;
     }
+
+    if (transport === "stdio" && command.trim().length === 0) {
+      setValidationMessage("stdio 模式需要填写 command。");
+      commandInputRef.current?.focus();
+      return;
+    }
+
+    if (transport === "http" && url.trim().length === 0) {
+      setValidationMessage("http 模式需要填写 url。");
+      urlInputRef.current?.focus();
+      return;
+    }
+
+    setValidationMessage(null);
 
     if (mode === "create") {
       const payload: McpServerCreate = {
@@ -119,9 +172,14 @@ export function McpServerFormDrawer({
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/25">
-      <div className="h-full w-full max-w-md border-l border-hairline bg-canvas shadow-xl">
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="h-full w-full max-w-md border-l border-hairline bg-canvas shadow-xl"
+        role="dialog"
+      >
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-          <h2 className="text-base font-semibold text-ink">
+          <h2 className="text-base font-semibold text-ink" id={titleId}>
             {mode === "create" ? "新增 MCP 服务" : "编辑 MCP 服务"}
           </h2>
           <button
@@ -133,7 +191,20 @@ export function McpServerFormDrawer({
           </button>
         </div>
 
-        <form className="space-y-4 p-4" onSubmit={(event) => void handleSubmit(event)}>
+        <form
+          className="space-y-4 p-4"
+          noValidate
+          onSubmit={(event) => void handleSubmit(event)}
+        >
+          {validationMessage ? (
+            <p
+              className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep"
+              id={validationId}
+              role="alert"
+            >
+              {validationMessage}
+            </p>
+          ) : null}
           <div>
             <label className="block text-xs text-body" htmlFor="mcp-form-name">
               服务名称
@@ -141,8 +212,12 @@ export function McpServerFormDrawer({
             <input
               className="mt-1 w-full rounded-lg border border-hairline px-3 py-2 text-sm"
               id="mcp-form-name"
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setValidationMessage(null);
+              }}
               required
+              ref={nameInputRef}
               value={name}
             />
           </div>
@@ -155,7 +230,10 @@ export function McpServerFormDrawer({
               className="mt-1 w-full rounded-lg border border-hairline px-3 py-2 text-sm"
               disabled={mode === "edit"}
               id="mcp-form-transport"
-              onChange={(event) => setTransport(event.target.value as McpTransport)}
+              onChange={(event) => {
+                setTransport(event.target.value as McpTransport);
+                setValidationMessage(null);
+              }}
               value={transport}
             >
               <option value="stdio">stdio</option>
@@ -169,9 +247,15 @@ export function McpServerFormDrawer({
                 command
               </label>
               <input
+                aria-describedby={validationMessage ? validationId : undefined}
                 className="mt-1 w-full rounded-lg border border-hairline px-3 py-2 text-sm"
                 id="mcp-form-command"
-                onChange={(event) => setCommand(event.target.value)}
+                onChange={(event) => {
+                  setCommand(event.target.value);
+                  setValidationMessage(null);
+                }}
+                ref={commandInputRef}
+                required={transport === "stdio"}
                 value={command}
               />
             </div>
@@ -181,9 +265,15 @@ export function McpServerFormDrawer({
                 url
               </label>
               <input
+                aria-describedby={validationMessage ? validationId : undefined}
                 className="mt-1 w-full rounded-lg border border-hairline px-3 py-2 text-sm"
                 id="mcp-form-url"
-                onChange={(event) => setUrl(event.target.value)}
+                onChange={(event) => {
+                  setUrl(event.target.value);
+                  setValidationMessage(null);
+                }}
+                ref={urlInputRef}
+                required={transport === "http"}
                 type="url"
                 value={url}
               />

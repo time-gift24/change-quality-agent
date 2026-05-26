@@ -10,9 +10,19 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { App } from "../../../app/App";
+import { useAuthz } from "../../../app/routing/useAuthz";
 import { useMcpMutations, useMcpServerDetail, useMcpServers } from "../hooks";
 import type { McpServerDetail, McpServerSummary } from "../types";
 import { McpPage } from "./McpPage";
+
+vi.mock("../../../app/routing/useAuthz", () => ({
+  useAuthz: vi.fn(),
+}));
+
+vi.mock("../../sop/pages/ChatPage", () => ({
+  ChatPage: () => <div>SOP Mock</div>,
+}));
 
 vi.mock("../hooks", () => ({
   useMcpMutations: vi.fn(),
@@ -20,6 +30,9 @@ vi.mock("../hooks", () => ({
   useMcpServers: vi.fn(),
 }));
 
+const createServer = vi.fn();
+const updateServer = vi.fn();
+const deleteServer = vi.fn();
 const startServer = vi.fn();
 const stopServer = vi.fn();
 const restartServer = vi.fn();
@@ -72,10 +85,14 @@ const detailById: Record<string, McpServerDetail> = {
 };
 
 beforeEach(() => {
+  createServer.mockReset();
+  updateServer.mockReset();
+  deleteServer.mockReset();
   startServer.mockReset();
   stopServer.mockReset();
   restartServer.mockReset();
   checkServer.mockReset();
+  vi.mocked(useAuthz).mockReturnValue({ isAdmin: true });
 
   vi.mocked(useMcpServers).mockReturnValue({
     data: servers,
@@ -93,14 +110,14 @@ beforeEach(() => {
 
   vi.mocked(useMcpMutations).mockReturnValue({
     checkServer,
-    createServer: vi.fn(),
-    deleteServer: vi.fn(),
+    createServer,
+    deleteServer,
     error: null,
     pending: false,
     restartServer,
     startServer,
     stopServer,
-    updateServer: vi.fn(),
+    updateServer,
   });
 });
 
@@ -109,6 +126,14 @@ afterEach(() => {
 });
 
 describe("McpPage", () => {
+  it("renders mcp workspace through /mcp route", () => {
+    window.history.pushState({}, "", "/mcp");
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "MCP 管理" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "MCP 服务列表" })).toBeInTheDocument();
+  });
+
   it("renders server list in left panel", () => {
     render(<McpPage />);
 
@@ -154,6 +179,47 @@ describe("McpPage", () => {
     expect(stopServer).toHaveBeenCalledWith("srv-1");
     expect(restartServer).toHaveBeenCalledWith("srv-1");
     expect(checkServer).toHaveBeenCalledWith("srv-1");
+  });
+
+  it("validates required command for stdio and closes drawer on Escape", () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    const nameInput = within(dialog).getByLabelText("服务名称");
+
+    expect(nameInput).toHaveFocus();
+    fireEvent.change(nameInput, { target: { value: "Gamma Server" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "stdio 模式需要填写 command。",
+    );
+    expect(createServer).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", { name: "新增 MCP 服务" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("validates required url for http before submit", () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    fireEvent.change(within(dialog).getByLabelText("服务名称"), {
+      target: { value: "Delta Server" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("传输方式"), {
+      target: { value: "http" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "http 模式需要填写 url。",
+    );
+    expect(createServer).not.toHaveBeenCalled();
   });
 });
 
