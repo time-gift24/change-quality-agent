@@ -6,6 +6,7 @@ Fixed stack:
 
 - Vite
 - React 19
+- React Router
 - TypeScript
 - Tailwind CSS v4 via `@tailwindcss/vite`
 - Streamdown for streamed markdown
@@ -22,8 +23,9 @@ Implementation notes:
 - Routes:
   - `/` redirects to `/sop`.
   - `/sop` renders the SOP quality page.
-  - `/mcp` renders the protected MCP management page for server CRUD,
-    lifecycle actions, and tool snapshots.
+  - `/mcp` renders the route-guarded MCP management page for server CRUD,
+    lifecycle actions, and tool snapshots. Real administrator authorization and
+    MCP admin token wiring are pending.
 - Tailwind scans frontend-local Streamdown classes via
   `@source "../../node_modules/streamdown/dist/*.js"` in
   `src/styles/globals.css`.

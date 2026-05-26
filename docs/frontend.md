@@ -255,9 +255,10 @@ Used endpoints:
 - `POST /api/mcp/servers/{server_id}/restart`: restart the server.
 - `POST /api/mcp/servers/{server_id}/check`: refresh runtime status and tools.
 
-The frontend treats returned `env` and `headers` as redacted display values.
-Editing those fields means replacing the stored values; the UI must not imply it
-can recover secret plaintext from the backend.
+API contract note: MCP server responses return `env` and `headers` as redacted
+values. The current UI does not display or edit those fields. If a future UI
+adds them, editing must be treated as value replacement and must not imply that
+the frontend can recover secret plaintext from the backend.
 
 ## Event Model
 
