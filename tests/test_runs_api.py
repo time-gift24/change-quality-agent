@@ -11,7 +11,13 @@ from app.schemas.runs import RunStatus
 
 
 class FakeEvent:
-    def __init__(self, sequence: int, run_id, event_type: str = "custom") -> None:
+    def __init__(
+        self,
+        sequence: int,
+        run_id,
+        event_type: str = "custom",
+        payload: dict[str, str] | None = None,
+    ) -> None:
         self.run_id = run_id
         self.sequence = sequence
         self.type = event_type
@@ -19,7 +25,7 @@ class FakeEvent:
         self.thread_id = "thread-1"
         self.checkpoint_id = None
         self.task_id = None
-        self.payload = {"message": f"event {sequence}"}
+        self.payload = payload or {"message": f"event {sequence}"}
         self.created_at = datetime.now(UTC)
 
 
@@ -126,6 +132,28 @@ async def test_events_replay_after_sequence(override_repository: FakeRun) -> Non
     assert "event: done" in response.text
     assert f'"run_id": "{override_repository.id}"' in response.text
     assert '"sequence": 2' in response.text
+
+
+@pytest.mark.asyncio
+async def test_events_replay_preserves_streaming_message_deltas(
+    override_repository: FakeRun,
+) -> None:
+    override_repository.events = [
+        FakeEvent(1, override_repository.id, "messages", {"delta": "alpha"}),
+        FakeEvent(2, override_repository.id, "messages", {"delta": "beta"}),
+        FakeEvent(3, override_repository.id, "done", {"status": "done"}),
+    ]
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get(f"/api/runs/{override_repository.id}/events?after=1")
+
+    assert response.status_code == 200
+    assert "id: 2" in response.text
+    assert '"delta": "beta"' in response.text
+    assert "event: done" in response.text
 
 
 @pytest.mark.asyncio
