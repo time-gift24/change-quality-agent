@@ -11,6 +11,7 @@ import {
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 
 import { App } from "../../../app/App";
 import { useAuthz } from "../../../app/routing/useAuthz";
@@ -22,6 +23,14 @@ import type {
   McpServerSummary,
 } from "../types";
 import { McpPage } from "./McpPage";
+
+function renderMcpPage() {
+  return render(
+    <MemoryRouter initialEntries={["/mcp"]}>
+      <McpPage />
+    </MemoryRouter>,
+  );
+}
 
 vi.mock("../../../app/routing/useAuthz", () => ({
   useAuthz: vi.fn(),
@@ -150,8 +159,41 @@ describe("McpPage", () => {
     expect(screen.getByRole("list", { name: "MCP 服务列表" })).toBeInTheDocument();
   });
 
+  it("renders the shared workspace sidebar with MCP marked active", () => {
+    renderMcpPage();
+
+    const sidebar = screen.getByRole("complementary", {
+      name: "工作台侧边栏",
+    });
+    const nav = within(sidebar).getByRole("navigation", {
+      name: "工作台导航",
+    });
+
+    expect(
+      within(nav).getByRole("button", { name: "发起新SOP质检" }),
+    ).toBeInTheDocument();
+    expect(
+      within(nav).getByRole("button", { name: "MCP 管理" }),
+    ).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps the server list and detail visible after toggling the sidebar", () => {
+    renderMcpPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "收起侧边栏" }));
+    expect(
+      screen.getByRole("list", { name: "MCP 服务列表" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "MCP 服务详情" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "MCP 管理" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders server list in left panel", () => {
-    render(<McpPage />);
+    renderMcpPage();
 
     const list = screen.getByRole("list", { name: "MCP 服务列表" });
 
@@ -160,7 +202,7 @@ describe("McpPage", () => {
   });
 
   it("switches right detail when clicking list item", () => {
-    render(<McpPage />);
+    renderMcpPage();
 
     const detail = screen.getByRole("region", { name: "MCP 服务详情" });
     expect(within(detail).getByRole("heading", { name: "Alpha Server" }))
@@ -173,7 +215,7 @@ describe("McpPage", () => {
   });
 
   it("shows tools after switching to tools snapshot tab", () => {
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "选择服务 Beta Server" }));
     fireEvent.click(screen.getByRole("tab", { name: "工具快照" }));
@@ -186,7 +228,7 @@ describe("McpPage", () => {
   it("invokes start stop restart check actions", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "启动 Alpha Server" }));
     fireEvent.click(screen.getByRole("button", { name: "停止 Alpha Server" }));
@@ -212,7 +254,7 @@ describe("McpPage", () => {
       updateServer,
     });
 
-    render(<McpPage />);
+    renderMcpPage();
 
     expect(screen.getByRole("alert")).toHaveTextContent("请先停止服务再修改配置");
   });
@@ -220,7 +262,7 @@ describe("McpPage", () => {
   it("asks for confirmation before delete and restart", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
 
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "重启 Alpha Server" }));
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
@@ -241,7 +283,7 @@ describe("McpPage", () => {
       refetch: refetchDetail,
     }));
 
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "选择服务 Beta Server" }));
 
@@ -255,7 +297,7 @@ describe("McpPage", () => {
   });
 
   it("stores the MCP admin token and refetches the selected server data", async () => {
-    render(<McpPage />);
+    renderMcpPage();
 
     expect(
       await screen.findByRole("heading", { name: "Alpha Server" }),
@@ -294,7 +336,7 @@ describe("McpPage", () => {
       refetch: refetchDetail,
     });
 
-    render(<McpPage />);
+    renderMcpPage();
 
     expect(screen.getByRole("alert")).toHaveTextContent("missing token");
     expect(screen.queryByText("Alpha Server")).not.toBeInTheDocument();
@@ -346,7 +388,7 @@ describe("McpPage", () => {
       };
     });
 
-    render(<McpPage />);
+    renderMcpPage();
 
     await waitFor(() => {
       const detailCalls = vi
@@ -362,7 +404,7 @@ describe("McpPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     restartServer.mockRejectedValueOnce(new ApiError(404, "Not Found", "missing server"));
 
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "重启 Beta Server" }));
 
@@ -379,7 +421,7 @@ describe("McpPage", () => {
     deleteServer.mockResolvedValueOnce(undefined);
     refetchDetail.mockRejectedValueOnce(new ApiError(404, "Not Found", "deleted"));
 
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
 
@@ -391,7 +433,7 @@ describe("McpPage", () => {
   });
 
   it("shows inline error for empty name and prevents create", () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
@@ -405,7 +447,7 @@ describe("McpPage", () => {
   });
 
   it("validates required command for stdio and closes drawer on Escape", () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
@@ -427,7 +469,7 @@ describe("McpPage", () => {
   });
 
   it("validates invalid http url before submit", () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
@@ -452,7 +494,7 @@ describe("McpPage", () => {
   });
 
   it("creates server with parsed args env headers and conservative defaults", async () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
@@ -487,7 +529,7 @@ describe("McpPage", () => {
   });
 
   it("shows inline validation for malformed key value config lines", () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
@@ -509,7 +551,7 @@ describe("McpPage", () => {
   });
 
   it("omits unchanged redacted env and headers when updating", async () => {
-    render(<McpPage />);
+    renderMcpPage();
 
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     const dialog = screen.getByRole("dialog", { name: "编辑 MCP 服务" });
@@ -530,7 +572,7 @@ describe("McpPage", () => {
   });
 
   it("wraps focus within drawer on Tab and Shift+Tab", () => {
-    render(<McpPage />);
+    renderMcpPage();
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
     const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
