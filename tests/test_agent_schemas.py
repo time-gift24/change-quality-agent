@@ -13,13 +13,14 @@ from app.schemas.agents import (
 
 
 def test_agent_create_accepts_initial_draft() -> None:
+    provider_id = uuid4()
     request = AgentCreate(
         key="release-reviewer",
         display_name="Release Reviewer",
         description="Checks release quality",
         draft=AgentDraftConfig(
             system_prompt="You are careful.",
-            model="openai:gpt-5-mini",
+            provider_id=provider_id,
             model_config={"temperature": 0},
             tool_allowlist=["search_sop"],
             mcp_server_ids=["change-docs"],
@@ -27,7 +28,34 @@ def test_agent_create_accepts_initial_draft() -> None:
     )
 
     assert request.key == "release-reviewer"
-    assert request.draft.model == "openai:gpt-5-mini"
+    assert request.draft.provider_id == provider_id
+
+
+def test_agent_draft_config_requires_provider_id() -> None:
+    provider_id = uuid4()
+
+    draft = AgentDraftConfig(
+        system_prompt="Review changes.",
+        provider_id=provider_id,
+        model_config={"temperature": 0},
+    )
+
+    assert draft.provider_id == provider_id
+    assert draft.model_dump(mode="json")["provider_id"] == str(provider_id)
+
+
+def test_agent_draft_config_rejects_missing_provider_id() -> None:
+    with pytest.raises(ValidationError):
+        AgentDraftConfig(system_prompt="Review changes.")
+
+
+def test_agent_draft_config_rejects_model_field() -> None:
+    with pytest.raises(ValidationError):
+        AgentDraftConfig(
+            system_prompt="Review changes.",
+            model="gpt-4.1-mini",
+            provider_id=uuid4(),
+        )
 
 
 def test_agent_test_run_requires_messages() -> None:
@@ -42,7 +70,7 @@ def test_agent_test_run_requires_messages() -> None:
 def test_agent_draft_config_dumps_external_model_config_key() -> None:
     draft = AgentDraftConfig(
         system_prompt="You are careful.",
-        model="openai:gpt-5-mini",
+        provider_id=uuid4(),
         model_config={"temperature": 0},
     )
 

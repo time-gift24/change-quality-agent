@@ -150,6 +150,17 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     assert "model_parameters" not in version_properties
 
 
+def test_agent_draft_schema_uses_provider_id_instead_of_model() -> None:
+    schema = load_contract()["components"]["schemas"]["AgentDraftConfig"]
+
+    assert "provider_id" in schema["required"]
+    assert "model" not in schema["properties"]
+    assert schema["properties"]["provider_id"] == {
+        "type": "string",
+        "format": "uuid",
+    }
+
+
 def test_agent_test_runs_response_reuses_run_start_response() -> None:
     contract = load_contract()
 

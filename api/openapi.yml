@@ -1589,14 +1589,14 @@ components:
       type: object
       required:
       - system_prompt
-      - model
+      - provider_id
       properties:
         system_prompt:
           type: string
           minLength: 1
-        model:
+        provider_id:
           type: string
-          minLength: 1
+          format: uuid
         model_config:
           type: object
           additionalProperties: true

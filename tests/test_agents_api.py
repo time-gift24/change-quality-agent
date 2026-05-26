@@ -175,7 +175,7 @@ def clear_overrides():
 def draft_payload() -> dict[str, object]:
     return {
         "system_prompt": "You are careful.",
-        "model": "openai:gpt-5-mini",
+        "provider_id": str(uuid4()),
         "model_config": {"temperature": 0},
         "tool_allowlist": ["search_sop"],
         "mcp_server_ids": ["change-docs"],
