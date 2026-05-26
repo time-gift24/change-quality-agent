@@ -156,7 +156,7 @@ class AgentService:
 
 
 async def run_agent_test_with_new_session(run_id: UUID) -> None:
-    return None
+    raise NotImplementedError("Agent test executor is implemented in Task 7")
 
 
 def _input_preview(messages: list[dict[str, str]]) -> str:

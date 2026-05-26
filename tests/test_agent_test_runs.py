@@ -11,7 +11,7 @@ from app.repositories.agents import AgentVersionNotFoundError
 from app.repositories.runs import RunRepository
 from app.schemas.agents import AgentTestRunCreate
 from app.schemas.runs import RunStatus
-from app.services.agents import AgentService
+from app.services.agents import AgentService, run_agent_test_with_new_session
 
 
 BASE_TIME = datetime(2026, 5, 26, 12, 0, tzinfo=UTC)
@@ -347,3 +347,14 @@ async def test_start_agent_test_run_endpoint_returns_accepted_and_schedules() ->
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_default_agent_test_executor_is_explicitly_unsupported() -> None:
+    run_id = uuid4()
+
+    with pytest.raises(
+        NotImplementedError,
+        match="Agent test executor is implemented in Task 7",
+    ):
+        await run_agent_test_with_new_session(run_id)
