@@ -62,7 +62,7 @@ button,
 input,
 textarea,
 select {
-  font: inherit;
+  font-family: inherit;
 }
 
 ::selection {
@@ -76,4 +76,3 @@ select {
     radial-gradient(50% 50% at 20% 80%, rgba(54, 115, 220, 0.10) 0%, transparent 70%),
     linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
 }
-

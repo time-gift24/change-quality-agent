@@ -6,9 +6,12 @@ import { useSopEnvironments, useSopRunHistory } from "../hooks";
 import type { SopRunHistoryItem } from "../types";
 
 type ChatPageProps = {
+  defaultHistorySopId?: string;
   initialSopId?: string;
   registeredNodeIds?: string[];
 };
+
+const DEFAULT_HISTORY_SOP_ID = "release-checklist";
 
 const DEFAULT_REGISTERED_NODE_IDS = [
   "load_sop",
@@ -17,10 +20,11 @@ const DEFAULT_REGISTERED_NODE_IDS = [
 ];
 
 export function ChatPage({
+  defaultHistorySopId = DEFAULT_HISTORY_SOP_ID,
   initialSopId = "",
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
 }: ChatPageProps) {
-  const [sopId, setSopId] = useState(initialSopId);
+  const [sopId, setSopId] = useState(initialSopId || defaultHistorySopId);
   const [pendingSopId, setPendingSopId] = useState(initialSopId);
   const [selectedEnv, setSelectedEnv] = useState("");
   const [observedRunId, setObservedRunId] = useState<string | null>(null);
@@ -109,6 +113,7 @@ export function ChatPage({
     setStartError(null);
     setStartMessage(null);
     setStarting(false);
+    setSopId(initialSopId || defaultHistorySopId);
     setPendingSopId(initialSopId);
   }
 
@@ -320,10 +325,10 @@ function EmptyState({
             }
           }}
         >
-          <div className="sm:w-48">
+          <div className="relative w-full sm:w-52">
             <select
               aria-label="环境"
-              className="h-10 w-full rounded-xl border border-hairline bg-canvas px-3 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:text-mute"
+              className="h-10 w-full appearance-none rounded-xl border border-hairline bg-canvas/95 py-0 pl-3 pr-10 text-sm font-medium text-ink shadow-sm outline-none transition-colors hover:border-hairline-strong hover:bg-canvas focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:bg-canvas-soft disabled:text-mute"
               disabled={envsLoading || envs.length === 0}
               id="env-select"
               onChange={(event) => onEnvChange(event.target.value)}
@@ -340,6 +345,13 @@ function EmptyState({
                 </option>
               ))}
             </select>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-mute"
+              data-testid="environment-select-chevron"
+            >
+              <SelectChevronIcon />
+            </span>
           </div>
 
           <div className="sm:w-96">
@@ -348,7 +360,7 @@ function EmptyState({
               className="h-10 w-full rounded-xl border border-hairline bg-canvas px-3 text-sm text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/25"
               id="sop-id-input"
               onChange={(event) => onSopIdChange(event.target.value)}
-              placeholder="输入 SOP ID,例如 release-checklist"
+              placeholder="输入 SOP ID"
               value={sopId}
             />
           </div>
@@ -478,6 +490,23 @@ function ChevronIcon({ open }: { open: boolean }) {
       viewBox="0 0 24 24"
     >
       <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function SelectChevronIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
