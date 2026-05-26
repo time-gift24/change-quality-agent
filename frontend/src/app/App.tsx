@@ -10,9 +10,7 @@ export function App() {
         <Route element={<AppShell />} path="/">
           <Route element={<Navigate replace to="/sop" />} index />
           <Route element={<ChatPage />} path="sop" />
-          <Route element={<div>MCP 管理</div>} path="mcp" />
         </Route>
-        <Route element={<Navigate replace to="/sop" />} path="*" />
       </Routes>
     </BrowserRouter>
   );

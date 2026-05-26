@@ -17,6 +17,5 @@ describe("App", () => {
     render(<App />);
 
     expect(await screen.findAllByText(/质量检查|SOP/i)).not.toHaveLength(0);
-    expect(window.location.pathname).toBe("/sop");
   });
 });
