@@ -192,3 +192,53 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
 
     assert agent.payload == {"messages": messages}
     assert result.messages == [{"role": "assistant", "content": "Done."}]
+
+
+@pytest.mark.asyncio
+async def test_agent_runtime_stream_yields_message_deltas() -> None:
+    class StreamingAgent:
+        async def astream(self, payload, stream_mode=None):
+            yield ("messages", ("alpha", {"langgraph_node": "agent"}))
+            yield ("messages", ("beta", {"langgraph_node": "agent"}))
+
+    runtime = AgentRuntime(
+        create_agent=lambda **_: StreamingAgent(),
+        model_factory=lambda *_, **__: object(),
+    )
+
+    chunks = [
+        chunk
+        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+    ]
+
+    assert [chunk["type"] for chunk in chunks] == ["messages", "messages"]
+    assert [chunk["node"] for chunk in chunks] == ["agent", "agent"]
+    assert [chunk["payload"]["delta"] for chunk in chunks] == ["alpha", "beta"]
+
+
+@pytest.mark.asyncio
+async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
+    class NonStreamingAgent:
+        async def ainvoke(self, payload):
+            return {"messages": [{"role": "assistant", "content": "done"}]}
+
+    runtime = AgentRuntime(
+        create_agent=lambda **_: NonStreamingAgent(),
+        model_factory=lambda *_, **__: object(),
+    )
+
+    chunks = [
+        chunk
+        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+    ]
+
+    assert chunks == [
+        {
+            "type": "messages",
+            "node": "agent",
+            "payload": {
+                "final": True,
+                "messages": [{"role": "assistant", "content": "done"}],
+            },
+        }
+    ]

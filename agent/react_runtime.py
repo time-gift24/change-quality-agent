@@ -7,6 +7,8 @@ from typing import Any
 from langchain.agents import create_agent as langchain_create_agent
 from langchain.chat_models import init_chat_model
 
+from app.services.run_events import normalize_langgraph_chunk
+
 
 @dataclass(frozen=True)
 class AgentRunResult:
@@ -41,6 +43,48 @@ class AgentRuntime:
         version: Any,
         messages: list[dict[str, Any]],
     ) -> AgentRunResult:
+        agent = await self._build_agent(version)
+        raw_output = await self._invoke(agent, {"messages": messages})
+        output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
+        return AgentRunResult(
+            messages=_extract_messages(output),
+            raw_output=output,
+        )
+
+    async def stream(
+        self,
+        *,
+        version: Any,
+        messages: list[dict[str, Any]],
+    ):
+        agent = await self._build_agent(version)
+        payload = {"messages": messages}
+
+        astream = getattr(agent, "astream", None)
+        if astream is None:
+            raw_output = await self._invoke(agent, payload)
+            output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
+            yield {
+                "type": "messages",
+                "node": "agent",
+                "payload": {
+                    "final": True,
+                    "messages": _extract_messages(output),
+                },
+            }
+            return
+
+        stream = astream(
+            payload,
+            stream_mode=["messages", "updates", "custom"],
+        )
+        if inspect.isawaitable(stream):
+            stream = await stream
+
+        async for chunk_type, chunk in stream:
+            yield runtime_stream_event(chunk_type, chunk)
+
+    async def _build_agent(self, version: Any) -> Any:
         tools = self._tool_resolver.resolve(
             list(getattr(version, "tool_allowlist", [])),
             list(getattr(version, "mcp_server_ids", [])),
@@ -54,12 +98,7 @@ class AgentRuntime:
             tools=tools,
             system_prompt=version.system_prompt,
         )
-        raw_output = await self._invoke(agent, {"messages": messages})
-        output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
-        return AgentRunResult(
-            messages=_extract_messages(output),
-            raw_output=output,
-        )
+        return agent
 
     async def _invoke(self, agent: Any, payload: dict[str, Any]) -> Any:
         invoke = getattr(agent, "ainvoke", None)
@@ -128,3 +167,41 @@ def _message_to_dict(message: Any) -> dict[str, Any]:
     if isinstance(converted, Mapping):
         return dict(converted)
     return {"content": str(converted)}
+
+
+def runtime_stream_event(chunk_type: str, chunk: object) -> dict[str, Any]:
+    event = normalize_langgraph_chunk(
+        chunk_type=chunk_type,
+        chunk=chunk,
+        run_id="",
+        thread_id="",
+        sequence=0,
+    )
+    payload = dict(event["payload"])
+    if chunk_type == "messages":
+        payload["delta"] = _message_delta(chunk)
+
+    runtime_event = {
+        "type": event["type"],
+        "node": event["node"] or "agent",
+        "payload": payload,
+    }
+    for key in ("checkpoint_id", "task_id"):
+        if event[key] is not None:
+            runtime_event[key] = event[key]
+    return runtime_event
+
+
+def _message_delta(chunk: object) -> str | None:
+    message = chunk[0] if _is_stream_message_tuple(chunk) else chunk
+    if isinstance(message, str):
+        return message
+    if isinstance(message, Mapping):
+        content = message.get("content")
+        return content if isinstance(content, str) else None
+    content = getattr(message, "content", None)
+    return content if isinstance(content, str) else None
+
+
+def _is_stream_message_tuple(chunk: object) -> bool:
+    return isinstance(chunk, tuple | list) and len(chunk) >= 2
