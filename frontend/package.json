@@ -12,12 +12,13 @@
   "dependencies": {
     "@tailwindcss/vite": "latest",
     "@vitejs/plugin-react": "latest",
-    "tailwindcss": "latest",
-    "typescript": "latest",
-    "vite": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "streamdown": "latest"
+    "react-router-dom": "^7.15.1",
+    "streamdown": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "vite": "latest"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "latest",
@@ -25,7 +26,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "jsdom": "latest",
-    "vitest": "latest",
-    "playwright": "latest"
+    "playwright": "latest",
+    "vitest": "latest"
   }
 }
