@@ -12,6 +12,7 @@ class FakeVersion:
     def __init__(self) -> None:
         self.id = uuid4()
         self.model = "openai:gpt-5-mini"
+        self.model_config = {"temperature": 0.2}
         self.system_prompt = "Review risky changes carefully."
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -23,6 +24,12 @@ class FakeResolver:
         self.tools = [lambda: "resolved"]
 
     def resolve(self, tool_allowlist, mcp_server_ids):
+        self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
+        return self.tools
+
+
+class AsyncFakeResolver(FakeResolver):
+    async def resolve(self, tool_allowlist, mcp_server_ids):
         self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
         return self.tools
 
@@ -63,7 +70,11 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
         created["system_prompt"] = system_prompt
         return agent
 
-    runtime = AgentRuntime(create_agent=fake_create_agent, tool_resolver=resolver)
+    runtime = AgentRuntime(
+        create_agent=fake_create_agent,
+        tool_resolver=resolver,
+        model_factory=lambda model, **_: model,
+    )
     input_messages = [{"role": "user", "content": "Can this deploy?"}]
 
     result = await runtime.run(version=version, messages=input_messages)
@@ -80,6 +91,63 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
 
 
 @pytest.mark.asyncio
+async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
+    version = FakeVersion()
+    resolver = FakeResolver()
+    configured_model = object()
+    model_factory_calls: list[tuple[str, dict[str, object]]] = []
+    created: dict[str, object] = {}
+
+    def fake_model_factory(model: str, **model_config):
+        model_factory_calls.append((model, dict(model_config)))
+        return configured_model
+
+    def fake_create_agent(*, model, tools, system_prompt):
+        created["model"] = model
+        created["tools"] = tools
+        created["system_prompt"] = system_prompt
+        return FakeAgent({"messages": []})
+
+    runtime = AgentRuntime(
+        create_agent=fake_create_agent,
+        model_factory=fake_model_factory,
+        tool_resolver=resolver,
+    )
+
+    await runtime.run(version=version, messages=[{"role": "user", "content": "Hi"}])
+
+    assert model_factory_calls == [
+        ("openai:gpt-5-mini", {"temperature": 0.2}),
+    ]
+    assert created["model"] is configured_model
+    assert created["tools"] == resolver.tools
+
+
+@pytest.mark.asyncio
+async def test_runtime_awaits_async_tool_resolver() -> None:
+    resolver = AsyncFakeResolver()
+    created: dict[str, object] = {}
+
+    def fake_create_agent(*, model, tools, system_prompt):
+        created["tools"] = tools
+        return FakeAgent({"messages": []})
+
+    runtime = AgentRuntime(
+        create_agent=fake_create_agent,
+        tool_resolver=resolver,
+        model_factory=lambda model, **_: model,
+    )
+
+    await runtime.run(
+        version=FakeVersion(),
+        messages=[{"role": "user", "content": "Hi"}],
+    )
+
+    assert resolver.calls == [(["search_sop"], ["change-docs"])]
+    assert created["tools"] == resolver.tools
+
+
+@pytest.mark.asyncio
 async def test_runtime_returns_json_serializable_raw_output_for_langchain_messages() -> None:
     raw_output = {
         "messages": [AIMessage(content="Review passed.")],
@@ -88,6 +156,7 @@ async def test_runtime_returns_json_serializable_raw_output_for_langchain_messag
     runtime = AgentRuntime(
         create_agent=lambda **_: FakeAgent(raw_output),
         tool_resolver=FakeResolver(),
+        model_factory=lambda model, **_: model,
     )
 
     result = await runtime.run(
@@ -112,7 +181,11 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
             return {"messages": [{"role": "assistant", "content": "Done."}]}
 
     agent = SyncAgent()
-    runtime = AgentRuntime(create_agent=lambda **_: agent, tool_resolver=FakeResolver())
+    runtime = AgentRuntime(
+        create_agent=lambda **_: agent,
+        tool_resolver=FakeResolver(),
+        model_factory=lambda model, **_: model,
+    )
     messages = [{"role": "user", "content": "Run the check."}]
 
     result = await runtime.run(version=FakeVersion(), messages=messages)

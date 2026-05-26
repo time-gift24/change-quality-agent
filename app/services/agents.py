@@ -8,6 +8,7 @@ from agent.react_runtime import AgentRuntime, to_jsonable
 from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
+    AgentDisabledError,
     AgentNotFoundError,
     AgentRepository,
     AgentVersionNotFoundError,
@@ -84,8 +85,10 @@ class AgentService:
             raise RuntimeError("Agent test run repository is not configured.")
 
         agent = await self._repository.get_agent(agent_key)
-        if agent is None or not agent.enabled:
+        if agent is None:
             raise AgentNotFoundError(agent_key)
+        if not agent.enabled:
+            raise AgentDisabledError(agent_key)
 
         version = await self._resolve_test_run_version(agent, request)
         messages = [message.model_dump(mode="json") for message in request.messages]
@@ -195,6 +198,7 @@ async def run_agent_test(
             },
             node="start",
         )
+        await _commit_if_available(run_repository)
         result = await runtime.run(
             version=version,
             messages=list(run.subject_snapshot.get("messages", [])),

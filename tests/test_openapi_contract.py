@@ -153,7 +153,11 @@ def test_agent_schemas_use_api_json_field_names() -> None:
 def test_agent_test_runs_response_reuses_run_start_response() -> None:
     contract = load_contract()
 
-    response_schema = contract["paths"]["/api/agents/{agent_key}/test-runs"]["post"][
+    responses = contract["paths"]["/api/agents/{agent_key}/test-runs"]["post"][
         "responses"
-    ]["202"]["content"]["application/json"]["schema"]
+    ]
+    response_schema = responses["202"]["content"]["application/json"]["schema"]
     assert response_schema == {"$ref": "#/components/schemas/RunStartResponse"}
+    assert responses["400"]["description"] == (
+        "Agent is disabled or requested agent version was not found."
+    )

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain.agents import create_agent as langchain_create_agent
+from langchain.chat_models import init_chat_model
 
 
 @dataclass(frozen=True)
@@ -27,9 +28,12 @@ class AgentRuntime:
         self,
         create_agent=langchain_create_agent,
         tool_resolver: StaticToolResolver | None = None,
+        *,
+        model_factory=init_chat_model,
     ) -> None:
         self._create_agent = create_agent
         self._tool_resolver = tool_resolver or StaticToolResolver()
+        self._model_factory = model_factory
 
     async def run(
         self,
@@ -41,8 +45,12 @@ class AgentRuntime:
             list(getattr(version, "tool_allowlist", [])),
             list(getattr(version, "mcp_server_ids", [])),
         )
+        if inspect.isawaitable(tools):
+            tools = await tools
+        model_config = getattr(version, "model_config", {}) or {}
+        model = self._model_factory(version.model, **dict(model_config))
         agent = self._create_agent(
-            model=version.model,
+            model=model,
             tools=tools,
             system_prompt=version.system_prompt,
         )

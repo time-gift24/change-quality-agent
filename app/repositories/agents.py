@@ -32,6 +32,12 @@ class AgentNotFoundError(Exception):
         super().__init__(key)
 
 
+class AgentDisabledError(Exception):
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(key)
+
+
 class AgentDraftInvalidError(Exception):
     def __init__(self, key: str) -> None:
         self.key = key

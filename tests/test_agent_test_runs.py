@@ -7,7 +7,7 @@ import pytest
 from app.api import deps
 from app.core.database import get_session
 from app.main import app
-from app.repositories.agents import AgentVersionNotFoundError
+from app.repositories.agents import AgentDisabledError, AgentVersionNotFoundError
 from app.repositories.runs import RunRepository
 from app.schemas.agents import AgentTestRunCreate
 from app.schemas.runs import RunStatus
@@ -311,6 +311,31 @@ async def test_start_test_run_raises_when_no_version_exists() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_test_run_raises_when_agent_is_disabled() -> None:
+    version = FakeVersion(version_number=3)
+    agent = FakeAgent(enabled=False, latest_version=version)
+    agent_repository = FakeAgentRepository(agent=agent, versions=[version])
+    run_repository = FakeRunRepository()
+    session = FakeSession()
+    service = AgentService(
+        repository=agent_repository,
+        run_repository=run_repository,
+        commit=session.commit,
+    )
+
+    with pytest.raises(AgentDisabledError):
+        await service.start_test_run(
+            "release-reviewer",
+            AgentTestRunCreate(
+                messages=[{"role": "user", "content": "Can this deploy?"}],
+            ),
+        )
+
+    assert run_repository.created_kwargs is None
+    assert session.commits == 0
+
+
+@pytest.mark.asyncio
 async def test_start_agent_test_run_endpoint_returns_accepted_and_schedules() -> None:
     version = FakeVersion(version_number=5)
     agent = FakeAgent(latest_version=version)
@@ -347,6 +372,31 @@ async def test_start_agent_test_run_endpoint_returns_accepted_and_schedules() ->
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_start_agent_test_run_endpoint_returns_400_when_agent_disabled() -> None:
+    version = FakeVersion(version_number=5)
+    agent = FakeAgent(enabled=False, latest_version=version)
+    agent_repository = FakeAgentRepository(agent=agent, versions=[version])
+    run_repository = FakeRunRepository()
+    session = FakeSession()
+    app.dependency_overrides[get_session] = make_session_override(session)
+    app.dependency_overrides[deps.get_agent_repository] = lambda: agent_repository
+    app.dependency_overrides[deps.get_run_repository] = lambda: run_repository
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/agents/release-reviewer/test-runs",
+            json={"messages": [{"role": "user", "content": "Can this deploy?"}]},
+        )
+
+    assert response.status_code == 400
+    assert run_repository.created_kwargs is None
+    assert session.commits == 0
 
 
 def test_default_agent_test_executor_is_available() -> None:

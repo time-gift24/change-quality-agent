@@ -37,14 +37,17 @@ class FakeRun:
 
 
 class FakeRunRepository:
-    def __init__(self, run: FakeRun) -> None:
+    def __init__(self, run: FakeRun, order: list[str] | None = None) -> None:
         self.run = run
+        self.order = order
         self.events: list[dict[str, object]] = []
         self.terminal: tuple[RunStatus, dict[str, object]] | None = None
         self.commits = 0
 
     async def mark_running(self, run_id):
         assert run_id == self.run.id
+        if self.order is not None:
+            self.order.append("mark_running")
         self.run.status = RunStatus.running.value
         return self.run
 
@@ -61,6 +64,8 @@ class FakeRunRepository:
     ):
         assert run_id == self.run.id
         assert thread_id == self.run.thread_id
+        if self.order is not None:
+            self.order.append(f"append_event:{event_type}")
         self.events.append(
             {
                 "event_type": event_type,
@@ -73,10 +78,14 @@ class FakeRunRepository:
 
     async def mark_terminal(self, run_id, status, **kwargs):
         assert run_id == self.run.id
+        if self.order is not None:
+            self.order.append(f"mark_terminal:{status.value}")
         self.run.status = status.value
         self.terminal = (status, kwargs)
 
     async def commit(self):
+        if self.order is not None:
+            self.order.append("commit")
         self.commits += 1
 
 
@@ -93,12 +102,20 @@ class FakeAgentRepository:
 
 
 class FakeRuntime:
-    def __init__(self, result: AgentRunResult | None = None, exc: Exception | None = None):
+    def __init__(
+        self,
+        result: AgentRunResult | None = None,
+        exc: Exception | None = None,
+        order: list[str] | None = None,
+    ):
         self.result = result
         self.exc = exc
+        self.order = order
         self.calls: list[dict[str, object]] = []
 
     async def run(self, *, version, messages):
+        if self.order is not None:
+            self.order.append("runtime_run")
         self.calls.append({"version": version, "messages": messages})
         if self.exc is not None:
             raise self.exc
@@ -155,7 +172,39 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
             "result_status": "success",
         },
     )
-    assert run_repository.commits == 1
+    assert run_repository.commits == 2
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_commits_running_start_before_runtime() -> None:
+    order: list[str] = []
+    version = FakeVersion(version_number=7)
+    run = FakeRun(version)
+    run_repository = FakeRunRepository(run, order=order)
+    agent_repository = FakeAgentRepository(version)
+    result = AgentRunResult(
+        messages=[{"role": "assistant", "content": "Review passed."}],
+        raw_output={"messages": [{"role": "assistant", "content": "Review passed."}]},
+    )
+    runtime = FakeRuntime(result=result, order=order)
+
+    await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=agent_repository,
+        runtime=runtime,
+    )
+
+    assert order == [
+        "mark_running",
+        "append_event:custom",
+        "commit",
+        "runtime_run",
+        "append_event:messages",
+        "append_event:done",
+        "mark_terminal:success",
+        "commit",
+    ]
 
 
 @pytest.mark.asyncio
@@ -218,7 +267,7 @@ async def test_run_agent_test_marks_error_when_runtime_raises() -> None:
             "result_status": "error",
         },
     )
-    assert run_repository.commits == 1
+    assert run_repository.commits == 2
 
 
 @pytest.mark.asyncio
