@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { App } from "../../../app/App";
 import { ChatPage } from "./ChatPage";
 
 afterEach(() => {
@@ -12,6 +13,14 @@ afterEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("renders chat page on /sop", async () => {
+    window.history.pushState({}, "", "/sop");
+    render(<App />);
+    expect(
+      await screen.findByRole("form", { name: "SOP 运行表单" }),
+    ).toBeInTheDocument();
+  });
+
   it("loads seeded mock history without pre-filling the SOP input", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
