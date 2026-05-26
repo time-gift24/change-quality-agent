@@ -58,7 +58,10 @@ const servers: McpServerSummary[] = [
 
 const detailById: Record<string, McpServerDetailType> = {
   "srv-1": buildDetail({
+    args: ["--alpha"],
     id: "srv-1",
+    env: { API_KEY: "********" },
+    headers: { Authorization: "********" },
     name: "Alpha Server",
     tools: [
       {
@@ -102,6 +105,7 @@ beforeEach(() => {
   checkServer.mockReset();
   refetchServers.mockReset();
   refetchDetail.mockReset();
+  window.sessionStorage.clear();
   vi.mocked(useAuthz).mockReturnValue({ isAdmin: true });
 
   vi.mocked(useMcpServers).mockReturnValue({
@@ -225,6 +229,39 @@ describe("McpPage", () => {
     expect(confirmSpy).toHaveBeenNthCalledWith(2, "确认删除 Alpha Server？");
     expect(restartServer).not.toHaveBeenCalled();
     expect(deleteServer).not.toHaveBeenCalled();
+  });
+
+  it("does not confirm or delete while selected detail belongs to a previous server", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(useMcpServerDetail).mockImplementation((serverId) => ({
+      data: serverId ? detailById["srv-1"] : null,
+      error: null,
+      loading: false,
+      refetch: refetchDetail,
+    }));
+
+    render(<McpPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "选择服务 Beta Server" }));
+
+    const deleteButton = screen.queryByRole("button", { name: "删除" });
+    if (deleteButton) {
+      fireEvent.click(deleteButton);
+    }
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(deleteServer).not.toHaveBeenCalled();
+  });
+
+  it("stores the MCP admin token for the current browser session", () => {
+    render(<McpPage />);
+
+    fireEvent.change(screen.getByLabelText("MCP Admin Token"), {
+      target: { value: "token-from-ui" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Token" }));
+
+    expect(window.sessionStorage.getItem("mcp-admin-token")).toBe("token-from-ui");
   });
 
   it("shows detail load errors before the empty selected state", () => {
@@ -367,6 +404,84 @@ describe("McpPage", () => {
     );
     expect(urlInput).toHaveFocus();
     expect(createServer).not.toHaveBeenCalled();
+  });
+
+  it("creates server with parsed args env headers and conservative defaults", async () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    fireEvent.change(within(dialog).getByLabelText("服务名称"), {
+      target: { value: "Gamma Server" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("command"), {
+      target: { value: "uvx" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("args"), {
+      target: { value: "--from\nmcp-package\nserve" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("env"), {
+      target: { value: "API_KEY=secret\nEMPTY=" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("headers"), {
+      target: { value: "Authorization=Bearer token" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(createServer).toHaveBeenCalled());
+    expect(createServer).toHaveBeenCalledWith({
+      args: ["--from", "mcp-package", "serve"],
+      command: "uvx",
+      desired_state: "stopped",
+      enabled: false,
+      env: { API_KEY: "secret", EMPTY: "" },
+      headers: { Authorization: "Bearer token" },
+      name: "Gamma Server",
+      transport: "stdio",
+    });
+  });
+
+  it("shows inline validation for malformed key value config lines", () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    fireEvent.change(within(dialog).getByLabelText("服务名称"), {
+      target: { value: "Gamma Server" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("command"), {
+      target: { value: "uvx" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("env"), {
+      target: { value: "BROKEN_LINE" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "env 第 1 行需要使用 KEY=VALUE 格式。",
+    );
+    expect(createServer).not.toHaveBeenCalled();
+  });
+
+  it("omits unchanged redacted env and headers when updating", async () => {
+    render(<McpPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    const dialog = screen.getByRole("dialog", { name: "编辑 MCP 服务" });
+
+    expect(within(dialog).getByLabelText("env")).toHaveValue("API_KEY=********");
+    expect(within(dialog).getByLabelText("headers")).toHaveValue(
+      "Authorization=********",
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(updateServer).toHaveBeenCalled());
+    const payload = updateServer.mock.calls[0]?.[1] as Record<string, unknown>;
+
+    expect(payload.args).toEqual(["--alpha"]);
+    expect(payload).not.toHaveProperty("env");
+    expect(payload).not.toHaveProperty("headers");
   });
 
   it("wraps focus within drawer on Tab and Shift+Tab", () => {

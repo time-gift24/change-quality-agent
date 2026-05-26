@@ -4,6 +4,7 @@ import {
   getMcpErrorMessage,
   isMcpNotFoundError,
 } from "../components/errorMessages";
+import { getMcpAdminToken, setMcpAdminToken } from "../adminToken";
 import { McpServerDetail, type McpDetailTab } from "../components/McpServerDetail";
 import { McpServerFormDrawer } from "../components/McpServerFormDrawer";
 import { McpServerList, type McpStatusFilter } from "../components/McpServerList";
@@ -23,6 +24,8 @@ export function McpPage() {
   const [activeTab, setActiveTab] = useState<McpDetailTab>("configuration");
   const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null);
   const [mutationFailure, setMutationFailure] = useState<MutationFailure | null>(null);
+  const [adminTokenInput, setAdminTokenInput] = useState(() => getMcpAdminToken());
+  const [adminTokenSaved, setAdminTokenSaved] = useState(false);
   const hasAutoSelectedServerRef = useRef(false);
 
   useEffect(() => {
@@ -130,10 +133,21 @@ export function McpPage() {
     });
   }, [searchText, serversState.data, statusFilter]);
 
-  const selectedServer = detailState.data;
+  const detailMatchesSelectedServer =
+    selectedServerId !== null && detailState.data?.id === selectedServerId;
+  const selectedServer = detailMatchesSelectedServer ? detailState.data : null;
+  const detailLoading =
+    detailState.loading ||
+    Boolean(selectedServerId && detailState.data && !detailMatchesSelectedServer);
   const mutationErrorMessage = getMcpErrorMessage(
     mutationFailure?.error ?? mutations.error,
   );
+
+  function handleSaveAdminToken(): void {
+    setMcpAdminToken(adminTokenInput);
+    setAdminTokenInput(getMcpAdminToken());
+    setAdminTokenSaved(true);
+  }
 
   async function handleCreate(payload: McpServerCreate): Promise<void> {
     try {
@@ -164,12 +178,12 @@ export function McpPage() {
   }
 
   async function handleDeleteServer(): Promise<void> {
-    if (!selectedServerId) {
+    if (!selectedServerId || !selectedServer) {
       return;
     }
 
-    const serverId = selectedServerId;
-    const serverName = selectedServer?.name ?? getServerName(serverId);
+    const serverId = selectedServer.id;
+    const serverName = selectedServer.name;
 
     if (!window.confirm(`确认删除 ${serverName}？`)) {
       return;
@@ -201,6 +215,44 @@ export function McpPage() {
           新增 MCP Server
         </button>
       </header>
+
+      <section
+        aria-label="MCP 后端 Token 设置"
+        className="mb-3 flex flex-col gap-2 rounded-lg border border-hairline bg-canvas-soft p-3 md:flex-row md:items-end"
+      >
+        <div className="min-w-0 flex-1">
+          <label className="block text-xs text-body" htmlFor="mcp-admin-token">
+            MCP Admin Token
+          </label>
+          <input
+            autoComplete="off"
+            className="mt-1 w-full rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm outline-none ring-primary focus:ring-1"
+            id="mcp-admin-token"
+            onChange={(event) => {
+              setAdminTokenInput(event.target.value);
+              setAdminTokenSaved(false);
+            }}
+            placeholder="X-MCP-Admin-Token"
+            type="password"
+            value={adminTokenInput}
+          />
+          <p className="mt-1 text-xs text-mute">
+            仅用于向后端请求发送 token；管理员访问策略仍由路由保护占位实现。
+          </p>
+        </div>
+        <button
+          className="rounded-lg border border-hairline bg-canvas px-3 py-2 text-sm text-body transition hover:border-primary hover:text-primary"
+          onClick={handleSaveAdminToken}
+          type="button"
+        >
+          保存 Token
+        </button>
+        {adminTokenSaved ? (
+          <p className="text-xs text-body" role="status">
+            已保存到当前会话
+          </p>
+        ) : null}
+      </section>
 
       {mutationErrorMessage ? (
         <p className="mb-3 rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep" role="alert">
@@ -245,7 +297,7 @@ export function McpPage() {
         <McpServerDetail
           activeTab={activeTab}
           error={detailState.error}
-          loading={detailState.loading}
+          loading={detailLoading}
           onDeleteServer={() => {
             void handleDeleteServer();
           }}

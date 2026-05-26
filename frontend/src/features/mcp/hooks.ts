@@ -141,15 +141,15 @@ export function useMcpServerDetail(
   }, []);
 
   const refetch = useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
     if (!serverId) {
       setState({ data: null, error: null, loading: false });
       return;
     }
 
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-
-    setState((current) => ({ ...current, error: null, loading: true }));
+    setState({ data: null, error: null, loading: true });
 
     try {
       const detail = await getMcpServer(serverId);
