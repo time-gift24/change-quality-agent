@@ -90,7 +90,7 @@ class AgentVersion(Base):
     agent_id: Mapped[UUID] = mapped_column(ForeignKey("agents.id"), nullable=False)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
-    model: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
     model_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

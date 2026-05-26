@@ -54,3 +54,15 @@ def test_provider_credentials_migration_exists() -> None:
         '''postgresql_where=sa.text("scope = 'global' AND is_active")'''
         in migration
     )
+
+
+def test_agent_provider_binding_migration_replaces_model() -> None:
+    path = MIGRATIONS_DIR / "20260526_0005_replace_agent_version_model.py"
+
+    assert path.exists()
+    migration = path.read_text(encoding="utf-8")
+    assert 'revision: str = "20260526_0005"' in migration
+    assert 'down_revision: str | Sequence[str] | None = "20260526_0004"' in migration
+    assert 'op.add_column("agent_versions"' in migration
+    assert '"provider_id"' in migration
+    assert 'op.drop_column("agent_versions", "model")' in migration
