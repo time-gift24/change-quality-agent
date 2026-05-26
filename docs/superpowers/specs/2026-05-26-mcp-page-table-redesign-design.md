@@ -6,7 +6,15 @@
 
 不在范围：后端 API 变更、权限模型变更、分页/虚拟滚动 (留 hook，不实现)。
 
-> **Spec v2 修订说明**：以下章节根据 spec-document-reviewer 反馈在 §URL 状态机、§可用 token 与 StatusBadge、§表单错误展示、§Row 交互与键盘、§详情页头加载态、§Drawer 路由归属、§测试迁移矩阵 处做了细化。
+> **Spec v3 修订说明**：v3 在 v2 基础上根据 reviewer round 2 反馈做了 8 处修订：
+> - §URL 状态机「详情 mutation 404」分支去掉 `refetchDetail`，与「详情头删除」分支统一；
+> - §Drawer 归属与共享 新增 `mutations.error` 生命周期与详情页「无 auto-retry 404」明确语义；
+> - §Validation 标注 `validateForm` 短路是 `getByRole("alert")` 测试的隐性依赖；
+> - §测试迁移矩阵 row 14 追加「404 后无自动 refetch」断言；row 17 增补字段范围查询写法；
+> - §StatusBadge 颜色 新增 `bg-success/15` alpha 修饰符可用性说明；
+> - §URL 状态机「创建成功」补充 drawer 关闭过渡说明；
+> - §测试策略 新增列表名称 `<Link>` 端到端点击导航测试；
+> - §风险与权衡 修正「约 18 个」为 23 个。
 
 ## 路由
 
@@ -43,7 +51,7 @@
 |---|---|---|---|
 | 点击 `+ 新增 Server` | `/mcp` | `/mcp/new` | 列表页打开 create drawer |
 | Drawer 关闭 / 取消 / Esc | `/mcp/new` | `/mcp` | search 不需保留 |
-| 创建成功 | `/mcp/new` | `/mcp/:newId` | `refetchServers()`；落地新建服务详情页，更连贯 |
+| 创建成功 | `/mcp/new` | `/mcp/:newId` | `refetchServers()`；落地新建服务详情页，更连贯。**过渡处理**：先 `setDrawerClosing(true)` 让 drawer 内部进入关闭态 (无动画时为即时)，再 `navigate('/mcp/:newId')`。v1 无 close 动画，硬切可接受；如未来加动画，需 await close transition 再 navigate。 |
 | 创建失败 | `/mcp/new` | `/mcp/new` | drawer 保持，顶部 `role="alert"` 渲染 API 错误 |
 | 行点击 | `/mcp` | `/mcp/:id` | `useMcpServerDetail(:id)` 触发首拉 |
 | `⋯ 编辑` 或详情页头 `编辑` | `/mcp/:id` | `/mcp/:id/edit?...` | drawer 打开，保留 `?tab=`；如详情 404 则直接 `navigate('/mcp', { replace: true })` |
@@ -53,7 +61,7 @@
 | 详情头 `删除` | `/mcp/:id` | `/mcp` (replace) | `refetchServers()`；**不调用** `refetchDetail`，避免对已删服务再发请求 |
 | 详情 404 | `/mcp/:id` | `/mcp/:id` (不跳) | tab 区域渲染 "MCP 服务不存在" + `返回列表` 按钮；URL 保持，浏览器后退仍能离开 |
 | `/mcp/:id/edit` 直链 + 详情 404 | `/mcp/:id/edit` | `/mcp` (replace) | drawer 无 seed 数据不可工作，直接跳列表 |
-| 详情 mutation 返回 404 (`isMcpNotFoundError`) | `/mcp/:id` | `/mcp/:id` | 顶部 alert 显示错误；触发 `refetchServers() + refetchDetail()` 让用户看到 "服务不存在" 卡片 |
+| 详情 mutation 返回 404 (`isMcpNotFoundError`) | `/mcp/:id` | `/mcp/:id` | 顶部 alert 显示错误；触发 `refetchServers()`；**不调用 `refetchDetail`** (与「详情头删除」分支一致：已知 404 时不再发 GET，避免浪费请求)。下一次 `useMcpServerDetail` 自然轮询或用户触发的刷新会自行收敛到 404 卡片 |
 | 列表 row mutation 返回 404 | `/mcp` | `/mcp` | 顶部 alert + `refetchServers()`；**不导航** |
 | `Admin Token` 保存 | 任意 | 同上 | `refetchServers()`；如在详情页且有 `serverId`，并行 `refetchDetail()` |
 
@@ -68,6 +76,11 @@
 - `useMcpMutations()` 已确认是「每实例独立 state」(`useState` 在 hook 内部)，列表页 mutation 与详情页 mutation 的 pending/error 互不影响 — 这是预期的，列表 row 操作的 pending 不应该让详情页的「编辑」disabled。
 - `useMcpServerDetail.refetch` 闭包了当前 `serverId`，重新调用即刷新当前 `serverId` 数据，无需手动重绑。
 - 列表页同时持有 `useMcpServers` + 自己的 `useMcpMutations()`；详情页持有 `useMcpServerDetail(serverId)` + 自己的 `useMcpMutations()`。两套 hook 实例并存不会互相干扰。
+- **`mutations.error` 生命周期**：为保证「顶部 API alert」与「字段 alert」严格互斥 (见 §Validation)，drawer / list 页 mutation hook 在以下时机主动清空 `error`：
+  1. drawer 打开 (mount 或路由切到 `/mcp/new`、`/mcp/:id/edit` 时)
+  2. 每次 submit 调用前 (`setError(null)` 在调用 mutation 之前)
+  3. 字段值变更不清空 (只清字段错误)；API error 必须由下一次 submit 覆盖或 drawer 关闭清除
+- **详情页不会自动重试 404**：`useMcpServerDetail` 在 hook 内部不做自动 refetch；404 后只有用户手动操作 (点击编辑、刷新等) 或路由切换才会重新发起。详情页 mount 时只调用一次 fetch；mutation 路径自定哪些场景调用 `refetchDetail` (见 §URL 状态机)。
 
 ## 列表页 `McpListPage`
 
@@ -120,6 +133,8 @@
 | unknown | `bg-canvas-soft` + `border border-hairline` | `text-mute` | `bg-hairline-strong` |
 
 不引入 `success-deep`。所有颜色 class 在当前 `globals.css` 已定义。
+
+> **关于 `bg-success/15` alpha 修饰符**：Tailwind v4 `/15` 仅在 `@theme` 中 `--color-*` 是字面色值 (hex / oklch / rgb) 时通过 `color-mix(in oklab, ...)` 生效。已确认 `--color-success: #16a34a` 是字面 hex；同理 `--color-primary` 等都不是 `var(...)` 链。如果未来把 `--color-success` 改成 `var(...)` 引用其它变量，`/15` 修饰会失效，需改用显式 token (如新增 `--color-success-soft`)。
 
 ### Row action dropdown
 
@@ -281,7 +296,7 @@ Select: 同 Input + `appearance-none` + 绝对定位 chevron。
 - **错误展示分两类，互斥渲染，避免 `getByRole("alert")` 多匹配**：
   - **客户端字段级错误** — 每个字段下方渲染一个 `<p id={errorId} role="alert" className="text-2xs text-error-deep">`，**仅在该字段有错误时**渲染。submit 校验失败时，**不渲染顶部 alert 区** (保持 API 错误专用)。这样 `getByRole("alert")` 在 client-side 校验场景下唯一匹配到第一个 / 当前唯一的字段错误，与现有断言 `expect(within(dialog).getByRole("alert")).toHaveTextContent("请填写服务名称。")` 兼容 (单字段错误时仅一个 alert)。
   - **API 错误** — 顶部一个 `<p role="alert">`，**仅在** `mutations.error` 非空时渲染。此时字段级错误已被用户编辑清除 (否则不会触发新提交)，二者不并存。
-- 多字段同时报错的情形：currently `validateForm` 找到第一个错误就 return false (沿用现有实现)；如果未来改为收集所有错误，将首字段错误用 `role="alert"`，其它用 `aria-live="polite"` 以避免多 alert 冲突。
+- 多字段同时报错的情形：当前 `validateForm` 找到第一个错误就 `return false` (沿用现有实现，**该短路行为是 `getByRole("alert")` 测试用例的隐性依赖**)。**实现约束**：v1 不得改为「收集所有错误一次性渲染」；如果未来需要收集多错误，必须把首字段错误用 `role="alert"`、其它字段错误用 `aria-live="polite"`，并同步更新对应测试用例，避免 `getByRole("alert")` 在单 dialog 内匹配多个。
 - screen-reader 噪音：字段错误使用 `role="alert"` 在用户清除时不会被 announce (只在出现时 announce)，可接受。
 - 校验文案完全不变，保留：
   1. "请填写服务名称。"
@@ -359,10 +374,10 @@ src/features/mcp/
 | 11 | `stores the MCP admin token and refetches the selected server data` | `McpListPage.test.tsx` | 详情 refetch 部分移除 (列表页没有详情)；仅断言 `refetchServers` 被调用 |
 | 12 | `reloads failed list data after saving a non-empty admin token` | `McpListPage.test.tsx` | 同上 |
 | 13 | `shows detail load errors before the empty selected state` | `McpDetailPage.test.tsx` | 改为：404 → "MCP 服务不存在" + 返回按钮；其它 detail error → 顶部 alert + 内容区错误状态 |
-| 14 | `clears selected server after detail returns 404` | `McpDetailPage.test.tsx` | **行为变更**：不再 auto-redirect；改为「断言 404 卡片渲染 + 点击 `返回列表` 后 URL → `/mcp`」 |
+| 14 | `clears selected server after detail returns 404` | `McpDetailPage.test.tsx` | **行为变更**：不再 auto-redirect；改为「断言 404 卡片渲染 + 点击 `返回列表` 后 URL → `/mcp`」。**追加用例**：404 后不应继续触发 detail 请求 (断言 `useMcpServerDetail.mock.results[0].value.refetch` 不被自动调用、且 hook 没有被以新 serverId 自动重新挂载) — 守住「无 auto-retry」语义 |
 | 15 | `keeps current detail when non-selected row mutation returns 404` | `McpListPage.test.tsx` | 行 mutation 404 → 顶部 alert 渲染 + `refetchServers` 调用 + 不导航 |
 | 16 | `clears selected server on successful delete without refetching deleted detail` | `McpDetailPage.test.tsx` | 详情头删除 → `useNavigate` mock 收到 `/mcp` + `refetchServers` 调用 + `refetchDetail` **未**调用 |
-| 17 | `shows inline error for empty name and prevents create` | `McpServerFormDrawer.test.tsx` | alert 现在是字段级 `role="alert"`，仍能命中 |
+| 17 | `shows inline error for empty name and prevents create` | `McpServerFormDrawer.test.tsx` | alert 现在是字段级 `role="alert"`，仍能命中 (依赖 `validateForm` 短路：单字段错误时 dialog 内只有一个 alert)。**防御性写法**：可改为 `within(nameField).getByRole("alert")` 把查询锚到 `<div className="space-y-1">` field 容器，未来即使多 alert 也不破。 |
 | 18 | `validates required command for stdio and closes drawer on Escape` | `McpServerFormDrawer.test.tsx` | 字段级 alert + Escape → URL 回到 `/mcp` |
 | 19 | `validates invalid http url before submit` | `McpServerFormDrawer.test.tsx` | 字段级 alert 在 url 字段下 |
 | 20 | `creates server with parsed args env headers and conservative defaults` | `McpServerFormDrawer.test.tsx` | payload 形状不变；额外断言成功后 URL → `/mcp/:newId` |
@@ -417,6 +432,7 @@ src/features/mcp/
 - `/mcp/new` → drawer 打开 (`role="dialog" name="新增 MCP 服务"`)
 - `/mcp/srv-1/edit` → drawer 打开 (`role="dialog" name="编辑 MCP 服务"`)
 - 关闭 drawer → URL 回到父路径
+- **从 `/mcp` 点击行内名称 `<Link>` → URL 变为 `/mcp/srv-2` 且渲染对应详情页 H1**：守住「行链接 → 详情页」的端到端集成 (仅有 href 断言不足以验证导航 + 详情页 mount 是否真发生)。使用 `render(<App />)` + `MemoryRouter` 或 `window.history` 初始化到 `/mcp`，触发 click 后 `await screen.findByRole("heading", { name: "Beta Server" })`。
 
 **`WorkspaceSidebar`** 测试沿用，无需修改 (`activeKey="mcp"` 仍然驱动)。
 
@@ -439,6 +455,6 @@ src/features/mcp/
 
 - **路由测试基建**：需要 mock `useNavigate` 或在 `MemoryRouter` 中渲染并读取 URL；ChatPage 已有 `MemoryRouter` 模式可参照，无新增依赖
 - **轻量 dropdown 自实现**：不引入 Radix。简单焦点管理代码量约 60 行；后续如需扩展为通用组件可再抽象
-- **现有测试影响**：`McpPage.test.tsx` 中约 18 个测试用例需要拆分到新页面。逐项映射后行为一致即可
+- **现有测试影响**：`McpPage.test.tsx` 中 23 个测试用例需要拆分到新页面 (见 §测试迁移矩阵)。逐项映射后行为一致即可。
 - **`destructive` 颜色**：DESIGN.md 仅有 `error / error-soft / error-deep`，足够；不引入新色
 - **AdminTokenControl 位置**：保持在列表页 header；不上浮到全局 sidebar，避免在详情页占位
