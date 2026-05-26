@@ -14,6 +14,7 @@ def api_key_hint(api_key: str) -> str:
 
 
 def prepare_api_key(api_key: str) -> PreparedApiKey:
+    # v1 stores the raw API key in the ciphertext column until encryption/KMS lands.
     return PreparedApiKey(
         ciphertext=api_key,
         hint=api_key_hint(api_key),

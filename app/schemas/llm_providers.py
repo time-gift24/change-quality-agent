@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class LlmProviderCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str = Field(min_length=1)
     provider: str | None = Field(default=None, min_length=1)
     base_url: str | None = Field(default=None, min_length=1)
@@ -15,6 +17,8 @@ class LlmProviderCreate(BaseModel):
 
 
 class LlmProviderUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str | None = Field(default=None, min_length=1)
     provider: str | None = Field(default=None, min_length=1)
     base_url: str | None = Field(default=None, min_length=1)

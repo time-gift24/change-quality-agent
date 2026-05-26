@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+import pytest
+from pydantic import ValidationError
+
 from app.schemas.llm_providers import (
     LlmProviderCreate,
     LlmProviderDetail,
@@ -37,6 +40,51 @@ def test_llm_provider_update_allows_partial_payload():
     assert payload.model is None
     assert payload.metadata == {}
     assert payload.is_active is None
+
+
+def test_llm_provider_update_metadata_exclude_unset_semantics():
+    assert "metadata" not in LlmProviderUpdate(model="gpt-4.1-mini").model_dump(
+        exclude_unset=True
+    )
+    assert LlmProviderUpdate(metadata={}).model_dump(exclude_unset=True)[
+        "metadata"
+    ] == {}
+
+
+@pytest.mark.parametrize(
+    ("schema_cls", "field_name", "payload"),
+    [
+        (LlmProviderCreate, "name", {"name": " ", "api_key": "sk-test123456"}),
+        (
+            LlmProviderCreate,
+            "provider",
+            {"name": "Personal OpenAI", "provider": " ", "api_key": "sk-test123456"},
+        ),
+        (
+            LlmProviderCreate,
+            "base_url",
+            {"name": "Personal OpenAI", "base_url": " ", "api_key": "sk-test123456"},
+        ),
+        (LlmProviderCreate, "api_key", {"name": "Personal OpenAI", "api_key": " "}),
+        (
+            LlmProviderCreate,
+            "model",
+            {"name": "Personal OpenAI", "model": " ", "api_key": "sk-test123456"},
+        ),
+        (LlmProviderUpdate, "name", {"name": " "}),
+        (LlmProviderUpdate, "provider", {"provider": " "}),
+        (LlmProviderUpdate, "base_url", {"base_url": " "}),
+        (LlmProviderUpdate, "api_key", {"api_key": " "}),
+        (LlmProviderUpdate, "model", {"model": " "}),
+    ],
+)
+def test_llm_provider_input_rejects_whitespace_only_strings(
+    schema_cls, field_name, payload
+):
+    with pytest.raises(ValidationError) as exc_info:
+        schema_cls(**payload)
+
+    assert exc_info.value.errors()[0]["loc"] == (field_name,)
 
 
 def test_llm_provider_detail_does_not_expose_real_keys():
