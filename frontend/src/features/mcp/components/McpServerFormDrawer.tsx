@@ -56,6 +56,12 @@ export function McpServerFormDrawer({
   const commandInputRef = useRef<HTMLInputElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
   const titleId = useId();
+  const nameErrorId = useId();
+  const commandErrorId = useId();
+  const urlErrorId = useId();
+  const envErrorId = useId();
+  const headersErrorId = useId();
+  const globalErrorId = useId();
 
   // Initialize / reset form state
   useEffect(() => {
@@ -270,12 +276,6 @@ export function McpServerFormDrawer({
   const hasEnvError = !!fieldErrors.env;
   const hasHeadersError = !!fieldErrors.headers;
   const hasGlobalError = !!fieldErrors._global;
-  const nameErrorId = useId();
-  const commandErrorId = useId();
-  const urlErrorId = useId();
-  const envErrorId = useId();
-  const headersErrorId = useId();
-  const globalErrorId = useId();
 
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/25">

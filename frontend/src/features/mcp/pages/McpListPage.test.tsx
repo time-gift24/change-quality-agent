@@ -122,6 +122,14 @@ describe("McpListPage", () => {
     expect(screen.getByText("Beta Server")).toBeInTheDocument();
   });
 
+  it("opens the create drawer when clicking 新增 Server", () => {
+    renderListPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    expect(screen.getByRole("dialog", { name: "新增 MCP 服务" })).toBeInTheDocument();
+  });
+
   it("filters servers by search text", () => {
     renderListPage();
 
