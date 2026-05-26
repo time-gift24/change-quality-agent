@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import CurrentUser, get_current_user, require_admin_user
 from app.core.config import settings
 from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
@@ -14,6 +15,8 @@ from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
+AdminUserDep = Annotated[CurrentUser, Depends(require_admin_user)]
 
 
 def get_sop_client() -> SopClient:

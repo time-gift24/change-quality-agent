@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.auth import fake_auth_middleware
 from app.api.deps import get_mcp_runtime_manager
 from app.api.v1 import agents, mcp, runs, sop
 from app.core.database import async_session
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Change Quality Agent", lifespan=lifespan)
+app.middleware("http")(fake_auth_middleware)
 app.include_router(mcp.router)
 app.include_router(agents.router)
 app.include_router(runs.router)
