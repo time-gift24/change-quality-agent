@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from app.api.auth import fake_auth_middleware
 from app.api.deps import get_mcp_runtime_manager
-from app.api.v1 import agents, llm_providers, mcp, runs, sop
+from app.api.v1 import admin_llm_providers, agents, llm_providers, mcp, runs, sop
 from app.core.database import async_session
 from app.repositories.runs import RunRepository
 
@@ -31,6 +31,7 @@ app = FastAPI(title="Change Quality Agent", lifespan=lifespan)
 app.middleware("http")(fake_auth_middleware)
 app.include_router(mcp.router)
 app.include_router(agents.router)
+app.include_router(admin_llm_providers.router)
 app.include_router(llm_providers.router)
 app.include_router(runs.router)
 app.include_router(sop.router)
