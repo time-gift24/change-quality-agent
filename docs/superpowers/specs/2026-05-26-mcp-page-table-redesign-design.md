@@ -51,12 +51,12 @@
 |---|---|---|---|
 | 点击 `+ 新增 Server` | `/mcp` | `/mcp/new` | 列表页打开 create drawer |
 | Drawer 关闭 / 取消 / Esc | `/mcp/new` | `/mcp` | search 不需保留 |
-| 创建成功 | `/mcp/new` | `/mcp/:newId` | `refetchServers()`；落地新建服务详情页，更连贯。**过渡处理**：先 `setDrawerClosing(true)` 让 drawer 内部进入关闭态 (无动画时为即时)，再 `navigate('/mcp/:newId')`。v1 无 close 动画，硬切可接受；如未来加动画，需 await close transition 再 navigate。 |
+| 创建成功 | `/mcp/new` | `/mcp/:newId` | `refetchServers()`；落地新建服务详情页，更连贯。**v1 过渡处理**：drawer 无关闭动画，直接 `navigate('/mcp/:newId')` 即可 (列表页 unmount → 详情页 mount 自然替换 drawer 实例)。如未来加入 close 动画，需先 await transitionend 再 navigate；当前实现不应引入 `setDrawerClosing` 类的 placeholder state，保持代码简洁。 |
 | 创建失败 | `/mcp/new` | `/mcp/new` | drawer 保持，顶部 `role="alert"` 渲染 API 错误 |
 | 行点击 | `/mcp` | `/mcp/:id` | `useMcpServerDetail(:id)` 触发首拉 |
 | `⋯ 编辑` 或详情页头 `编辑` | `/mcp/:id` | `/mcp/:id/edit?...` | drawer 打开，保留 `?tab=`；如详情 404 则直接 `navigate('/mcp', { replace: true })` |
 | Drawer 关闭 (edit) | `/mcp/:id/edit` | `/mcp/:id` | 关闭时 `navigate({ pathname: '/mcp/:id', search: location.search })` 保留 tab |
-| 更新成功 | `/mcp/:id/edit` | `/mcp/:id` | `refetchServers() + refetchDetail()` |
+| 更新成功 | `/mcp/:id/edit` | `/mcp/:id` | `refetchServers() + refetchDetail()`。**如 update mutation 本身返回 404**，走「详情 mutation 返回 404」分支：跳过 `refetchDetail`，只 `refetchServers()`，顶部 alert 显示错误 |
 | `⋯ 删除` (列表) | `/mcp` | `/mcp` | `refetchServers()`；若删除当前列表已无项目，渲染空态 |
 | 详情头 `删除` | `/mcp/:id` | `/mcp` (replace) | `refetchServers()`；**不调用** `refetchDetail`，避免对已删服务再发请求 |
 | 详情 404 | `/mcp/:id` | `/mcp/:id` (不跳) | tab 区域渲染 "MCP 服务不存在" + `返回列表` 按钮；URL 保持，浏览器后退仍能离开 |
@@ -185,7 +185,7 @@
   - 加载态 (`detail.loading && !detail.data`)：H1 渲染 `serverId`，类名 `font-mono text-base text-mute`；副行只渲染 `<StatusBadge status="unknown" />`；其它分段不渲染
   - 404 态：H1 渲染 `serverId` (灰)；副行不渲染
 - 右：`编辑` (h-9 ghost) · `删除` (h-9 destructive ghost) · `⋯` 触发与 row 相同的动作 dropdown (Start/Stop/Restart/Check)
-  - 加载/404 态：右侧三个控件 disabled (`aria-disabled="true"`)
+  - 加载/404 态：右侧三个控件 (`编辑` / `删除` / `⋯`) 全部 disabled (`aria-disabled="true"` 并阻止点击 / 键盘激活)
 
 ### Tab bar
 
@@ -374,7 +374,7 @@ src/features/mcp/
 | 11 | `stores the MCP admin token and refetches the selected server data` | `McpListPage.test.tsx` | 详情 refetch 部分移除 (列表页没有详情)；仅断言 `refetchServers` 被调用 |
 | 12 | `reloads failed list data after saving a non-empty admin token` | `McpListPage.test.tsx` | 同上 |
 | 13 | `shows detail load errors before the empty selected state` | `McpDetailPage.test.tsx` | 改为：404 → "MCP 服务不存在" + 返回按钮；其它 detail error → 顶部 alert + 内容区错误状态 |
-| 14 | `clears selected server after detail returns 404` | `McpDetailPage.test.tsx` | **行为变更**：不再 auto-redirect；改为「断言 404 卡片渲染 + 点击 `返回列表` 后 URL → `/mcp`」。**追加用例**：404 后不应继续触发 detail 请求 (断言 `useMcpServerDetail.mock.results[0].value.refetch` 不被自动调用、且 hook 没有被以新 serverId 自动重新挂载) — 守住「无 auto-retry」语义 |
+| 14 | `clears selected server after detail returns 404` | `McpDetailPage.test.tsx` | **行为变更**：不再 auto-redirect；改为「断言 404 卡片渲染 + 点击 `返回列表` 后 URL → `/mcp`」。**追加用例 (精确断言文本)**：`await waitFor(() => screen.getByText("MCP 服务不存在"))` 之后 `expect(refetchDetail).not.toHaveBeenCalled()` — 守住「无 auto-retry」语义。不要换成「等若干 ms 再断言 call count」的写法。 |
 | 15 | `keeps current detail when non-selected row mutation returns 404` | `McpListPage.test.tsx` | 行 mutation 404 → 顶部 alert 渲染 + `refetchServers` 调用 + 不导航 |
 | 16 | `clears selected server on successful delete without refetching deleted detail` | `McpDetailPage.test.tsx` | 详情头删除 → `useNavigate` mock 收到 `/mcp` + `refetchServers` 调用 + `refetchDetail` **未**调用 |
 | 17 | `shows inline error for empty name and prevents create` | `McpServerFormDrawer.test.tsx` | alert 现在是字段级 `role="alert"`，仍能命中 (依赖 `validateForm` 短路：单字段错误时 dialog 内只有一个 alert)。**防御性写法**：可改为 `within(nameField).getByRole("alert")` 把查询锚到 `<div className="space-y-1">` field 容器，未来即使多 alert 也不破。 |
