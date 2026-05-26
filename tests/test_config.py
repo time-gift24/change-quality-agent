@@ -54,6 +54,27 @@ def test_environment_variables_override_config_yaml(
     assert settings.database_url == "postgresql+asyncpg://env:env@db:5432/env_db"
 
 
+def test_logging_settings_have_defaults() -> None:
+    settings = Settings()
+
+    assert settings.log_level == "INFO"
+    assert settings.access_log_enabled is True
+
+
+def test_logging_settings_can_be_overridden_by_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("LOG_LEVEL", "DEBUG")
+    monkeypatch.setenv("ACCESS_LOG_ENABLED", "false")
+
+    settings = Settings()
+
+    assert settings.log_level == "DEBUG"
+    assert settings.access_log_enabled is False
+
+
 def test_environment_lookup_by_key() -> None:
     settings = Settings(
         environments=[
