@@ -7,7 +7,7 @@ from typing import Any
 from langchain.agents import create_agent as langchain_create_agent
 from langchain.chat_models import init_chat_model
 
-from app.services.run_events import normalize_langgraph_chunk
+from agent.stream_events import runtime_stream_event
 
 
 @dataclass(frozen=True)
@@ -167,41 +167,3 @@ def _message_to_dict(message: Any) -> dict[str, Any]:
     if isinstance(converted, Mapping):
         return dict(converted)
     return {"content": str(converted)}
-
-
-def runtime_stream_event(chunk_type: str, chunk: object) -> dict[str, Any]:
-    event = normalize_langgraph_chunk(
-        chunk_type=chunk_type,
-        chunk=chunk,
-        run_id="",
-        thread_id="",
-        sequence=0,
-    )
-    payload = dict(event["payload"])
-    if chunk_type == "messages":
-        payload["delta"] = _message_delta(chunk)
-
-    runtime_event = {
-        "type": event["type"],
-        "node": event["node"] or "agent",
-        "payload": payload,
-    }
-    for key in ("checkpoint_id", "task_id"):
-        if event[key] is not None:
-            runtime_event[key] = event[key]
-    return runtime_event
-
-
-def _message_delta(chunk: object) -> str | None:
-    message = chunk[0] if _is_stream_message_tuple(chunk) else chunk
-    if isinstance(message, str):
-        return message
-    if isinstance(message, Mapping):
-        content = message.get("content")
-        return content if isinstance(content, str) else None
-    content = getattr(message, "content", None)
-    return content if isinstance(content, str) else None
-
-
-def _is_stream_message_tuple(chunk: object) -> bool:
-    return isinstance(chunk, tuple | list) and len(chunk) >= 2

@@ -217,6 +217,31 @@ async def test_agent_runtime_stream_yields_message_deltas() -> None:
 
 
 @pytest.mark.asyncio
+async def test_agent_runtime_stream_extracts_content_block_message_deltas() -> None:
+    class StreamingAgent:
+        async def astream(self, payload, stream_mode=None):
+            yield (
+                "messages",
+                (
+                    AIMessage(content=[{"type": "text", "text": "hello"}]),
+                    {"langgraph_node": "agent"},
+                ),
+            )
+
+    runtime = AgentRuntime(
+        create_agent=lambda **_: StreamingAgent(),
+        model_factory=lambda *_, **__: object(),
+    )
+
+    chunks = [
+        chunk
+        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+    ]
+
+    assert chunks[0]["payload"]["delta"] == "hello"
+
+
+@pytest.mark.asyncio
 async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
     class NonStreamingAgent:
         async def ainvoke(self, payload):
