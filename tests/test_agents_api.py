@@ -542,6 +542,7 @@ async def test_start_agent_test_run_accepts_optional_user_context() -> None:
         "user_id": "user-123",
         "role": "user",
     }
+    assert run_repository.created_kwargs["created_by"] == "user-123"
 
 
 @pytest.mark.asyncio

@@ -105,6 +105,7 @@ class AgentService:
             messages=messages,
             input_preview=_input_preview(messages),
             current_user=current_user_payload,
+            created_by=current_user.user_id if current_user else None,
         )
         await self._commit_if_configured()
         await self._schedule_test_run_if_configured(run.id)

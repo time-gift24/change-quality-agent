@@ -269,6 +269,7 @@ async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
     ]
+    assert run_repository.created_kwargs["created_by"] is None
 
 
 @pytest.mark.asyncio
@@ -294,6 +295,7 @@ async def test_start_test_run_persists_optional_user_context() -> None:
         "user_id": "user-123",
         "role": "user",
     }
+    assert run_repository.created_kwargs["created_by"] == "user-123"
 
 
 @pytest.mark.asyncio
