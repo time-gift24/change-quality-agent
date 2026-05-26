@@ -11,7 +11,13 @@ from sqlalchemy.orm import selectinload
 from app.models.agents import Agent, AgentVersion
 from app.schemas.agents import AgentDraftConfig
 
-_UNSET: Final = object()
+
+class _UnsetType:
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET: Final = _UnsetType()
 
 
 class AgentKeyExistsError(Exception):
@@ -38,6 +44,27 @@ class AgentVersionNotFoundError(Exception):
         super().__init__(str(version_id))
 
 
+def validate_draft_config(
+    key: str,
+    draft: AgentDraftConfig | Mapping[str, Any] | None,
+) -> AgentDraftConfig:
+    try:
+        return (
+            draft
+            if isinstance(draft, AgentDraftConfig)
+            else AgentDraftConfig.model_validate(draft)
+        )
+    except ValidationError as exc:
+        raise AgentDraftInvalidError(key) from exc
+
+
+def dump_draft_config(
+    key: str,
+    draft: AgentDraftConfig | Mapping[str, Any],
+) -> dict[str, Any]:
+    return validate_draft_config(key, draft).model_dump(mode="json", by_alias=True)
+
+
 class AgentRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -55,7 +82,7 @@ class AgentRepository:
             key=key,
             display_name=display_name,
             description=description,
-            draft_config=self._dump_draft(key, draft),
+            draft_config=dump_draft_config(key, draft),
             created_by=created_by,
             updated_by=created_by,
         )
@@ -97,28 +124,27 @@ class AgentRepository:
         self,
         key: str,
         *,
-        display_name: str | object = _UNSET,
-        description: str | None | object = _UNSET,
-        enabled: bool | object = _UNSET,
-        draft: AgentDraftConfig | Mapping[str, Any] | object = _UNSET,
+        display_name: str | _UnsetType = UNSET,
+        description: str | None | _UnsetType = UNSET,
+        enabled: bool | _UnsetType = UNSET,
+        draft: AgentDraftConfig | Mapping[str, Any] | _UnsetType = UNSET,
         updated_by: str | None = None,
     ) -> Agent:
-        agent = await self._require_active_agent(key)
-        if display_name is not _UNSET:
-            agent.display_name = display_name  # type: ignore[assignment]
-        if description is not _UNSET:
-            agent.description = description  # type: ignore[assignment]
-        if enabled is not _UNSET:
-            agent.enabled = enabled  # type: ignore[assignment]
-        if draft is not _UNSET:
-            agent.draft_config = self._dump_draft(
-                key,
-                draft,  # type: ignore[arg-type]
-            )
+        """Update only fields whose arguments are not the public UNSET sentinel."""
+
+        agent = await self._require_agent(key)
+        if display_name is not UNSET:
+            agent.display_name = display_name
+        if description is not UNSET:
+            agent.description = description
+        if enabled is not UNSET:
+            agent.enabled = enabled
+        if draft is not UNSET:
+            agent.draft_config = dump_draft_config(key, draft)
         if updated_by is not None:
             agent.updated_by = updated_by
         await self._session.flush()
-        return agent
+        return await self._require_agent(key)
 
     async def publish_agent(
         self,
@@ -126,8 +152,8 @@ class AgentRepository:
         *,
         published_by: str | None = None,
     ) -> AgentVersion:
-        agent = await self._require_active_agent(key, lock=True)
-        draft = self._validate_draft(key, agent.draft_config)
+        agent = await self._require_agent(key, lock=True)
+        draft = validate_draft_config(key, agent.draft_config)
         version = AgentVersion(
             agent_id=agent.id,
             version_number=await self._next_version_number(agent.id),
@@ -144,6 +170,7 @@ class AgentRepository:
         if published_by is not None:
             agent.updated_by = published_by
         await self._session.flush()
+        await self._session.refresh(version)
         return version
 
     async def list_versions(self, key: str) -> list[AgentVersion]:
@@ -178,11 +205,33 @@ class AgentRepository:
         *,
         updated_by: str | None = None,
     ) -> Agent:
-        agent = await self._require_active_agent(key)
+        agent = await self._require_agent(key)
         agent.deleted_at = datetime.now(UTC)
         if updated_by is not None:
             agent.updated_by = updated_by
         await self._session.flush()
+        return await self._require_agent(key, include_deleted=True)
+
+    async def _require_agent(
+        self,
+        key: str,
+        *,
+        include_deleted: bool = False,
+        lock: bool = False,
+    ) -> Agent:
+        statement = (
+            select(Agent)
+            .options(selectinload(Agent.latest_version))
+            .where(Agent.key == key)
+            .execution_options(populate_existing=True)
+        )
+        if not include_deleted:
+            statement = statement.where(Agent.deleted_at.is_(None))
+        if lock:
+            statement = statement.with_for_update()
+        agent = await self._session.scalar(statement)
+        if agent is None:
+            raise AgentNotFoundError(key)
         return agent
 
     async def _require_active_agent(
@@ -191,15 +240,7 @@ class AgentRepository:
         *,
         lock: bool = False,
     ) -> Agent:
-        statement = (
-            select(Agent).where(Agent.key == key).where(Agent.deleted_at.is_(None))
-        )
-        if lock:
-            statement = statement.with_for_update()
-        agent = await self._session.scalar(statement)
-        if agent is None:
-            raise AgentNotFoundError(key)
-        return agent
+        return await self._require_agent(key, lock=lock)
 
     async def _next_version_number(self, agent_id: UUID) -> int:
         statement = (
@@ -215,18 +256,4 @@ class AgentRepository:
         key: str,
         draft: AgentDraftConfig | Mapping[str, Any],
     ) -> dict[str, Any]:
-        return self._validate_draft(key, draft).model_dump(mode="json", by_alias=True)
-
-    def _validate_draft(
-        self,
-        key: str,
-        draft: AgentDraftConfig | Mapping[str, Any] | None,
-    ) -> AgentDraftConfig:
-        try:
-            return (
-                draft
-                if isinstance(draft, AgentDraftConfig)
-                else AgentDraftConfig.model_validate(draft)
-            )
-        except ValidationError as exc:
-            raise AgentDraftInvalidError(key) from exc
+        return dump_draft_config(key, draft)

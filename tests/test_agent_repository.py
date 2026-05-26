@@ -1,4 +1,6 @@
 import os
+from datetime import UTC, datetime
+from inspect import signature
 from typing import Any
 
 import pytest
@@ -42,10 +44,47 @@ def test_repository_module_defines_expected_public_api() -> None:
     agents = repository_types()
 
     assert agents.AgentRepository is not None
+    assert agents.UNSET is not None
     assert agents.AgentKeyExistsError is not None
     assert agents.AgentNotFoundError is not None
     assert agents.AgentDraftInvalidError is not None
     assert agents.AgentVersionNotFoundError is not None
+
+
+def test_update_draft_uses_public_sentinel_for_optional_fields() -> None:
+    agents = repository_types()
+    parameters = signature(agents.AgentRepository.update_draft).parameters
+
+    assert parameters["display_name"].default is agents.UNSET
+    assert parameters["description"].default is agents.UNSET
+    assert parameters["enabled"].default is agents.UNSET
+    assert parameters["draft"].default is agents.UNSET
+
+
+def test_dump_draft_config_uses_external_model_config_key() -> None:
+    agents = repository_types()
+
+    payload = agents.dump_draft_config(
+        "release-reviewer",
+        draft_config(temperature=0.1),
+    )
+
+    assert payload["model_config"] == {"temperature": 0.1}
+    assert "model_parameters" not in payload
+
+
+def test_dump_draft_config_rejects_invalid_raw_draft() -> None:
+    agents = repository_types()
+
+    with pytest.raises(agents.AgentDraftInvalidError):
+        agents.dump_draft_config(
+            "release-reviewer",
+            {
+                "system_prompt": "",
+                "model": "openai:gpt-5-mini",
+                "model_config": {},
+            },
+        )
 
 
 def draft_config(
@@ -61,6 +100,119 @@ def draft_config(
         tool_allowlist=["search_sop"],
         mcp_server_ids=["change-docs"],
     )
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.flushed = 0
+
+    async def flush(self) -> None:
+        self.flushed += 1
+
+
+class FakeAgent:
+    def __init__(
+        self,
+        *,
+        description: str | None = "Initial description",
+        deleted_at: datetime | None = None,
+    ) -> None:
+        self.display_name = "Release Reviewer"
+        self.description = description
+        self.enabled = True
+        self.draft_config = {}
+        self.updated_by = None
+        self.deleted_at = deleted_at
+
+
+@pytest.mark.asyncio
+async def test_update_draft_returns_reloaded_agent_after_flush() -> None:
+    agents = repository_types()
+    session = FakeSession()
+    initial_agent = FakeAgent()
+    reloaded_agent = FakeAgent(description=None)
+
+    class ReloadingRepository(agents.AgentRepository):
+        def __init__(self) -> None:
+            super().__init__(session)
+            self.calls: list[tuple[str, bool, bool, int]] = []
+
+        async def _require_agent(
+            self,
+            key: str,
+            *,
+            include_deleted: bool = False,
+            lock: bool = False,
+        ) -> FakeAgent:
+            self.calls.append((key, include_deleted, lock, session.flushed))
+            if session.flushed == 0:
+                return initial_agent
+            return reloaded_agent
+
+        async def _require_active_agent(
+            self,
+            key: str,
+            *,
+            lock: bool = False,
+        ) -> FakeAgent:
+            return await self._require_agent(key, lock=lock)
+
+    repository = ReloadingRepository()
+
+    result = await repository.update_draft("release-reviewer", description=None)
+
+    assert result is reloaded_agent
+    assert initial_agent.description is None
+    assert session.flushed == 1
+    assert repository.calls == [
+        ("release-reviewer", False, False, 0),
+        ("release-reviewer", False, False, 1),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_soft_delete_returns_reloaded_deleted_agent_after_flush() -> None:
+    agents = repository_types()
+    session = FakeSession()
+    initial_agent = FakeAgent()
+    reloaded_agent = FakeAgent(deleted_at=datetime(2026, 5, 26, tzinfo=UTC))
+
+    class ReloadingRepository(agents.AgentRepository):
+        def __init__(self) -> None:
+            super().__init__(session)
+            self.calls: list[tuple[str, bool, bool, int]] = []
+
+        async def _require_agent(
+            self,
+            key: str,
+            *,
+            include_deleted: bool = False,
+            lock: bool = False,
+        ) -> FakeAgent:
+            self.calls.append((key, include_deleted, lock, session.flushed))
+            if session.flushed == 0:
+                return initial_agent
+            return reloaded_agent
+
+        async def _require_active_agent(
+            self,
+            key: str,
+            *,
+            lock: bool = False,
+        ) -> FakeAgent:
+            return await self._require_agent(key, lock=lock)
+
+    repository = ReloadingRepository()
+
+    result = await repository.soft_delete("release-reviewer")
+
+    assert result is reloaded_agent
+    assert initial_agent.deleted_at is not None
+    assert session.flushed == 1
+    assert repository.calls == [
+        ("release-reviewer", False, False, 0),
+        ("release-reviewer", True, False, 1),
+    ]
 
 
 @pytest.mark.asyncio
