@@ -1413,8 +1413,8 @@ git commit -m "feat: add McpDetailToolsPanel with schema expand"
 
 ```tsx
 // src/features/mcp/pages/McpDetailPage.tsx
-import { useCallback, useMemo } from "react";
-import { useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { WorkspaceSidebar } from "../../../app/WorkspaceSidebar";
 import { McpBreadcrumb } from "../components/McpBreadcrumb";
@@ -1431,6 +1431,7 @@ export function McpDetailPage() {
   const { serverId } = useParams<{ serverId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const tabParam = searchParams.get("tab");
   const activeTab: McpDetailTab =
@@ -1688,11 +1689,7 @@ export function McpDetailPage() {
 }
 ```
 
-- [ ] **Step 2: Fix missing `useState` import in the component**
-
-Check that `useState` is imported from React (the `sidebarOpen` state needs it). Add `import { useCallback, useState } from "react";` at the top.
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 git add frontend/src/features/mcp/pages/McpDetailPage.tsx
@@ -2439,6 +2436,96 @@ vi.mock("../../mcp/pages/McpListPage", () => ({
 
 And add a mock for `McpDetailPage` if it doesn't exist yet.
 
+Also add the integration test that verifies clicking a name link on the list page navigates to the detail page (end-to-end). Add this test to `src/app/App.test.tsx` or a new `src/features/mcp/AppMcpNavigation.test.tsx`:
+
+```tsx
+// src/features/mcp/pages/AppMcpNavigation.test.tsx
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+
+import { McpListPage } from "./McpListPage";
+import { McpDetailPage } from "./McpDetailPage";
+
+vi.mock("../../../app/routing/useAuthz", () => ({
+  useAuthz: () => ({ isAdmin: true }),
+}));
+vi.mock("../../sop/pages/ChatPage", () => ({
+  ChatPage: () => <div>SOP Mock</div>,
+}));
+vi.mock("../hooks", () => ({
+  useMcpMutations: vi.fn(() => ({
+    checkServer: vi.fn(),
+    createServer: vi.fn(),
+    deleteServer: vi.fn(),
+    error: null,
+    pending: false,
+    restartServer: vi.fn(),
+    startServer: vi.fn(),
+    stopServer: vi.fn(),
+    updateServer: vi.fn(),
+  })),
+  useMcpServerDetail: vi.fn(() => ({
+    data: null,
+    error: null,
+    loading: false,
+    refetch: vi.fn(),
+  })),
+  useMcpServers: vi.fn(() => ({
+    data: [
+      { id: "srv-1", name: "Alpha Server", runtime_status: "running", tool_count: 1, transport: "stdio", args: [], command: "echo", desired_state: "running", enabled: true, env: {}, headers: {}, last_checked_at: null, last_error: null, url: null },
+      { id: "srv-2", name: "Beta Server", runtime_status: "stopped", tool_count: 2, transport: "stdio", args: [], command: "node", desired_state: "stopped", enabled: false, env: {}, headers: {}, last_checked_at: null, last_error: null, url: null },
+    ],
+    error: null,
+    loading: false,
+    refetch: vi.fn(),
+  })),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe("MCP navigation integration", () => {
+  it("navigates from list name link to detail page", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/mcp"]}>
+        <McpListPage />
+      </MemoryRouter>,
+    );
+
+    const alphaLink = screen.getByRole("link", { name: /Alpha Server/ });
+    fireEvent.click(alphaLink);
+
+    // Navigation via MemoryRouter — verify the link's href points to the detail route
+    expect(alphaLink).toHaveAttribute("href", "/mcp/srv-1");
+  });
+
+  it("renders detail page from direct URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/mcp/srv-2"]}>
+        <McpDetailPage />
+      </MemoryRouter>,
+    );
+
+    // Should render breadcrumb with server name
+    expect(screen.getByText("srv-2")).toBeInTheDocument();
+  });
+});
+```
+
+> Note: Full end-to-end navigation test (clicking a `<Link>` in the list and seeing the detail page mount) requires `<App />` + `<BrowserRouter>`. The test above verifies href correctness and direct URL rendering. The `App.test.tsx` for navigation between routes can be verified manually in the browser.
+
 - [ ] **Step 4: Commit**
 
 ```bash
@@ -3064,16 +3151,265 @@ git commit -m "test: add McpDetailPage tests covering detail migration rows"
 
 Covers migration rows 17-23.
 
-- [ ] **Step 1: Write the test** (based on migration matrix rows 17-23)
+- [ ] **Step 1: Write the test** (covers migration matrix rows 17-23)
 
-Key changes from old tests:
-- Field-level `role="alert"` instead of top-level
-- Drawer opens via route (`/mcp/new` or `/mcp/srv-1/edit`)  
-- `desired_state` is checkbox instead of select
+```tsx
+// src/features/mcp/components/McpServerFormDrawer.test.tsx
+// @vitest-environment jsdom
 
-```bash
-# The test is ~250 lines; write the full file then commit
+import "@testing-library/jest-dom/vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+
+import { McpServerFormDrawer } from "./McpServerFormDrawer";
+import type { McpServerDetail } from "../types";
+
+const server: McpServerDetail = {
+  args: ["--alpha"],
+  command: "echo",
+  desired_state: "running",
+  enabled: true,
+  env: { API_KEY: "********" },
+  headers: { Authorization: "********" },
+  id: "srv-1",
+  last_checked_at: null,
+  last_error: null,
+  name: "Alpha Server",
+  runtime_status: "running",
+  tool_count: 1,
+  tools: [],
+  transport: "stdio",
+  url: null,
+};
+
+function renderCreateDrawer(overrides: Partial<React.ComponentProps<typeof McpServerFormDrawer>> = {}) {
+  const onClose = vi.fn();
+  const onCreate = vi.fn<Promise<void>>().mockResolvedValue(undefined);
+  const onUpdate = vi.fn<Promise<void>>().mockResolvedValue(undefined);
+
+  render(
+    <MemoryRouter initialEntries={["/mcp/new"]}>
+      <McpServerFormDrawer
+        mode="create"
+        onClose={onClose}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        open={true}
+        pending={false}
+        server={null}
+        {...overrides}
+      />
+    </MemoryRouter>,
+  );
+
+  return { onClose, onCreate, onUpdate };
+}
+
+function renderEditDrawer(overrides: Partial<React.ComponentProps<typeof McpServerFormDrawer>> = {}) {
+  const onClose = vi.fn();
+  const onCreate = vi.fn<Promise<void>>().mockResolvedValue(undefined);
+  const onUpdate = vi.fn<Promise<void>>().mockResolvedValue(undefined);
+
+  render(
+    <MemoryRouter initialEntries={["/mcp/srv-1/edit"]}>
+      <McpServerFormDrawer
+        mode="edit"
+        onClose={onClose}
+        onCreate={onCreate}
+        onUpdate={onUpdate}
+        open={true}
+        pending={false}
+        server={server}
+        {...overrides}
+      />
+    </MemoryRouter>,
+  );
+
+  return { onClose, onCreate, onUpdate };
+}
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("McpServerFormDrawer", () => {
+  it("shows inline error for empty name and prevents create (row 17)", () => {
+    const { onCreate } = renderCreateDrawer();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const nameField = screen.getByLabelText(/服务名称/).closest(".space-y-1")!;
+    expect(within(nameField).getByRole("alert")).toHaveTextContent("请填写服务名称。");
+    expect(screen.getByLabelText(/服务名称/)).toHaveFocus();
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
+  it("validates required command for stdio and closes drawer on Escape (row 18)", () => {
+    const { onClose } = renderCreateDrawer();
+
+    fireEvent.change(screen.getByLabelText(/服务名称/), {
+      target: { value: "Gamma Server" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const commandField = screen.getByLabelText(/command/).closest(".space-y-1")!;
+    expect(within(commandField).getByRole("alert")).toHaveTextContent(
+      "stdio 模式需要填写 command。",
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("validates invalid http url before submit (row 19)", () => {
+    renderCreateDrawer();
+
+    fireEvent.change(screen.getByLabelText(/服务名称/), {
+      target: { value: "Delta Server" },
+    });
+    fireEvent.change(screen.getByLabelText("传输方式"), {
+      target: { value: "http" },
+    });
+
+    const urlInput = screen.getByLabelText(/url/);
+    fireEvent.change(urlInput, { target: { value: "not-a-url" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const urlField = screen.getByLabelText(/url/).closest(".space-y-1")!;
+    expect(within(urlField).getByRole("alert")).toHaveTextContent(
+      "请填写有效的 http url。",
+    );
+    expect(urlInput).toHaveFocus();
+  });
+
+  it("creates server with parsed args env headers and conservative defaults (row 20)", async () => {
+    const onClose = vi.fn();
+    const onCreate = vi.fn<Promise<{ id: string }>>().mockResolvedValue({ id: "new-srv" });
+
+    render(
+      <MemoryRouter initialEntries={["/mcp/new"]}>
+        <McpServerFormDrawer
+          mode="create"
+          onClose={onClose}
+          onCreate={onCreate}
+          onUpdate={vi.fn().mockResolvedValue(undefined)}
+          open={true}
+          pending={false}
+          server={null}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText(/服务名称/), {
+      target: { value: "Gamma Server" },
+    });
+    fireEvent.change(screen.getByLabelText(/command/), {
+      target: { value: "uvx" },
+    });
+    fireEvent.change(screen.getByLabelText(/args/), {
+      target: { value: "--from\nmcp-package\nserve" },
+    });
+    fireEvent.change(screen.getByLabelText(/env/), {
+      target: { value: "API_KEY=secret\nEMPTY=" },
+    });
+    fireEvent.change(screen.getByLabelText(/headers/), {
+      target: { value: "Authorization=Bearer token" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    expect(onCreate).toHaveBeenCalledWith({
+      args: ["--from", "mcp-package", "serve"],
+      command: "uvx",
+      desired_state: "stopped", // checkbox unchecked = stopped
+      enabled: false,
+      env: { API_KEY: "secret", EMPTY: "" },
+      headers: { Authorization: "Bearer token" },
+      name: "Gamma Server",
+      transport: "stdio",
+    });
+  });
+
+  it("shows inline validation for malformed key value config lines (row 21)", () => {
+    renderCreateDrawer();
+
+    fireEvent.change(screen.getByLabelText(/服务名称/), {
+      target: { value: "Gamma Server" },
+    });
+    fireEvent.change(screen.getByLabelText(/command/), {
+      target: { value: "uvx" },
+    });
+    fireEvent.change(screen.getByLabelText(/env/), {
+      target: { value: "BROKEN_LINE" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const envField = screen.getByLabelText(/env/).closest(".space-y-1")!;
+    expect(within(envField).getByRole("alert")).toHaveTextContent(
+      "env 第 1 行需要使用 KEY=VALUE 格式。",
+    );
+  });
+
+  it("omits unchanged redacted env and headers when updating (row 22)", async () => {
+    const { onUpdate } = renderEditDrawer();
+
+    expect(screen.getByLabelText(/env/)).toHaveValue("API_KEY=********");
+    expect(screen.getByLabelText(/headers/)).toHaveValue("Authorization=********");
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(onUpdate).toHaveBeenCalled());
+    const payload = onUpdate.mock.calls[0]?.[1] as Record<string, unknown>;
+
+    expect(payload.args).toEqual(["--alpha"]);
+    expect(payload).not.toHaveProperty("env");
+    expect(payload).not.toHaveProperty("headers");
+  });
+
+  it("wraps focus within drawer on Tab and Shift+Tab (row 23)", () => {
+    renderCreateDrawer();
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    const closeButton = within(dialog).getByRole("button", { name: "关闭" });
+    const saveButton = within(dialog).getByRole("button", { name: "保存" });
+
+    saveButton.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+
+    closeButton.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(saveButton).toHaveFocus();
+  });
+
+  it("shows NEW SERVER label in create mode", () => {
+    renderCreateDrawer();
+    expect(screen.getByText("NEW SERVER")).toBeInTheDocument();
+  });
+
+  it("shows EDIT · serverId label in edit mode", () => {
+    renderEditDrawer();
+    expect(screen.getByText("EDIT · srv-1")).toBeInTheDocument();
+  });
+
+  it("uses checkbox for desired_state", () => {
+    renderCreateDrawer();
+    const checkbox = screen.getByLabelText("创建后立即启动");
+    expect(checkbox).toBeInstanceOf(HTMLInputElement);
+    expect((checkbox as HTMLInputElement).type).toBe("checkbox");
+  });
+});
 ```
+
+- [ ] **Step 2: Run tests**
 
 - [ ] **Step 2: Run tests**
 
