@@ -34,6 +34,12 @@ docker run -d --name cqa-postgres-13 \
   -p 5432:5432 \
   postgres:13
 
+until docker exec cqa-postgres-13 pg_isready \
+  -U postgres \
+  -d change_quality_agent; do
+  sleep 1
+done
+
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/change_quality_agent \
   uv run alembic upgrade head
 
