@@ -31,6 +31,25 @@ class AgentRunStartResult:
     status: RunStatus
 
 
+@dataclass(frozen=True)
+class RuntimeStreamResult:
+    messages: list[dict[str, Any]]
+    raw_graph_output: dict[str, Any]
+    done_seen: bool
+    error: dict[str, Any] | None = None
+
+
+SUPPORTED_STREAM_EVENT_TYPES = {
+    "tasks",
+    "messages",
+    "updates",
+    "custom",
+    "checkpoints",
+    "error",
+    "done",
+}
+
+
 class AgentService:
     def __init__(
         self,
@@ -202,13 +221,24 @@ async def run_agent_test(
         input_messages = list(run.subject_snapshot.get("messages", []))
         stream = getattr(runtime, "stream", None)
         if stream is not None:
-            result_messages, raw_graph_output = await _consume_runtime_stream(
+            stream_result = await _consume_runtime_stream(
                 run_repository,
                 run,
                 stream,
                 version=version,
                 messages=input_messages,
             )
+            if stream_result.error is not None:
+                await run_repository.mark_terminal(
+                    run_id,
+                    RunStatus.error,
+                    error=stream_result.error,
+                    result_status="error",
+                )
+                await _commit_if_available(run_repository)
+                return {"status": "error", "error": stream_result.error}
+            result_messages = stream_result.messages
+            raw_graph_output = stream_result.raw_graph_output
         else:
             result = await runtime.run(
                 version=version,
@@ -223,12 +253,13 @@ async def run_agent_test(
                 payload={"messages": result_messages},
                 node="agent",
             )
-        await run_repository.append_event(
-            run_id,
-            event_type="done",
-            thread_id=run.thread_id,
-            payload={"status": "done", "result_status": "success"},
-        )
+        if stream is None or not stream_result.done_seen:
+            await run_repository.append_event(
+                run_id,
+                event_type="done",
+                thread_id=run.thread_id,
+                payload={"status": "done", "result_status": "success"},
+            )
         await run_repository.mark_terminal(
             run_id,
             RunStatus.success,
@@ -305,9 +336,12 @@ async def _consume_runtime_stream(
     *,
     version: Any,
     messages: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+) -> RuntimeStreamResult:
     result_messages: list[dict[str, Any]] = []
+    message_deltas: list[str] = []
     raw_events: list[Any] = []
+    done_seen = False
+    stream_error: dict[str, Any] | None = None
     events = stream(version=version, messages=messages)
     if inspect.isawaitable(events):
         events = await events
@@ -331,10 +365,26 @@ async def _consume_runtime_stream(
         await _commit_if_available(repository)
 
         payload = event_parts["payload"]
+        if event_parts["event_type"] == "done":
+            done_seen = True
+        if event_parts["event_type"] == "error":
+            stream_error = _stream_error_payload(payload)
+        if isinstance(payload.get("delta"), str):
+            message_deltas.append(payload["delta"])
         if isinstance(payload.get("messages"), list):
             result_messages = to_jsonable(payload["messages"])
 
-    return result_messages, {"stream_events": raw_events}
+    if not result_messages and message_deltas:
+        result_messages = [
+            {"role": "assistant", "content": "".join(message_deltas)},
+        ]
+
+    return RuntimeStreamResult(
+        messages=result_messages,
+        raw_graph_output={"stream_events": raw_events},
+        done_seen=done_seen,
+        error=stream_error,
+    )
 
 
 def _stream_event_parts(event: Any) -> dict[str, Any] | None:
@@ -345,6 +395,8 @@ def _stream_event_parts(event: Any) -> dict[str, Any] | None:
     payload = event.get("payload")
     if not isinstance(event_type, str) or not isinstance(payload, Mapping):
         return None
+    if event_type not in SUPPORTED_STREAM_EVENT_TYPES:
+        event_type = "custom"
 
     return {
         "event_type": event_type,
@@ -359,3 +411,12 @@ def _optional_str(value: Any) -> str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _stream_error_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    error_type = payload.get("type")
+    message = payload.get("message")
+    return {
+        "type": error_type if isinstance(error_type, str) else "StreamError",
+        "message": message if isinstance(message, str) else "Stream failed.",
+    }
