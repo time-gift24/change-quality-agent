@@ -17,6 +17,10 @@ tags:
   description: MCP server configuration and runtime management APIs.
 - name: agents
   description: ReAct agent definitions, versions, and test runs.
+- name: llm-providers
+  description: User-scoped LLM provider credentials.
+- name: admin-llm-providers
+  description: Administrator-managed global LLM provider credentials.
 paths:
   /api/sop/environments:
     get:
@@ -686,12 +690,271 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/llm-providers:
+    get:
+      tags:
+      - llm-providers
+      summary: List the current user's LLM providers
+      operationId: listLlmProviders
+      security:
+      - FakeUserHeaders: []
+      responses:
+        '200':
+          description: Current user's active LLM providers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags:
+      - llm-providers
+      summary: Create a user-scoped LLM provider
+      operationId: createLlmProvider
+      security:
+      - FakeUserHeaders: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderCreate'
+      responses:
+        '201':
+          description: Created user-scoped LLM provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/llm-providers/{provider_id}:
+    get:
+      tags:
+      - llm-providers
+      summary: Get one user-scoped LLM provider
+      operationId: getLlmProvider
+      security:
+      - FakeUserHeaders: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '200':
+          description: User-scoped LLM provider detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    patch:
+      tags:
+      - llm-providers
+      summary: Update one user-scoped LLM provider
+      operationId: updateLlmProvider
+      security:
+      - FakeUserHeaders: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderUpdate'
+      responses:
+        '200':
+          description: Updated user-scoped LLM provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - llm-providers
+      summary: Soft-delete one user-scoped LLM provider
+      operationId: deleteLlmProvider
+      security:
+      - FakeUserHeaders: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '204':
+          description: User-scoped LLM provider deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/admin/llm-providers:
+    get:
+      tags:
+      - admin-llm-providers
+      summary: List global LLM providers
+      operationId: listAdminLlmProviders
+      security:
+      - FakeUserHeaders: []
+        FakeUserRole: []
+      responses:
+        '200':
+          description: Global LLM providers visible to administrators.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags:
+      - admin-llm-providers
+      summary: Create a global LLM provider
+      operationId: createAdminLlmProvider
+      security:
+      - FakeUserHeaders: []
+        FakeUserRole: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderCreate'
+      responses:
+        '201':
+          description: Created global LLM provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/admin/llm-providers/{provider_id}:
+    get:
+      tags:
+      - admin-llm-providers
+      summary: Get one global LLM provider
+      operationId: getAdminLlmProvider
+      security:
+      - FakeUserHeaders: []
+        FakeUserRole: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '200':
+          description: Global LLM provider detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    patch:
+      tags:
+      - admin-llm-providers
+      summary: Update one global LLM provider
+      operationId: updateAdminLlmProvider
+      security:
+      - FakeUserHeaders: []
+        FakeUserRole: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderUpdate'
+      responses:
+        '200':
+          description: Updated global LLM provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - admin-llm-providers
+      summary: Soft-delete one global LLM provider
+      operationId: deleteAdminLlmProvider
+      security:
+      - FakeUserHeaders: []
+        FakeUserRole: []
+      parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      responses:
+        '204':
+          description: Global LLM provider deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     McpAdminToken:
       type: apiKey
       in: header
       name: X-MCP-Admin-Token
+    FakeUserHeaders:
+      type: apiKey
+      in: header
+      name: X-User-Id
+    FakeUserRole:
+      type: apiKey
+      in: header
+      name: X-User-Role
   parameters:
     SopId:
       name: sop_id
@@ -736,9 +999,22 @@ components:
         type: integer
         minimum: 1
       example: 1
+    ProviderId:
+      name: provider_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     NotFound:
-      description: Unknown environment, SOP, or run.
+      description: Requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication is required.
       content:
         application/json:
           schema:
@@ -750,7 +1026,13 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: Missing or invalid MCP admin token.
+      description: Authenticated caller does not have permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Resource already exists or conflicts with current state.
       content:
         application/json:
           schema:
@@ -1178,6 +1460,113 @@ components:
         tool_count:
           type: integer
           minimum: 0
+    LlmProviderCreate:
+      type: object
+      required:
+      - name
+      - api_key
+      properties:
+        name:
+          type: string
+          minLength: 1
+          example: OpenAI personal
+        provider:
+          type: string
+          minLength: 1
+          nullable: true
+          example: openai
+        base_url:
+          type: string
+          minLength: 1
+          nullable: true
+          example: https://api.openai.com/v1
+        api_key:
+          type: string
+          minLength: 1
+          writeOnly: true
+          example: sk-...
+        model:
+          type: string
+          minLength: 1
+          nullable: true
+          example: gpt-4.1-mini
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+    LlmProviderUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        provider:
+          type: string
+          minLength: 1
+          nullable: true
+        base_url:
+          type: string
+          minLength: 1
+          nullable: true
+        api_key:
+          type: string
+          minLength: 1
+          writeOnly: true
+        model:
+          type: string
+          minLength: 1
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+        is_active:
+          type: boolean
+          nullable: true
+    LlmProviderDetail:
+      type: object
+      required:
+      - id
+      - name
+      - api_key_hint
+      - metadata
+      - is_active
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+          example: OpenAI personal
+        provider:
+          type: string
+          nullable: true
+          example: openai
+        base_url:
+          type: string
+          nullable: true
+          example: https://api.openai.com/v1
+        api_key_hint:
+          type: string
+          example: sk-...abcd
+        model:
+          type: string
+          nullable: true
+          example: gpt-4.1-mini
+        metadata:
+          type: object
+          additionalProperties: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     ErrorResponse:
       type: object
       required:

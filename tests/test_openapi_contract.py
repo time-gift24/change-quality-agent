@@ -161,3 +161,95 @@ def test_agent_test_runs_response_reuses_run_start_response() -> None:
     assert responses["400"]["description"] == (
         "Agent is disabled or requested agent version was not found."
     )
+
+
+def test_llm_provider_paths_are_documented() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+
+    expected_operations = {
+        ("/api/llm-providers", "get"): {"200", "401", "422"},
+        ("/api/llm-providers", "post"): {"201", "401", "409", "422"},
+        ("/api/llm-providers/{provider_id}", "get"): {"200", "401", "404", "422"},
+        ("/api/llm-providers/{provider_id}", "patch"): {
+            "200",
+            "401",
+            "404",
+            "409",
+            "422",
+        },
+        ("/api/llm-providers/{provider_id}", "delete"): {
+            "204",
+            "401",
+            "404",
+            "422",
+        },
+        ("/api/admin/llm-providers", "get"): {"200", "401", "403", "422"},
+        ("/api/admin/llm-providers", "post"): {"201", "401", "403", "409", "422"},
+        ("/api/admin/llm-providers/{provider_id}", "get"): {
+            "200",
+            "401",
+            "403",
+            "404",
+            "422",
+        },
+        ("/api/admin/llm-providers/{provider_id}", "patch"): {
+            "200",
+            "401",
+            "403",
+            "404",
+            "409",
+            "422",
+        },
+        ("/api/admin/llm-providers/{provider_id}", "delete"): {
+            "204",
+            "401",
+            "403",
+            "404",
+            "422",
+        },
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert statuses <= set(operation["responses"])
+
+    assert paths["/api/llm-providers"]["get"]["security"] == [
+        {"FakeUserHeaders": []}
+    ]
+    assert paths["/api/llm-providers/{provider_id}"]["patch"]["parameters"] == [
+        {"$ref": "#/components/parameters/ProviderId"}
+    ]
+    assert paths["/api/admin/llm-providers"]["post"]["security"] == [
+        {"FakeUserHeaders": [], "FakeUserRole": []}
+    ]
+    assert paths["/api/admin/llm-providers/{provider_id}"]["delete"][
+        "parameters"
+    ] == [{"$ref": "#/components/parameters/ProviderId"}]
+
+    security_schemes = contract["components"]["securitySchemes"]
+    assert security_schemes["FakeUserHeaders"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-User-Id",
+    }
+    assert security_schemes["FakeUserRole"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-User-Role",
+    }
+
+
+def test_llm_provider_schemas_do_not_expose_secrets() -> None:
+    schemas = load_contract()["components"]["schemas"]
+
+    assert {"LlmProviderCreate", "LlmProviderUpdate", "LlmProviderDetail"} <= set(
+        schemas
+    )
+    assert "api_key" in schemas["LlmProviderCreate"]["properties"]
+    assert "api_key" in schemas["LlmProviderUpdate"]["properties"]
+
+    detail_properties = schemas["LlmProviderDetail"]["properties"]
+    assert "api_key_hint" in detail_properties
+    assert "api_key" not in detail_properties
+    assert "api_key_ciphertext" not in detail_properties
