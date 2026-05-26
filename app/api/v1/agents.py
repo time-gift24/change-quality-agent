@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     HTTPException,
+    Path,
     Query,
     Request,
     Response,
@@ -158,7 +159,7 @@ async def list_agent_versions(
 @router.get("/{agent_key}/versions/{version_number}")
 async def get_agent_version(
     agent_key: str,
-    version_number: int,
+    version_number: Annotated[int, Path(ge=1)],
     repository: AgentRepositoryDep,
 ) -> AgentVersionDetail:
     try:

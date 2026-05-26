@@ -426,6 +426,20 @@ async def test_get_version_returns_detail_or_404() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_version_rejects_non_positive_version_number() -> None:
+    repository = FakeAgentRepository(agents=[FakeAgent()])
+    override_dependencies(repository, FakeSession())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/agents/release-reviewer/versions/0")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_delete_agent_returns_no_content_and_commits() -> None:
     repository = FakeAgentRepository(agents=[FakeAgent()])
     session = FakeSession()
