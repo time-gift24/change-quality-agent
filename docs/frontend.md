@@ -6,9 +6,9 @@ reference for the browser app and its run-observation contract.
 ## Scope
 
 The frontend is the first UI layer for Change Quality Agent. SOP quality checks
-are the first workflow, but the UI is built on a generic run substrate so future
-change quality workflows can reuse the same observer, event reducer, and stream
-renderer.
+are the first workflow, and MCP server management is the first operational admin
+workflow. The run UI is built on a generic substrate so future change quality
+workflows can reuse the same observer, event reducer, and stream renderer.
 
 The v1 backend runs LangGraph in the service process. Postgres stores business
 run history and durable run events. LangGraph checkpoint storage stays separate
@@ -20,6 +20,7 @@ from the business `runs` table.
 - React 19
 - TypeScript
 - Tailwind CSS v4 through `@tailwindcss/vite`
+- React Router for page routing
 - Streamdown for streamed markdown
 - Vitest and React Testing Library for frontend tests
 - Playwright smoke scripts for browser-level verification
@@ -31,9 +32,11 @@ contract for the frontend.
 
 The frontend mirrors the backend split:
 
+- `src/app` owns routing, shell layout, and route guards.
 - `features/runs` is the reusable run observation substrate.
 - `features/sop` is the SOP-specific wrapper.
-- `src/app/App.tsx` mounts the current SOP quality page.
+- `features/mcp` is the MCP server management workspace.
+- `src/app/App.tsx` mounts `/sop` and protected `/mcp` routes.
 - `src/styles/globals.css` owns Tailwind, Streamdown, and design-token CSS.
 
 Current structure:
@@ -42,6 +45,10 @@ Current structure:
 frontend/src/
   app/
     App.tsx
+    AppShell.tsx
+    routing/
+      ProtectedRoute.tsx
+      useAuthz.ts
   styles/
     globals.css
   lib/
@@ -62,7 +69,25 @@ frontend/src/
       hooks.ts
       pages/
         ChatPage.tsx
+    mcp/
+      api.ts
+      types.ts
+      hooks.ts
+      components/
+        McpServerList.tsx
+        McpServerDetail.tsx
+        McpServerFormDrawer.tsx
+        errorMessages.ts
+      pages/
+        McpPage.tsx
 ```
+
+Routes:
+
+- `/` redirects to `/sop`.
+- `/sop` renders the SOP quality workflow.
+- `/mcp` renders the MCP management workspace behind `ProtectedRoute`.
+- Unknown routes redirect to `/sop`.
 
 `features/runs` only knows generic run concepts:
 
@@ -86,6 +111,19 @@ SOP environment context stays in `features/sop` and SOP entry APIs.
 - `409 Conflict` join-existing-run behavior
 - recent SOP run history
 - handoff to the generic `RunObserver`
+
+`features/mcp` owns:
+
+- MCP server list and selected server state
+- create, update, delete, start, stop, restart, and check actions
+- detail refresh and tools snapshot display
+- transport-specific form validation
+- MCP-specific error message mapping and destructive-action confirmation
+
+MCP route authorization is intentionally abstracted behind `useAuthz()`. The
+current placeholder returns admin access so the page can be developed and
+tested; the real administrator policy should replace that hook without changing
+MCP page code.
 
 ## API Contract
 
@@ -197,6 +235,30 @@ Streams Server-Sent Events. The server first replays persisted events with
 sequence greater than `after`, then follows new events until terminal `done` or
 `error`. Multiple users can subscribe to the same run.
 
+### MCP Management APIs
+
+The MCP page uses the `/api/mcp/servers` API family from `api/openapi.yml`.
+These endpoints require the backend MCP admin token contract. The current
+frontend route guard only controls page access; it does not replace the backend
+`X-MCP-Admin-Token` requirement.
+
+Used endpoints:
+
+- `GET /api/mcp/servers`: list redacted server configurations and runtime
+  summaries.
+- `POST /api/mcp/servers`: create a server configuration.
+- `GET /api/mcp/servers/{server_id}`: load detail plus latest tool snapshot.
+- `PATCH /api/mcp/servers/{server_id}`: update stopped server configuration.
+- `DELETE /api/mcp/servers/{server_id}`: delete a server configuration.
+- `POST /api/mcp/servers/{server_id}/start`: start the server.
+- `POST /api/mcp/servers/{server_id}/stop`: stop the server.
+- `POST /api/mcp/servers/{server_id}/restart`: restart the server.
+- `POST /api/mcp/servers/{server_id}/check`: refresh runtime status and tools.
+
+The frontend treats returned `env` and `headers` as redacted display values.
+Editing those fields means replacing the stored values; the UI must not imply it
+can recover secret plaintext from the backend.
+
 ## Event Model
 
 Every stored and streamed event uses the same envelope:
@@ -282,6 +344,17 @@ On service startup, leftover `pending` or `running` runs are marked
 
 ## Components
 
+### `AppShell`
+
+Shared page frame with sidebar navigation and route outlet. It exposes the SOP
+quality route and MCP management route without owning feature behavior.
+
+### `ProtectedRoute`
+
+Route guard for admin-only areas. It currently delegates to `useAuthz()` and
+renders a small 403 state when access is denied. Future auth integration should
+replace `useAuthz()` rather than duplicating authorization logic in pages.
+
 ### `RunObserver`
 
 Top-level generic run observation component.
@@ -324,6 +397,19 @@ The page is a thin wrapper. SOP `env` is used for environment loading, run
 creation, conflict join, and history APIs. It is not passed into `RunObserver`
 as generic run metadata.
 
+### `McpPage`
+
+Operational MCP management workspace. It composes:
+
+- top bar with page title and create action
+- left panel with search, status filter, server list, and lifecycle shortcuts
+- right panel with selected server status, configuration, and tools snapshot
+- drawer form for create and edit flows
+
+`McpPage` owns orchestration state such as selected server ID, active tab,
+drawer state, and mutation refresh flow. Request construction stays in
+`features/mcp/api.ts`; loading and mutation state stay in `features/mcp/hooks.ts`.
+
 ## UI Rules
 
 Use the Cohere-inspired system in `DESIGN.md`.
@@ -347,6 +433,12 @@ Use the Cohere-inspired system in `DESIGN.md`.
 - SOP preview or start `502`: show upstream SOP client failure.
 - SSE reconnect: show reconnecting state without clearing previous output.
 - Unknown event type: keep the observer stable and avoid crashing the page.
+- MCP update `409`: show "请先停止服务再修改配置".
+- MCP `404`: show a clear missing-server message and clear stale selection when
+  the missing server is the selected one.
+- MCP lifecycle `502` or `503`: show an operation failure message and keep the
+  user on the management page.
+- MCP delete and restart require confirmation before dispatch.
 
 Frontend API errors should preserve FastAPI `detail` when the response provides
 it.
@@ -362,6 +454,13 @@ Frontend coverage should include:
 - Run observer status, node ordering, and event stream behavior.
 - SOP page behavior for environment loading, start, conflict join, recent
   history, and sidebar interactions.
+- App routing for `/sop`, `/mcp`, default redirects, and protected-route
+  allow/deny behavior.
+- MCP API URL construction, lifecycle paths, and FastAPI `detail` propagation.
+- MCP hooks for initial loading, selected detail refresh, and mutation-triggered
+  refresh.
+- MCP page behavior for list rendering, selection, tools tab, lifecycle actions,
+  safeguards, and error messages.
 - Browser smoke checks for desktop and mobile layout.
 
 Backend coverage should include:
@@ -409,6 +508,8 @@ DB integration tests require `TEST_DATABASE_URL` and a local Postgres instance.
 
 - Final structured SOP quality report schema.
 - Authentication and authorization rules for `debug=true`.
+- Real administrator authorization and how the MCP admin token reaches the
+  frontend request layer.
 - Whether `created_by` comes from auth middleware, headers, or a future user
   table.
 - Exact graph node list and whether node registries come from backend metadata.
