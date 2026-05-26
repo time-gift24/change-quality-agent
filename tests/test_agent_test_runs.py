@@ -349,12 +349,5 @@ async def test_start_agent_test_run_endpoint_returns_accepted_and_schedules() ->
     ]
 
 
-@pytest.mark.asyncio
-async def test_default_agent_test_executor_is_explicitly_unsupported() -> None:
-    run_id = uuid4()
-
-    with pytest.raises(
-        NotImplementedError,
-        match="Agent test executor is implemented in Task 7",
-    ):
-        await run_agent_test_with_new_session(run_id)
+def test_default_agent_test_executor_is_available() -> None:
+    assert callable(run_agent_test_with_new_session)

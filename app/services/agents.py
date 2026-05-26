@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from agent.react_runtime import AgentRuntime
+from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
     AgentNotFoundError,
@@ -155,8 +157,88 @@ class AgentService:
             await result
 
 
-async def run_agent_test_with_new_session(run_id: UUID) -> None:
-    raise NotImplementedError("Agent test executor is implemented in Task 7")
+async def run_agent_test(
+    run_id: UUID,
+    run_repository: RunRepository,
+    agent_repository: AgentRepository,
+    runtime: AgentRuntime | None = None,
+) -> dict[str, Any]:
+    run = await run_repository.mark_running(run_id)
+    runtime = runtime or AgentRuntime()
+
+    try:
+        version_id = _agent_version_id(run)
+        version = await agent_repository.get_version_by_id(version_id)
+        if version is None:
+            error = {
+                "type": "AgentVersionNotFound",
+                "message": f"Agent version not found: {version_id}",
+            }
+            await _append_error_event(run_repository, run, error)
+            await run_repository.mark_terminal(
+                run_id,
+                RunStatus.error,
+                error=error,
+                result_status="error",
+            )
+            await _commit_if_available(run_repository)
+            return {"status": "error", "error": error}
+
+        await run_repository.append_event(
+            run_id,
+            event_type="custom",
+            thread_id=run.thread_id,
+            payload={
+                "message": "Started agent test run.",
+                "agent_key": _agent_key(run),
+                "agent_version_number": version.version_number,
+            },
+            node="start",
+        )
+        result = await runtime.run(
+            version=version,
+            messages=list(run.subject_snapshot.get("messages", [])),
+        )
+        await run_repository.append_event(
+            run_id,
+            event_type="messages",
+            thread_id=run.thread_id,
+            payload={"messages": result.messages},
+            node="agent",
+        )
+        await run_repository.append_event(
+            run_id,
+            event_type="done",
+            thread_id=run.thread_id,
+            payload={"status": "done", "result_status": "success"},
+        )
+        await run_repository.mark_terminal(
+            run_id,
+            RunStatus.success,
+            structured_result={"messages": result.messages},
+            raw_graph_output=result.raw_output,
+            result_status="success",
+        )
+        await _commit_if_available(run_repository)
+        return {"status": "success", "messages": result.messages}
+    except Exception as exc:
+        error = {"type": type(exc).__name__, "message": str(exc)}
+        await _append_error_event(run_repository, run, error)
+        await run_repository.mark_terminal(
+            run_id,
+            RunStatus.error,
+            error=error,
+            result_status="error",
+        )
+        await _commit_if_available(run_repository)
+        return {"status": "error", "error": error}
+
+
+async def run_agent_test_with_new_session(run_id: UUID) -> dict[str, Any]:
+    async with async_session() as session:
+        run_repository = RunRepository(session)
+        agent_repository = AgentRepository(session)
+        return await run_agent_test(run_id, run_repository, agent_repository)
 
 
 def _input_preview(messages: list[dict[str, str]]) -> str:
@@ -167,3 +249,33 @@ def _input_preview(messages: list[dict[str, str]]) -> str:
         messages[0],
     )
     return user_message.get("content", "")[:200]
+
+
+def _agent_version_id(run: Any) -> UUID:
+    return UUID(str(run.metadata_["agent_version_id"]))
+
+
+def _agent_key(run: Any) -> str:
+    return str(run.metadata_.get("agent_key") or run.subject_id)
+
+
+async def _append_error_event(
+    repository: RunRepository,
+    run: Any,
+    error: dict[str, Any],
+) -> None:
+    await repository.append_event(
+        run.id,
+        event_type="error",
+        thread_id=run.thread_id,
+        payload=error,
+    )
+
+
+async def _commit_if_available(repository: RunRepository) -> None:
+    commit = getattr(repository, "commit", None)
+    if commit is None:
+        return
+    result = commit()
+    if inspect.isawaitable(result):
+        await result
