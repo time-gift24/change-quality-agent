@@ -4,7 +4,11 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.react_runtime import AgentRuntime, to_jsonable
+from agent.react_runtime import (
+    AgentRuntime,
+    AgentRuntimeProviderUnavailableError,
+    to_jsonable,
+)
 from app.api.auth import CurrentUser
 from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
@@ -14,6 +18,7 @@ from app.repositories.agents import (
     AgentRepository,
     AgentVersionNotFoundError,
 )
+from app.repositories.provider_credentials import ProviderCredentialRepository
 from app.repositories.runs import RunRepository
 from app.schemas.agents import AgentCreate, AgentDraftUpdate, AgentTestRunCreate
 from app.schemas.runs import RunStatus
@@ -30,6 +35,22 @@ class AgentRunStartResult:
     events_url: str
     run_id: UUID
     status: RunStatus
+
+
+class ProviderCredentialRuntimeResolver:
+    def __init__(self, repository: ProviderCredentialRepository) -> None:
+        self._repository = repository
+
+    async def resolve(self, provider_id: UUID, owner_user_id: str | None):
+        provider = await self._repository.get_runtime_llm_provider(
+            provider_id,
+            owner_user_id,
+        )
+        if provider is None:
+            raise AgentRuntimeProviderUnavailableError(
+                f"LLM provider is unavailable for runtime: {provider_id}"
+            )
+        return provider
 
 
 class AgentService:
@@ -174,11 +195,21 @@ async def run_agent_test(
     run_repository: RunRepository,
     agent_repository: AgentRepository,
     runtime: AgentRuntime | None = None,
+    provider_repository: ProviderCredentialRepository | None = None,
 ) -> dict[str, Any]:
     run = await run_repository.mark_running(run_id)
-    runtime = runtime or AgentRuntime()
 
     try:
+        if runtime is None:
+            if provider_repository is None:
+                raise RuntimeError(
+                    "Agent runtime requires a provider credential repository."
+                )
+            runtime = AgentRuntime(
+                provider_resolver=ProviderCredentialRuntimeResolver(
+                    provider_repository
+                )
+            )
         version_id = _agent_version_id(run)
         version = await agent_repository.get_version_by_id(version_id)
         if version is None:
@@ -211,6 +242,7 @@ async def run_agent_test(
         result = await runtime.run(
             version=version,
             messages=list(run.subject_snapshot.get("messages", [])),
+            current_user=run.subject_snapshot.get("current_user"),
         )
         result_messages = to_jsonable(result.messages)
         raw_graph_output = to_jsonable(result.raw_output)
@@ -253,7 +285,13 @@ async def run_agent_test_with_new_session(run_id: UUID) -> dict[str, Any]:
     async with async_session() as session:
         run_repository = RunRepository(session)
         agent_repository = AgentRepository(session)
-        return await run_agent_test(run_id, run_repository, agent_repository)
+        provider_repository = ProviderCredentialRepository(session)
+        return await run_agent_test(
+            run_id,
+            run_repository,
+            agent_repository,
+            provider_repository=provider_repository,
+        )
 
 
 def _input_preview(messages: list[dict[str, str]]) -> str:

@@ -23,16 +23,29 @@ class StaticToolResolver:
         return []
 
 
+class AgentRuntimeProviderUnavailableError(RuntimeError):
+    pass
+
+
+class UnconfiguredProviderResolver:
+    async def resolve(self, provider_id: Any, owner_user_id: str | None) -> Any:
+        raise AgentRuntimeProviderUnavailableError(
+            f"LLM provider is not configured for runtime: {provider_id}"
+        )
+
+
 class AgentRuntime:
     def __init__(
         self,
         create_agent=langchain_create_agent,
         tool_resolver: StaticToolResolver | None = None,
+        provider_resolver: Any | None = None,
         *,
         model_factory=init_chat_model,
     ) -> None:
         self._create_agent = create_agent
         self._tool_resolver = tool_resolver or StaticToolResolver()
+        self._provider_resolver = provider_resolver or UnconfiguredProviderResolver()
         self._model_factory = model_factory
 
     async def run(
@@ -40,6 +53,7 @@ class AgentRuntime:
         *,
         version: Any,
         messages: list[dict[str, Any]],
+        current_user: dict[str, Any] | None = None,
     ) -> AgentRunResult:
         tools = self._tool_resolver.resolve(
             list(getattr(version, "tool_allowlist", [])),
@@ -47,8 +61,12 @@ class AgentRuntime:
         )
         if inspect.isawaitable(tools):
             tools = await tools
+        provider = await self._resolve_provider(version, current_user)
         model_config = getattr(version, "model_config", {}) or {}
-        model = self._model_factory(version.model, **dict(model_config))
+        model = self._model_factory(
+            _provider_model(provider),
+            **_provider_model_kwargs(provider, model_config),
+        )
         agent = self._create_agent(
             model=model,
             tools=tools,
@@ -77,6 +95,29 @@ class AgentRuntime:
         if inspect.isawaitable(result):
             return await result
         return result
+
+    async def _resolve_provider(
+        self,
+        version: Any,
+        current_user: dict[str, Any] | None,
+    ) -> Any:
+        provider_id = getattr(version, "provider_id", None)
+        if provider_id is None:
+            raise AgentRuntimeProviderUnavailableError(
+                "Agent version does not declare an LLM provider."
+            )
+
+        owner_user_id = None
+        if current_user is not None:
+            owner_user_id = current_user.get("user_id")
+        provider = self._provider_resolver.resolve(provider_id, owner_user_id)
+        if inspect.isawaitable(provider):
+            provider = await provider
+        if provider is None:
+            raise AgentRuntimeProviderUnavailableError(
+                f"LLM provider is unavailable for agent version: {provider_id}"
+            )
+        return provider
 
 
 def to_jsonable(value: Any) -> Any:
@@ -114,6 +155,31 @@ def _json_key(key: Any) -> str:
     if isinstance(key, str):
         return key
     return str(to_jsonable(key))
+
+
+def _provider_model(provider: Any) -> str:
+    model = getattr(provider, "model", None)
+    if not model:
+        provider_id = getattr(provider, "id", "unknown")
+        raise AgentRuntimeProviderUnavailableError(
+            f"LLM provider does not declare a model: {provider_id}"
+        )
+    return str(model)
+
+
+def _provider_model_kwargs(
+    provider: Any,
+    model_config: dict[str, Any],
+) -> dict[str, Any]:
+    kwargs = dict(model_config)
+    kwargs["api_key"] = getattr(provider, "api_key_ciphertext")
+    base_url = getattr(provider, "base_url", None)
+    if base_url:
+        kwargs["base_url"] = base_url
+    provider_name = getattr(provider, "provider", None)
+    if provider_name:
+        kwargs["model_provider"] = provider_name
+    return kwargs
 
 
 def _extract_messages(output: dict[str, Any]) -> list[dict[str, Any]]:

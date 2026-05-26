@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
+import app.services.agents as agents_service
 from agent.react_runtime import AgentRunResult
 from app.schemas.runs import RunStatus
 from app.services.agents import run_agent_test
@@ -14,14 +15,20 @@ class FakeVersion:
         self.id = uuid4()
         self.agent_id = uuid4()
         self.version_number = version_number
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = uuid4()
         self.system_prompt = "Review carefully."
         self.tool_allowlist = []
         self.mcp_server_ids = []
+        self.model_config = {}
 
 
 class FakeRun:
-    def __init__(self, version: FakeVersion) -> None:
+    def __init__(
+        self,
+        version: FakeVersion,
+        *,
+        current_user: dict[str, str] | None = None,
+    ) -> None:
         self.id = uuid4()
         self.thread_id = "thread-agent-test"
         self.status = RunStatus.pending.value
@@ -34,6 +41,8 @@ class FakeRun:
         self.subject_snapshot = {
             "messages": [{"role": "user", "content": "Can this deploy?"}]
         }
+        if current_user is not None:
+            self.subject_snapshot["current_user"] = current_user
 
 
 class FakeRunRepository:
@@ -113,14 +122,33 @@ class FakeRuntime:
         self.order = order
         self.calls: list[dict[str, object]] = []
 
-    async def run(self, *, version, messages):
+    async def run(self, *, version, messages, current_user=None):
         if self.order is not None:
             self.order.append("runtime_run")
-        self.calls.append({"version": version, "messages": messages})
+        self.calls.append(
+            {"version": version, "messages": messages, "current_user": current_user}
+        )
         if self.exc is not None:
             raise self.exc
         assert self.result is not None
         return self.result
+
+
+class FakeProvider:
+    model = "gpt-5-mini"
+    provider = "openai"
+    base_url = None
+    api_key_ciphertext = "secret-key"
+
+
+class FakeProviderRepository:
+    def __init__(self, provider=FakeProvider()) -> None:
+        self.provider = provider
+        self.calls: list[tuple[UUID, str | None]] = []
+
+    async def get_runtime_llm_provider(self, provider_id, owner_user_id):
+        self.calls.append((provider_id, owner_user_id))
+        return self.provider
 
 
 @pytest.mark.asyncio
@@ -147,6 +175,7 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
         {
             "version": version,
             "messages": [{"role": "user", "content": "Can this deploy?"}],
+            "current_user": None,
         }
     ]
     assert [event["event_type"] for event in run_repository.events] == [
@@ -293,3 +322,84 @@ async def test_run_agent_test_marks_error_when_version_is_missing() -> None:
     assert terminal_kwargs["result_status"] == "error"
     assert runtime.calls == []
     assert run_repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_forwards_current_user_to_runtime() -> None:
+    version = FakeVersion()
+    current_user = {"user_id": "user-1", "role": "user"}
+    run = FakeRun(version, current_user=current_user)
+    run_repository = FakeRunRepository(run)
+    result = AgentRunResult(messages=[], raw_output={"messages": []})
+    runtime = FakeRuntime(result=result)
+
+    await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=FakeAgentRepository(version),
+        runtime=runtime,
+    )
+
+    assert runtime.calls == [
+        {
+            "version": version,
+            "messages": [{"role": "user", "content": "Can this deploy?"}],
+            "current_user": current_user,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_constructs_runtime_with_provider_repository(
+    monkeypatch,
+) -> None:
+    version = FakeVersion()
+    run = FakeRun(version, current_user={"user_id": "user-1", "role": "user"})
+    run_repository = FakeRunRepository(run)
+    provider_repository = FakeProviderRepository()
+    constructed: dict[str, object] = {}
+
+    class ConstructedRuntime:
+        def __init__(self, *, provider_resolver):
+            self.provider_resolver = provider_resolver
+            constructed["runtime"] = self
+
+        async def run(self, *, version, messages, current_user=None):
+            provider = await self.provider_resolver.resolve(
+                version.provider_id,
+                current_user["user_id"],
+            )
+            constructed["provider"] = provider
+            return AgentRunResult(messages=[], raw_output={"messages": []})
+
+    monkeypatch.setattr(agents_service, "AgentRuntime", ConstructedRuntime)
+
+    result = await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=FakeAgentRepository(version),
+        provider_repository=provider_repository,
+    )
+
+    assert result == {"status": "success", "messages": []}
+    assert constructed["provider"] is provider_repository.provider
+    assert provider_repository.calls == [(version.provider_id, "user-1")]
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_requires_runtime_or_provider_repository() -> None:
+    version = FakeVersion()
+    run = FakeRun(version)
+    run_repository = FakeRunRepository(run)
+
+    result = await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=FakeAgentRepository(version),
+    )
+
+    assert result["status"] == "error"
+    assert result["error"] == {
+        "type": "RuntimeError",
+        "message": "Agent runtime requires a provider credential repository.",
+    }

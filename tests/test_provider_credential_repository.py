@@ -255,6 +255,71 @@ async def test_global_llm_provider_update_and_soft_delete_are_scoped_to_global(
 
 
 @repository_db_test
+async def test_runtime_llm_provider_allows_matching_user_provider(session) -> None:
+    repository = ProviderCredentialRepository(session)
+    provider = await repository.create_llm_provider(
+        **user_provider_values("user-1", "personal-openai")
+    )
+
+    fetched = await repository.get_runtime_llm_provider(provider.id, "user-1")
+
+    assert fetched is provider
+
+
+@repository_db_test
+async def test_runtime_llm_provider_rejects_user_provider_without_user(
+    session,
+) -> None:
+    repository = ProviderCredentialRepository(session)
+    provider = await repository.create_llm_provider(
+        **user_provider_values("user-1", "personal-openai")
+    )
+
+    fetched = await repository.get_runtime_llm_provider(provider.id, None)
+
+    assert fetched is None
+
+
+@repository_db_test
+async def test_runtime_llm_provider_allows_global_provider_without_user(
+    session,
+) -> None:
+    repository = ProviderCredentialRepository(session)
+    provider = await repository.create_llm_provider(
+        **global_provider_values("global-openai")
+    )
+
+    fetched = await repository.get_runtime_llm_provider(provider.id, None)
+
+    assert fetched is provider
+
+
+@repository_db_test
+async def test_runtime_llm_provider_rejects_wrong_owner_and_inactive_records(
+    session,
+) -> None:
+    repository = ProviderCredentialRepository(session)
+    wrong_owner_provider = await repository.create_llm_provider(
+        **user_provider_values("user-1", "personal-openai")
+    )
+    inactive_provider = await repository.create_llm_provider(
+        **user_provider_values("user-2", "inactive-openai", is_active=False)
+    )
+
+    wrong_owner = await repository.get_runtime_llm_provider(
+        wrong_owner_provider.id,
+        "user-2",
+    )
+    inactive = await repository.get_runtime_llm_provider(
+        inactive_provider.id,
+        "user-2",
+    )
+
+    assert wrong_owner is None
+    assert inactive is None
+
+
+@repository_db_test
 async def test_update_and_delete_raise_not_found_for_missing_scoped_records(
     session,
 ) -> None:

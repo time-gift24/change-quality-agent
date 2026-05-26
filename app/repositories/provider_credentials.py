@@ -1,7 +1,7 @@
 from typing import Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -97,6 +97,32 @@ class ProviderCredentialRepository:
             .where(ProviderCredential.id == provider_id)
             .where(ProviderCredential.scope == "global")
             .where(ProviderCredential.owner_user_id.is_(None))
+            .limit(1)
+        )
+        return await self._session.scalar(statement)
+
+    async def get_runtime_llm_provider(
+        self,
+        provider_id: UUID,
+        owner_user_id: str | None,
+    ) -> ProviderCredential | None:
+        visibility_filters = [
+            and_(
+                ProviderCredential.scope == "global",
+                ProviderCredential.owner_user_id.is_(None),
+            )
+        ]
+        if owner_user_id is not None:
+            visibility_filters.append(
+                and_(
+                    ProviderCredential.scope == "user",
+                    ProviderCredential.owner_user_id == owner_user_id,
+                )
+            )
+        statement = (
+            self._active_llm_provider_statement()
+            .where(ProviderCredential.id == provider_id)
+            .where(or_(*visibility_filters))
             .limit(1)
         )
         return await self._session.scalar(statement)

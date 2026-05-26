@@ -5,13 +5,13 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
-from agent.react_runtime import AgentRuntime
+from agent.react_runtime import AgentRuntime, AgentRuntimeProviderUnavailableError
 
 
 class FakeVersion:
     def __init__(self) -> None:
         self.id = uuid4()
-        self.model = "openai:gpt-5-mini"
+        self.provider_id = uuid4()
         self.model_config = {"temperature": 0.2}
         self.system_prompt = "Review risky changes carefully."
         self.tool_allowlist = ["search_sop"]
@@ -32,6 +32,31 @@ class AsyncFakeResolver(FakeResolver):
     async def resolve(self, tool_allowlist, mcp_server_ids):
         self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
         return self.tools
+
+
+class FakeProvider:
+    def __init__(
+        self,
+        *,
+        model: str | None = "gpt-5-mini",
+        provider: str | None = "openai",
+        base_url: str | None = "https://api.openai.com/v1",
+    ) -> None:
+        self.id = uuid4()
+        self.model = model
+        self.provider = provider
+        self.base_url = base_url
+        self.api_key_ciphertext = "secret-key"
+
+
+class FakeProviderResolver:
+    def __init__(self, provider: FakeProvider | None = None) -> None:
+        self.provider = provider or FakeProvider()
+        self.calls: list[tuple[object, str | None]] = []
+
+    async def resolve(self, provider_id, owner_user_id):
+        self.calls.append((provider_id, owner_user_id))
+        return self.provider
 
 
 class FakeAgent:
@@ -73,6 +98,7 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
     runtime = AgentRuntime(
         create_agent=fake_create_agent,
         tool_resolver=resolver,
+        provider_resolver=FakeProviderResolver(),
         model_factory=lambda model, **_: model,
     )
     input_messages = [{"role": "user", "content": "Can this deploy?"}]
@@ -81,7 +107,7 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
 
     assert resolver.calls == [(["search_sop"], ["change-docs"])]
     assert created == {
-        "model": "openai:gpt-5-mini",
+        "model": "gpt-5-mini",
         "tools": resolver.tools,
         "system_prompt": "Review risky changes carefully.",
     }
@@ -97,6 +123,8 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
     configured_model = object()
     model_factory_calls: list[tuple[str, dict[str, object]]] = []
     created: dict[str, object] = {}
+    provider = FakeProvider()
+    provider_resolver = FakeProviderResolver(provider)
 
     def fake_model_factory(model: str, **model_config):
         model_factory_calls.append((model, dict(model_config)))
@@ -112,12 +140,26 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
         create_agent=fake_create_agent,
         model_factory=fake_model_factory,
         tool_resolver=resolver,
+        provider_resolver=provider_resolver,
     )
 
-    await runtime.run(version=version, messages=[{"role": "user", "content": "Hi"}])
+    await runtime.run(
+        version=version,
+        messages=[{"role": "user", "content": "Hi"}],
+        current_user={"user_id": "user-1", "role": "user"},
+    )
 
+    assert provider_resolver.calls == [(version.provider_id, "user-1")]
     assert model_factory_calls == [
-        ("openai:gpt-5-mini", {"temperature": 0.2}),
+        (
+            "gpt-5-mini",
+            {
+                "temperature": 0.2,
+                "api_key": "secret-key",
+                "base_url": "https://api.openai.com/v1",
+                "model_provider": "openai",
+            },
+        ),
     ]
     assert created["model"] is configured_model
     assert created["tools"] == resolver.tools
@@ -135,6 +177,7 @@ async def test_runtime_awaits_async_tool_resolver() -> None:
     runtime = AgentRuntime(
         create_agent=fake_create_agent,
         tool_resolver=resolver,
+        provider_resolver=FakeProviderResolver(),
         model_factory=lambda model, **_: model,
     )
 
@@ -156,6 +199,7 @@ async def test_runtime_returns_json_serializable_raw_output_for_langchain_messag
     runtime = AgentRuntime(
         create_agent=lambda **_: FakeAgent(raw_output),
         tool_resolver=FakeResolver(),
+        provider_resolver=FakeProviderResolver(),
         model_factory=lambda model, **_: model,
     )
 
@@ -184,6 +228,7 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
     runtime = AgentRuntime(
         create_agent=lambda **_: agent,
         tool_resolver=FakeResolver(),
+        provider_resolver=FakeProviderResolver(),
         model_factory=lambda model, **_: model,
     )
     messages = [{"role": "user", "content": "Run the check."}]
@@ -192,3 +237,57 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
 
     assert agent.payload == {"messages": messages}
     assert result.messages == [{"role": "assistant", "content": "Done."}]
+
+
+@pytest.mark.asyncio
+async def test_runtime_omits_optional_provider_kwargs_when_absent() -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    provider = FakeProvider(provider=None, base_url=None)
+
+    def fake_model_factory(model: str, **kwargs):
+        calls.append((model, dict(kwargs)))
+        return model
+
+    runtime = AgentRuntime(
+        create_agent=lambda **_: FakeAgent({"messages": []}),
+        tool_resolver=FakeResolver(),
+        provider_resolver=FakeProviderResolver(provider),
+        model_factory=fake_model_factory,
+    )
+
+    await runtime.run(version=FakeVersion(), messages=[])
+
+    assert calls == [
+        ("gpt-5-mini", {"temperature": 0.2, "api_key": "secret-key"})
+    ]
+
+
+@pytest.mark.asyncio
+async def test_runtime_default_provider_resolver_fails_clearly() -> None:
+    runtime = AgentRuntime(
+        create_agent=lambda **_: FakeAgent({"messages": []}),
+        tool_resolver=FakeResolver(),
+        model_factory=lambda model, **_: model,
+    )
+
+    with pytest.raises(
+        AgentRuntimeProviderUnavailableError,
+        match="LLM provider is not configured",
+    ):
+        await runtime.run(version=FakeVersion(), messages=[])
+
+
+@pytest.mark.asyncio
+async def test_runtime_rejects_provider_without_model() -> None:
+    runtime = AgentRuntime(
+        create_agent=lambda **_: FakeAgent({"messages": []}),
+        tool_resolver=FakeResolver(),
+        provider_resolver=FakeProviderResolver(FakeProvider(model=None)),
+        model_factory=lambda model, **_: model,
+    )
+
+    with pytest.raises(
+        AgentRuntimeProviderUnavailableError,
+        match="does not declare a model",
+    ):
+        await runtime.run(version=FakeVersion(), messages=[])
