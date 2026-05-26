@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.api.auth import CurrentUser
 from app.core.database import get_session
 from app.main import app
 from app.repositories.agents import AgentDisabledError, AgentVersionNotFoundError
@@ -211,6 +212,25 @@ async def test_create_agent_test_run_snapshots_provider_id() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_agent_test_run_persists_current_user_context() -> None:
+    session = FakeSession()
+    repository = RunRepository(session)
+    version = FakeVersion()
+    current_user = {"user_id": "user-123", "role": "user"}
+
+    run = await repository.create_agent_test_run(
+        agent_key="release-reviewer",
+        agent_version=version,
+        messages=[{"role": "user", "content": "Can this deploy?"}],
+        input_preview="Can this deploy?",
+        current_user=current_user,
+    )
+
+    assert run.metadata_["current_user"] == current_user
+    assert run.subject_snapshot["current_user"] == current_user
+
+
+@pytest.mark.asyncio
 async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -> None:
     order: list[str] = []
     version = FakeVersion(version_number=3)
@@ -249,6 +269,31 @@ async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_start_test_run_persists_optional_user_context() -> None:
+    version = FakeVersion(version_number=3)
+    repository = FakeAgentRepository(agent=FakeAgent(latest_version=version))
+    run_repository = FakeRunRepository()
+    service = AgentService(
+        repository=repository,
+        run_repository=run_repository,
+        schedule_test_run=lambda run_id: None,
+        commit=lambda: None,
+    )
+
+    await service.start_test_run(
+        "release-reviewer",
+        AgentTestRunCreate(messages=[{"role": "user", "content": "Can this deploy?"}]),
+        current_user=CurrentUser(user_id="user-123", role="user"),
+    )
+
+    assert run_repository.created_kwargs is not None
+    assert run_repository.created_kwargs["current_user"] == {
+        "user_id": "user-123",
+        "role": "user",
+    }
 
 
 @pytest.mark.asyncio

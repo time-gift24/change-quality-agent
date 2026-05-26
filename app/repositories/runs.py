@@ -78,11 +78,29 @@ class RunRepository:
         messages: list[dict[str, Any]],
         input_preview: str,
         created_by: str | None = None,
+        current_user: dict[str, str] | None = None,
         assistant_id: str = "react-agent-test-v1",
     ) -> Run:
         agent_id = str(agent_version.agent_id)
         agent_version_id = str(agent_version.id)
         version_number = agent_version.version_number
+        metadata = {
+            "subject_type": "agent_test",
+            "subject_id": agent_key,
+            "agent_id": agent_id,
+            "agent_key": agent_key,
+            "agent_version_id": agent_version_id,
+            "agent_version_number": version_number,
+            "run_kind": "agent_test",
+            "input_preview": input_preview,
+        }
+        subject_snapshot = {
+            "messages": [dict(message) for message in messages],
+            "agent_version": _agent_version_snapshot(agent_version),
+        }
+        if current_user is not None:
+            metadata["current_user"] = dict(current_user)
+            subject_snapshot["current_user"] = dict(current_user)
         run = Run(
             thread_id=str(uuid4()),
             assistant_id=assistant_id,
@@ -91,26 +109,14 @@ class RunRepository:
             env_key=None,
             status=RunStatus.pending.value,
             active_conflict_key=None,
-            metadata_={
-                "subject_type": "agent_test",
-                "subject_id": agent_key,
-                "agent_id": agent_id,
-                "agent_key": agent_key,
-                "agent_version_id": agent_version_id,
-                "agent_version_number": version_number,
-                "run_kind": "agent_test",
-                "input_preview": input_preview,
-            },
+            metadata_=metadata,
             kwargs={
                 "agent_key": agent_key,
                 "agent_version_id": agent_version_id,
                 "agent_version_number": version_number,
             },
             completed_nodes=[],
-            subject_snapshot={
-                "messages": [dict(message) for message in messages],
-                "agent_version": _agent_version_snapshot(agent_version),
-            },
+            subject_snapshot=subject_snapshot,
             created_by=created_by,
         )
         self._session.add(run)

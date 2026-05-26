@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from agent.react_runtime import AgentRuntime, to_jsonable
+from app.api.auth import CurrentUser
 from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
@@ -80,6 +81,7 @@ class AgentService:
         self,
         agent_key: str,
         request: AgentTestRunCreate,
+        current_user: CurrentUser | None = None,
     ) -> AgentRunStartResult:
         if self._run_repository is None:
             raise RuntimeError("Agent test run repository is not configured.")
@@ -92,11 +94,17 @@ class AgentService:
 
         version = await self._resolve_test_run_version(agent, request)
         messages = [message.model_dump(mode="json") for message in request.messages]
+        current_user_payload = (
+            {"user_id": current_user.user_id, "role": current_user.role}
+            if current_user is not None
+            else None
+        )
         run = await self._run_repository.create_agent_test_run(
             agent_key=agent_key,
             agent_version=version,
             messages=messages,
             input_preview=_input_preview(messages),
+            current_user=current_user_payload,
         )
         await self._commit_if_configured()
         await self._schedule_test_run_if_configured(run.id)

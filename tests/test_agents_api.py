@@ -12,6 +12,7 @@ from app.repositories.agents import (
     AgentKeyExistsError,
     AgentNotFoundError,
 )
+from app.schemas.runs import RunStatus
 from app.schemas.agents import AgentDraftConfig
 
 
@@ -66,6 +67,22 @@ class FakeAgent:
         self.created_at = BASE_TIME
         self.updated_at = BASE_TIME
         self.deleted_at = None
+
+
+class FakeRun:
+    def __init__(self) -> None:
+        self.id = uuid4()
+        self.status = RunStatus.pending.value
+
+
+class FakeRunRepository:
+    def __init__(self) -> None:
+        self.created_kwargs: dict[str, object] | None = None
+        self.run = FakeRun()
+
+    async def create_agent_test_run(self, **kwargs):
+        self.created_kwargs = kwargs
+        return self.run
 
 
 class FakeAgentRepository:
@@ -157,6 +174,13 @@ class FakeAgentRepository:
                 return version
         return None
 
+    async def get_version_by_id(self, version_id):
+        for versions in self.versions.values():
+            for version in versions:
+                if version.id == version_id:
+                    return version
+        return None
+
     async def soft_delete(self, key: str):
         agent = self.agents.get(key)
         if agent is None:
@@ -171,6 +195,8 @@ def clear_overrides():
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
+    if hasattr(app.state, "agent_test_run_executor"):
+        delattr(app.state, "agent_test_run_executor")
 
 
 def draft_payload() -> dict[str, object]:
@@ -205,11 +231,19 @@ def make_session_override(session: FakeSession):
     return override_session
 
 
-def override_dependencies(repository: FakeAgentRepository, session: FakeSession):
+def override_dependencies(
+    repository: FakeAgentRepository,
+    session: FakeSession | None = None,
+    run_repository: FakeRunRepository | None = None,
+):
+    session = session or FakeSession()
     app.dependency_overrides[get_session] = make_session_override(session)
     get_agent_repository = getattr(deps, "get_agent_repository", None)
     if get_agent_repository is not None:
         app.dependency_overrides[get_agent_repository] = lambda: repository
+    get_run_repository = getattr(deps, "get_run_repository", None)
+    if get_run_repository is not None and run_repository is not None:
+        app.dependency_overrides[get_run_repository] = lambda: run_repository
 
 
 @pytest.mark.asyncio
@@ -475,6 +509,39 @@ async def test_get_version_rejects_non_positive_version_number() -> None:
         response = await client.get("/api/agents/release-reviewer/versions/0")
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_start_agent_test_run_accepts_optional_user_context() -> None:
+    agent = FakeAgent()
+    version = FakeVersion(agent_id=agent.id)
+    agent.latest_version = version
+    repository = FakeAgentRepository(agents=[agent])
+    repository.versions[agent.key].append(version)
+    run_repository = FakeRunRepository()
+    override_dependencies(repository=repository, run_repository=run_repository)
+
+    async def fake_executor(run_id) -> None:
+        return None
+
+    app.state.agent_test_run_executor = fake_executor
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/agents/release-reviewer/test-runs",
+            headers={"x-user-id": "user-123"},
+            json={"messages": [{"role": "user", "content": "Can this deploy?"}]},
+        )
+
+    assert response.status_code == 202
+    assert run_repository.created_kwargs is not None
+    assert run_repository.created_kwargs["current_user"] == {
+        "user_id": "user-123",
+        "role": "user",
+    }
 
 
 @pytest.mark.asyncio
