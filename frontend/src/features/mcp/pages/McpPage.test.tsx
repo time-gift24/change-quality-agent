@@ -181,6 +181,20 @@ describe("McpPage", () => {
     expect(checkServer).toHaveBeenCalledWith("srv-1");
   });
 
+  it("shows inline error for empty name and prevents create", () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    const nameInput = within(dialog).getByLabelText("服务名称");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("请填写服务名称。");
+    expect(nameInput).toHaveFocus();
+    expect(createServer).not.toHaveBeenCalled();
+  });
+
   it("validates required command for stdio and closes drawer on Escape", () => {
     render(<McpPage />);
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
@@ -203,7 +217,7 @@ describe("McpPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("validates required url for http before submit", () => {
+  it("validates invalid http url before submit", () => {
     render(<McpPage />);
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
@@ -214,12 +228,35 @@ describe("McpPage", () => {
     fireEvent.change(within(dialog).getByLabelText("传输方式"), {
       target: { value: "http" },
     });
+
+    const urlInput = within(dialog).getByLabelText("url");
+    fireEvent.change(urlInput, {
+      target: { value: "not-a-url" },
+    });
     fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
 
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "http 模式需要填写 url。",
+      "请填写有效的 http url。",
     );
+    expect(urlInput).toHaveFocus();
     expect(createServer).not.toHaveBeenCalled();
+  });
+
+  it("wraps focus within drawer on Tab and Shift+Tab", () => {
+    render(<McpPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
+
+    const dialog = screen.getByRole("dialog", { name: "新增 MCP 服务" });
+    const closeButton = within(dialog).getByRole("button", { name: "关闭" });
+    const saveButton = within(dialog).getByRole("button", { name: "保存" });
+
+    saveButton.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(closeButton).toHaveFocus();
+
+    closeButton.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(saveButton).toHaveFocus();
   });
 });
 

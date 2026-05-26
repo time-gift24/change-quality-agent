@@ -26,6 +26,8 @@ type McpServerFormDrawerProps = {
 
 const DEFAULT_TRANSPORT: McpTransport = "stdio";
 const DEFAULT_DESIRED_STATE: McpDesiredState = "running";
+const FOCUSABLE_SELECTOR =
+  "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
 
 export function McpServerFormDrawer({
   open,
@@ -45,6 +47,7 @@ export function McpServerFormDrawer({
     DEFAULT_DESIRED_STATE,
   );
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const drawerRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const commandInputRef = useRef<HTMLInputElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
@@ -91,7 +94,47 @@ export function McpServerFormDrawer({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const drawerElement = drawerRef.current;
+      if (!drawerElement) {
+        return;
+      }
+
+      const focusableElements = Array.from(
+        drawerElement.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      );
+
+      if (focusableElements.length === 0) {
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (!active || !drawerElement.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+        return;
+      }
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last?.focus();
+        return;
+      }
+
+      if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first?.focus();
       }
     };
 
@@ -110,6 +153,8 @@ export function McpServerFormDrawer({
 
     const nextName = name.trim();
     if (!nextName) {
+      setValidationMessage("请填写服务名称。");
+      nameInputRef.current?.focus();
       return;
     }
 
@@ -119,8 +164,15 @@ export function McpServerFormDrawer({
       return;
     }
 
-    if (transport === "http" && url.trim().length === 0) {
+    const nextUrl = url.trim();
+    if (transport === "http" && nextUrl.length === 0) {
       setValidationMessage("http 模式需要填写 url。");
+      urlInputRef.current?.focus();
+      return;
+    }
+
+    if (transport === "http" && !isValidHttpUrl(nextUrl)) {
+      setValidationMessage("请填写有效的 http url。");
       urlInputRef.current?.focus();
       return;
     }
@@ -140,7 +192,7 @@ export function McpServerFormDrawer({
       }
 
       if (transport === "http") {
-        payload.url = url.trim() || null;
+        payload.url = nextUrl || null;
       }
 
       await onCreate(payload);
@@ -163,7 +215,7 @@ export function McpServerFormDrawer({
     }
 
     if (transport === "http") {
-      payload.url = url.trim() || null;
+      payload.url = nextUrl || null;
       payload.command = null;
     }
 
@@ -176,6 +228,7 @@ export function McpServerFormDrawer({
         aria-labelledby={titleId}
         aria-modal="true"
         className="h-full w-full max-w-md border-l border-hairline bg-canvas shadow-xl"
+        ref={drawerRef}
         role="dialog"
       >
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
@@ -325,4 +378,13 @@ export function McpServerFormDrawer({
       </div>
     </div>
   );
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
