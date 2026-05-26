@@ -12,7 +12,7 @@ export function getMcpErrorMessage(error: Error | null): string | null {
   }
 
   if (status === 404) {
-    return "MCP 服务不存在，已清空当前选择";
+    return "MCP 服务不存在，请刷新列表后重试";
   }
 
   if (status === 502 || status === 503) {

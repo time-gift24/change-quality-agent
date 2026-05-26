@@ -10,6 +10,11 @@ import { McpServerList, type McpStatusFilter } from "../components/McpServerList
 import { useMcpMutations, useMcpServerDetail, useMcpServers } from "../hooks";
 import type { McpServerCreate, McpServerUpdate } from "../types";
 
+type MutationFailure = {
+  error: Error;
+  serverId: string | null;
+};
+
 export function McpPage() {
   const serversState = useMcpServers();
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
@@ -17,6 +22,7 @@ export function McpPage() {
   const [statusFilter, setStatusFilter] = useState<McpStatusFilter>("all");
   const [activeTab, setActiveTab] = useState<McpDetailTab>("configuration");
   const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null);
+  const [mutationFailure, setMutationFailure] = useState<MutationFailure | null>(null);
   const hasAutoSelectedServerRef = useRef(false);
 
   useEffect(() => {
@@ -44,27 +50,71 @@ export function McpPage() {
 
   const detailState = useMcpServerDetail(selectedServerId);
 
-  const refreshAll = useCallback(async () => {
+  const mutations = useMcpMutations();
+
+  const refreshServerViews = useCallback(
+    async (serverId: string | null) => {
+      await serversState.refetch();
+      if (serverId && selectedServerId === serverId) {
+        await detailState.refetch();
+      }
+    },
+    [detailState, selectedServerId, serversState],
+  );
+
+  const handleMutationError = useCallback(
+    async (error: unknown, serverId: string | null) => {
+      const nextError = asError(error);
+
+      setMutationFailure({ error: nextError, serverId });
+
+      if (isMcpNotFoundError(nextError)) {
+        await serversState.refetch();
+
+        if (serverId && selectedServerId === serverId) {
+          setSelectedServerId(null);
+          setActiveTab("configuration");
+        }
+      }
+    },
+    [selectedServerId, serversState],
+  );
+
+  const runServerMutation = useCallback(
+    (serverId: string, action: () => Promise<unknown>) => {
+      void (async () => {
+        try {
+          await action();
+          setMutationFailure(null);
+          await refreshServerViews(serverId);
+        } catch (error) {
+          await handleMutationError(error, serverId);
+        }
+      })();
+    },
+    [handleMutationError, refreshServerViews],
+  );
+
+  useEffect(() => {
+    if (selectedServerId && isMcpNotFoundError(detailState.error)) {
+      setSelectedServerId(null);
+      setActiveTab("configuration");
+    }
+  }, [detailState.error, selectedServerId]);
+
+  const getServerName = useCallback(
+    (serverId: string) =>
+      serversState.data.find((server) => server.id === serverId)?.name ??
+      "这个 MCP Server",
+    [serversState.data],
+  );
+
+  const refreshSelectedDetail = useCallback(async () => {
     await serversState.refetch();
     if (selectedServerId) {
       await detailState.refetch();
     }
   }, [detailState, selectedServerId, serversState]);
-
-  const mutations = useMcpMutations({
-    onSuccess: refreshAll,
-  });
-
-  useEffect(() => {
-    if (
-      selectedServerId &&
-      (isMcpNotFoundError(detailState.error) ||
-        isMcpNotFoundError(mutations.error))
-    ) {
-      setSelectedServerId(null);
-      setActiveTab("configuration");
-    }
-  }, [detailState.error, mutations.error, selectedServerId]);
 
   const filteredServers = useMemo(() => {
     const normalizedQuery = searchText.trim().toLowerCase();
@@ -81,21 +131,36 @@ export function McpPage() {
   }, [searchText, serversState.data, statusFilter]);
 
   const selectedServer = detailState.data;
-  const mutationErrorMessage = getMcpErrorMessage(mutations.error);
+  const mutationErrorMessage = getMcpErrorMessage(
+    mutationFailure?.error ?? mutations.error,
+  );
 
   async function handleCreate(payload: McpServerCreate): Promise<void> {
-    const created = await mutations.createServer(payload);
-    setSelectedServerId(created.id);
-    setDrawerMode(null);
-    setActiveTab("configuration");
+    try {
+      const created = await mutations.createServer(payload);
+
+      setMutationFailure(null);
+      setSelectedServerId(created.id);
+      setDrawerMode(null);
+      setActiveTab("configuration");
+      await serversState.refetch();
+    } catch (error) {
+      await handleMutationError(error, null);
+    }
   }
 
   async function handleUpdate(
     serverId: string,
     payload: McpServerUpdate,
   ): Promise<void> {
-    await mutations.updateServer(serverId, payload);
-    setDrawerMode(null);
+    try {
+      await mutations.updateServer(serverId, payload);
+      setMutationFailure(null);
+      setDrawerMode(null);
+      await refreshSelectedDetail();
+    } catch (error) {
+      await handleMutationError(error, serverId);
+    }
   }
 
   async function handleDeleteServer(): Promise<void> {
@@ -103,13 +168,22 @@ export function McpPage() {
       return;
     }
 
-    if (!window.confirm("确认删除这个 MCP Server？")) {
+    const serverId = selectedServerId;
+    const serverName = selectedServer?.name ?? getServerName(serverId);
+
+    if (!window.confirm(`确认删除 ${serverName}？`)) {
       return;
     }
 
-    await mutations.deleteServer(selectedServerId);
-    setSelectedServerId(null);
-    setActiveTab("configuration");
+    try {
+      await mutations.deleteServer(serverId);
+      setMutationFailure(null);
+      setSelectedServerId(null);
+      setActiveTab("configuration");
+      await serversState.refetch();
+    } catch (error) {
+      await handleMutationError(error, serverId);
+    }
   }
 
   return (
@@ -139,14 +213,14 @@ export function McpPage() {
           error={serversState.error}
           loading={serversState.loading}
           onCheckServer={(serverId) => {
-            void mutations.checkServer(serverId);
+            runServerMutation(serverId, () => mutations.checkServer(serverId));
           }}
           onCreateServer={() => {
             setDrawerMode("create");
           }}
           onRestartServer={(serverId) => {
-            if (window.confirm("确认重启这个 MCP Server？")) {
-              void mutations.restartServer(serverId);
+            if (window.confirm(`确认重启 ${getServerName(serverId)}？`)) {
+              runServerMutation(serverId, () => mutations.restartServer(serverId));
             }
           }}
           onSearchTextChange={setSearchText}
@@ -155,11 +229,11 @@ export function McpPage() {
             setActiveTab("configuration");
           }}
           onStartServer={(serverId) => {
-            void mutations.startServer(serverId);
+            runServerMutation(serverId, () => mutations.startServer(serverId));
           }}
           onStatusFilterChange={setStatusFilter}
           onStopServer={(serverId) => {
-            void mutations.stopServer(serverId);
+            runServerMutation(serverId, () => mutations.stopServer(serverId));
           }}
           pending={mutations.pending}
           searchText={searchText}
@@ -197,4 +271,8 @@ export function McpPage() {
       />
     </div>
   );
+}
+
+function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

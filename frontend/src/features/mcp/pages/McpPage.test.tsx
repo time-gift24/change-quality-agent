@@ -15,7 +15,11 @@ import { App } from "../../../app/App";
 import { useAuthz } from "../../../app/routing/useAuthz";
 import { ApiError } from "../../../lib/apiClient";
 import { useMcpMutations, useMcpServerDetail, useMcpServers } from "../hooks";
-import type { McpServerDetail, McpServerSummary } from "../types";
+import { McpServerDetail } from "../components/McpServerDetail";
+import type {
+  McpServerDetail as McpServerDetailType,
+  McpServerSummary,
+} from "../types";
 import { McpPage } from "./McpPage";
 
 vi.mock("../../../app/routing/useAuthz", () => ({
@@ -39,6 +43,8 @@ const startServer = vi.fn();
 const stopServer = vi.fn();
 const restartServer = vi.fn();
 const checkServer = vi.fn();
+const refetchServers = vi.fn();
+const refetchDetail = vi.fn();
 
 const servers: McpServerSummary[] = [
   buildSummary({ id: "srv-1", name: "Alpha Server", tool_count: 1 }),
@@ -50,7 +56,7 @@ const servers: McpServerSummary[] = [
   }),
 ];
 
-const detailById: Record<string, McpServerDetail> = {
+const detailById: Record<string, McpServerDetailType> = {
   "srv-1": buildDetail({
     id: "srv-1",
     name: "Alpha Server",
@@ -94,20 +100,22 @@ beforeEach(() => {
   stopServer.mockReset();
   restartServer.mockReset();
   checkServer.mockReset();
+  refetchServers.mockReset();
+  refetchDetail.mockReset();
   vi.mocked(useAuthz).mockReturnValue({ isAdmin: true });
 
   vi.mocked(useMcpServers).mockReturnValue({
     data: servers,
     error: null,
     loading: false,
-    refetch: vi.fn(),
+    refetch: refetchServers,
   });
 
   vi.mocked(useMcpServerDetail).mockImplementation((serverId) => ({
     data: serverId ? detailById[serverId] ?? null : null,
     error: null,
     loading: false,
-    refetch: vi.fn(),
+    refetch: refetchDetail,
   }));
 
   vi.mocked(useMcpMutations).mockReturnValue({
@@ -213,8 +221,28 @@ describe("McpPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
 
     expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(confirmSpy).toHaveBeenNthCalledWith(1, "确认重启 Alpha Server？");
+    expect(confirmSpy).toHaveBeenNthCalledWith(2, "确认删除 Alpha Server？");
     expect(restartServer).not.toHaveBeenCalled();
     expect(deleteServer).not.toHaveBeenCalled();
+  });
+
+  it("shows detail load errors before the empty selected state", () => {
+    render(
+      <McpServerDetail
+        activeTab="configuration"
+        error={new ApiError(404, "Not Found", "missing server")}
+        loading={false}
+        onDeleteServer={vi.fn()}
+        onEditServer={vi.fn()}
+        onTabChange={vi.fn()}
+        pending={false}
+        server={null}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("MCP 服务不存在");
+    expect(screen.queryByText("请选择一个 MCP 服务。")).not.toBeInTheDocument();
   });
 
   it("clears selected server after detail returns 404", async () => {
@@ -232,7 +260,7 @@ describe("McpPage", () => {
         data: null,
         error: null,
         loading: false,
-        refetch: vi.fn(),
+        refetch: refetchDetail,
       };
     });
 
@@ -246,6 +274,38 @@ describe("McpPage", () => {
       expect(detailCalls).toContain("srv-1");
       expect(detailCalls[detailCalls.length - 1]).toBeNull();
     });
+  });
+
+  it("keeps current detail when non-selected row mutation returns 404", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    restartServer.mockRejectedValueOnce(new ApiError(404, "Not Found", "missing server"));
+
+    render(<McpPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "重启 Beta Server" }));
+
+    await waitFor(() => expect(restartServer).toHaveBeenCalledWith("srv-2"));
+    await waitFor(() => expect(refetchServers).toHaveBeenCalled());
+
+    const detail = screen.getByRole("region", { name: "MCP 服务详情" });
+    expect(within(detail).getByRole("heading", { name: "Alpha Server" }))
+      .toBeInTheDocument();
+  });
+
+  it("clears selected server on successful delete without refetching deleted detail", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    deleteServer.mockResolvedValueOnce(undefined);
+    refetchDetail.mockRejectedValueOnce(new ApiError(404, "Not Found", "deleted"));
+
+    render(<McpPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+
+    await waitFor(() => expect(deleteServer).toHaveBeenCalledWith("srv-1"));
+    await waitFor(() => expect(refetchServers).toHaveBeenCalled());
+
+    expect(refetchDetail).not.toHaveBeenCalled();
+    expect(screen.getByText("请选择一个 MCP 服务。")).toBeInTheDocument();
   });
 
   it("shows inline error for empty name and prevents create", () => {
@@ -347,7 +407,9 @@ function buildSummary(overrides: Partial<McpServerSummary> = {}): McpServerSumma
   };
 }
 
-function buildDetail(overrides: Partial<McpServerDetail> = {}): McpServerDetail {
+function buildDetail(
+  overrides: Partial<McpServerDetailType> = {},
+): McpServerDetailType {
   return {
     ...buildSummary(overrides),
     tools: [],

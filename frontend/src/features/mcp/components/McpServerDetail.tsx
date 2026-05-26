@@ -37,9 +37,20 @@ export function McpServerDetail({
       role="region"
     >
       {!server ? (
-        <div className="flex flex-1 items-center justify-center p-6 text-sm text-mute">
-          请选择一个 MCP 服务。
-        </div>
+        loading || errorMessage ? (
+          <div className="flex flex-1 flex-col justify-center gap-2 p-6">
+            {loading ? <p className="text-sm text-mute">加载详情中...</p> : null}
+            {errorMessage ? (
+              <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep" role="alert">
+                {errorMessage}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex flex-1 items-center justify-center p-6 text-sm text-mute">
+            请选择一个 MCP 服务。
+          </div>
+        )
       ) : (
         <>
           <header className="space-y-3 border-b border-hairline p-4">
