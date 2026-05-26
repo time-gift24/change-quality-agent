@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  getMcpErrorMessage,
+  isMcpNotFoundError,
+} from "../components/errorMessages";
 import { McpServerDetail, type McpDetailTab } from "../components/McpServerDetail";
 import { McpServerFormDrawer } from "../components/McpServerFormDrawer";
 import { McpServerList, type McpStatusFilter } from "../components/McpServerList";
@@ -13,18 +17,27 @@ export function McpPage() {
   const [statusFilter, setStatusFilter] = useState<McpStatusFilter>("all");
   const [activeTab, setActiveTab] = useState<McpDetailTab>("configuration");
   const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null);
+  const hasAutoSelectedServerRef = useRef(false);
 
   useEffect(() => {
     if (serversState.data.length === 0) {
       setSelectedServerId(null);
+      hasAutoSelectedServerRef.current = false;
       return;
     }
 
-    const exists = selectedServerId
-      ? serversState.data.some((server) => server.id === selectedServerId)
-      : false;
+    if (selectedServerId) {
+      const exists = serversState.data.some((server) => server.id === selectedServerId);
 
-    if (!exists) {
+      if (!exists) {
+        setSelectedServerId(serversState.data[0]?.id ?? null);
+      }
+
+      return;
+    }
+
+    if (!hasAutoSelectedServerRef.current) {
+      hasAutoSelectedServerRef.current = true;
       setSelectedServerId(serversState.data[0]?.id ?? null);
     }
   }, [selectedServerId, serversState.data]);
@@ -42,6 +55,17 @@ export function McpPage() {
     onSuccess: refreshAll,
   });
 
+  useEffect(() => {
+    if (
+      selectedServerId &&
+      (isMcpNotFoundError(detailState.error) ||
+        isMcpNotFoundError(mutations.error))
+    ) {
+      setSelectedServerId(null);
+      setActiveTab("configuration");
+    }
+  }, [detailState.error, mutations.error, selectedServerId]);
+
   const filteredServers = useMemo(() => {
     const normalizedQuery = searchText.trim().toLowerCase();
 
@@ -57,6 +81,7 @@ export function McpPage() {
   }, [searchText, serversState.data, statusFilter]);
 
   const selectedServer = detailState.data;
+  const mutationErrorMessage = getMcpErrorMessage(mutations.error);
 
   async function handleCreate(payload: McpServerCreate): Promise<void> {
     const created = await mutations.createServer(payload);
@@ -75,6 +100,10 @@ export function McpPage() {
 
   async function handleDeleteServer(): Promise<void> {
     if (!selectedServerId) {
+      return;
+    }
+
+    if (!window.confirm("确认删除这个 MCP Server？")) {
       return;
     }
 
@@ -99,9 +128,9 @@ export function McpPage() {
         </button>
       </header>
 
-      {mutations.error ? (
+      {mutationErrorMessage ? (
         <p className="mb-3 rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep" role="alert">
-          {mutations.error.message}
+          {mutationErrorMessage}
         </p>
       ) : null}
 
@@ -116,7 +145,9 @@ export function McpPage() {
             setDrawerMode("create");
           }}
           onRestartServer={(serverId) => {
-            void mutations.restartServer(serverId);
+            if (window.confirm("确认重启这个 MCP Server？")) {
+              void mutations.restartServer(serverId);
+            }
           }}
           onSearchTextChange={setSearchText}
           onSelectServer={(serverId) => {

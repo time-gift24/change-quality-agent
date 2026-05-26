@@ -6,12 +6,14 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../app/App";
 import { useAuthz } from "../../../app/routing/useAuthz";
+import { ApiError } from "../../../lib/apiClient";
 import { useMcpMutations, useMcpServerDetail, useMcpServers } from "../hooks";
 import type { McpServerDetail, McpServerSummary } from "../types";
 import { McpPage } from "./McpPage";
@@ -123,6 +125,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("McpPage", () => {
@@ -168,6 +171,8 @@ describe("McpPage", () => {
   });
 
   it("invokes start stop restart check actions", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
     render(<McpPage />);
 
     fireEvent.click(screen.getByRole("button", { name: "启动 Alpha Server" }));
@@ -179,6 +184,68 @@ describe("McpPage", () => {
     expect(stopServer).toHaveBeenCalledWith("srv-1");
     expect(restartServer).toHaveBeenCalledWith("srv-1");
     expect(checkServer).toHaveBeenCalledWith("srv-1");
+  });
+
+  it("shows clear Chinese message for 409 update conflicts", () => {
+    vi.mocked(useMcpMutations).mockReturnValue({
+      checkServer,
+      createServer,
+      deleteServer,
+      error: new ApiError(409, "Conflict", "server is running"),
+      pending: false,
+      restartServer,
+      startServer,
+      stopServer,
+      updateServer,
+    });
+
+    render(<McpPage />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent("请先停止服务再修改配置");
+  });
+
+  it("asks for confirmation before delete and restart", () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<McpPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "重启 Alpha Server" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除" }));
+
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(restartServer).not.toHaveBeenCalled();
+    expect(deleteServer).not.toHaveBeenCalled();
+  });
+
+  it("clears selected server after detail returns 404", async () => {
+    vi.mocked(useMcpServerDetail).mockImplementation((serverId) => {
+      if (serverId === "srv-1") {
+        return {
+          data: null,
+          error: new ApiError(404, "Not Found", "missing server"),
+          loading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: null,
+        error: null,
+        loading: false,
+        refetch: vi.fn(),
+      };
+    });
+
+    render(<McpPage />);
+
+    await waitFor(() => {
+      const detailCalls = vi
+        .mocked(useMcpServerDetail)
+        .mock.calls.map(([serverId]) => serverId);
+
+      expect(detailCalls).toContain("srv-1");
+      expect(detailCalls[detailCalls.length - 1]).toBeNull();
+    });
   });
 
   it("shows inline error for empty name and prevents create", () => {

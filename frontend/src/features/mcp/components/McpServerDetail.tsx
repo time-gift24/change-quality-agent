@@ -1,4 +1,5 @@
 import type { McpServerDetail } from "../types";
+import { getMcpErrorMessage } from "./errorMessages";
 
 export type McpDetailTab = "configuration" | "tools";
 
@@ -23,6 +24,7 @@ export function McpServerDetail({
   onEditServer,
   onDeleteServer,
 }: McpServerDetailProps) {
+  const errorMessage = getMcpErrorMessage(error);
   const configTabId = server ? `mcp-config-tab-${server.id}` : "mcp-config-tab";
   const toolsTabId = server ? `mcp-tools-tab-${server.id}` : "mcp-tools-tab";
   const configPanelId = server ? `mcp-config-panel-${server.id}` : "mcp-config-panel";
@@ -117,13 +119,13 @@ export function McpServerDetail({
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {loading ? <p className="text-sm text-mute">加载详情中...</p> : null}
-            {error ? (
+            {errorMessage ? (
               <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep" role="alert">
-                {error.message}
+                {errorMessage}
               </p>
             ) : null}
 
-            {!loading && !error && activeTab === "configuration" ? (
+            {!loading && !errorMessage && activeTab === "configuration" ? (
               <div
                 aria-labelledby={configTabId}
                 id={configPanelId}
@@ -140,7 +142,7 @@ export function McpServerDetail({
               </div>
             ) : null}
 
-            {!loading && !error && activeTab === "tools" ? (
+            {!loading && !errorMessage && activeTab === "tools" ? (
               <div
                 aria-labelledby={toolsTabId}
                 id={toolsPanelId}

@@ -1,4 +1,5 @@
 import type { McpServerRuntimeStatus, McpServerSummary } from "../types";
+import { getMcpErrorMessage } from "./errorMessages";
 
 export type McpStatusFilter = "all" | McpServerRuntimeStatus;
 
@@ -37,6 +38,8 @@ export function McpServerList({
   onRestartServer,
   onCheckServer,
 }: McpServerListProps) {
+  const errorMessage = getMcpErrorMessage(error);
+
   return (
     <section className="flex h-full min-h-0 flex-col rounded-2xl border border-hairline bg-canvas/90">
       <header className="border-b border-hairline p-4">
@@ -83,9 +86,9 @@ export function McpServerList({
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {error ? (
+        {errorMessage ? (
           <p className="rounded-md bg-error-soft px-2 py-1 text-xs text-error-deep" role="alert">
-            {error.message}
+            {errorMessage}
           </p>
         ) : null}
         {loading ? <p className="px-2 py-2 text-xs text-mute">加载中...</p> : null}
