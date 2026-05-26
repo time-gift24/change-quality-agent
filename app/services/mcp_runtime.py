@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 import logging
+import re
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -34,6 +35,12 @@ MCP_OPERATION_TIMEOUT_MESSAGE = "MCP operation timed out."
 MCP_RUNTIME_NOT_ENABLED_MESSAGE = (
     "MCP runtime requires mcp_runtime_single_instance=true."
 )
+REDACTED_ERROR_VALUE = "[redacted]"
+_SENSITIVE_ERROR_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(token|secret|password|api[_-]?key|authorization|credential)"
+    r"(\s*[:=]\s*)(['\"]?)(bearer\s+)?([^\s,;'\"}]+)(['\"]?)"
+)
+_BEARER_TOKEN_RE = re.compile(r"(?i)(bearer\s+)([^\s,;'\"}]+)")
 
 
 @dataclass
@@ -205,7 +212,7 @@ class McpRuntimeManager:
                 await repository.update_runtime_status(
                     server_id,
                     runtime_status=McpServerRuntimeStatus.error.value,
-                    last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                    last_error=sanitize_mcp_error(exc, server),
                     checked=True,
                 )
                 await repository.commit()
@@ -219,8 +226,17 @@ class McpRuntimeManager:
         async with self._lock_for(server_id):
             return await self._stop_locked(server_id)
 
+    @asynccontextmanager
+    async def server_operation_lock(self, server_id: UUID) -> AsyncIterator[None]:
+        async with self._lock_for(server_id):
+            yield
+
+    async def stop_locked(self, server_id: UUID) -> McpLifecycleResponse:
+        return await self._stop_locked(server_id)
+
     async def _stop_locked(self, server_id: UUID) -> McpLifecycleResponse:
         async with self._repository_context() as repository:
+            server = await repository.require_server(server_id)
             await repository.update_desired_state(
                 server_id,
                 McpDesiredState.stopped.value,
@@ -237,7 +253,7 @@ class McpRuntimeManager:
                     await repository.update_runtime_status(
                         server_id,
                         runtime_status=McpServerRuntimeStatus.error.value,
-                        last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                        last_error=sanitize_mcp_error(exc, server),
                         checked=True,
                     )
                     await repository.commit()
@@ -291,7 +307,7 @@ class McpRuntimeManager:
                         await repository.update_runtime_status(
                             server.id,
                             runtime_status=McpServerRuntimeStatus.error.value,
-                            last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                            last_error=sanitize_mcp_error(exc, server),
                             checked=True,
                         )
                         await repository.commit()
@@ -333,7 +349,7 @@ class McpRuntimeManager:
                 await repository.update_runtime_status(
                     server_id,
                     runtime_status=McpServerRuntimeStatus.error.value,
-                    last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                    last_error=sanitize_mcp_error(exc, server),
                     checked=True,
                 )
                 await repository.commit()
@@ -346,13 +362,14 @@ class McpRuntimeManager:
     async def shutdown(self) -> None:
         for server_id, handle in list(self._handles.items()):
             async with self._repository_context() as repository:
+                server = await repository.require_server(server_id)
                 try:
                     await self._run_operation(self._probe.stop(handle))
                 except Exception as exc:
                     await repository.update_runtime_status(
                         server_id,
                         runtime_status=McpServerRuntimeStatus.error.value,
-                        last_error=str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE,
+                        last_error=sanitize_mcp_error(exc, server),
                         checked=True,
                     )
                     await repository.commit()
@@ -419,3 +436,32 @@ class McpRuntimeManager:
             return
 
         yield repository_or_context
+
+
+def sanitize_mcp_error(exc: Exception, server: Any | None = None) -> str:
+    message = str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE
+    for secret in sorted(_server_secret_values(server), key=len, reverse=True):
+        message = message.replace(secret, REDACTED_ERROR_VALUE)
+    message = _BEARER_TOKEN_RE.sub(r"\1" + REDACTED_ERROR_VALUE, message)
+    return _SENSITIVE_ERROR_ASSIGNMENT_RE.sub(
+        lambda match: (
+            f"{match.group(1)}{match.group(2)}{match.group(3)}"
+            f"{match.group(4) or ''}{REDACTED_ERROR_VALUE}{match.group(6)}"
+        ),
+        message,
+    )
+
+
+def _server_secret_values(server: Any | None) -> set[str]:
+    if server is None:
+        return set()
+
+    secrets: set[str] = set()
+    for mapping_name in ("env", "headers"):
+        mapping = getattr(server, mapping_name, None)
+        if not isinstance(mapping, dict):
+            continue
+        for value in mapping.values():
+            if isinstance(value, str) and value:
+                secrets.add(value)
+    return secrets

@@ -71,25 +71,26 @@ async def update_mcp_server(
     repository: McpRepositoryDep,
     runtime: McpRuntimeManagerDep,
 ) -> McpServerDetail:
-    server = await repository.get_server(server_id)
-    if server is None:
-        raise _not_found()
-    if server.runtime_status == "running" or runtime.is_running(server_id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Stop the MCP server before updating its configuration.",
-        )
+    async with runtime.server_operation_lock(server_id):
+        server = await repository.get_server(server_id)
+        if server is None:
+            raise _not_found()
+        if server.runtime_status == "running" or runtime.is_running(server_id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stop the MCP server before updating its configuration.",
+            )
 
-    values = _validated_update_values(
-        server,
-        payload.model_dump(exclude_unset=True, mode="json"),
-    )
-    try:
-        server = await repository.update_server(server_id, **values)
-        await repository.commit()
-    except IntegrityError as exc:
-        raise _name_conflict() from exc
-    return _server_detail(server)
+        values = _validated_update_values(
+            server,
+            payload.model_dump(exclude_unset=True, mode="json"),
+        )
+        try:
+            server = await repository.update_server(server_id, **values)
+            await repository.commit()
+        except IntegrityError as exc:
+            raise _name_conflict() from exc
+        return _server_detail(server)
 
 
 @router.delete("/servers/{server_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -98,14 +99,15 @@ async def delete_mcp_server(
     repository: McpRepositoryDep,
     runtime: McpRuntimeManagerDep,
 ) -> None:
-    server = await repository.get_server(server_id)
-    if server is None:
-        raise _not_found()
-    if server.runtime_status == "running" or runtime.is_running(server_id):
-        await _run_lifecycle(runtime.stop, server_id)
+    async with runtime.server_operation_lock(server_id):
+        server = await repository.get_server(server_id)
+        if server is None:
+            raise _not_found()
+        if server.runtime_status == "running" or runtime.is_running(server_id):
+            await _run_lifecycle(runtime.stop_locked, server_id)
 
-    await repository.delete_server(server_id)
-    await repository.commit()
+        await repository.delete_server(server_id)
+        await repository.commit()
 
 
 @router.post("/servers/{server_id}/start")

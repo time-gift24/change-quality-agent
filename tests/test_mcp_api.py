@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -82,6 +84,8 @@ class FakeRuntimeManager:
         self.stopped = []
         self.running_ids = set()
         self.start_error: Exception | None = None
+        self._lock = asyncio.Lock()
+        self.lock_entries = 0
 
     async def start(self, server_id):
         if self.start_error is not None:
@@ -95,6 +99,9 @@ class FakeRuntimeManager:
         self.running_ids.discard(server_id)
         return _lifecycle_response(server_id, desired_state="stopped")
 
+    async def stop_locked(self, server_id):
+        return await self.stop(server_id)
+
     async def restart(self, server_id):
         return _lifecycle_response(server_id)
 
@@ -103,6 +110,12 @@ class FakeRuntimeManager:
 
     def is_running(self, server_id):
         return server_id in self.running_ids
+
+    @asynccontextmanager
+    async def server_operation_lock(self, server_id):
+        self.lock_entries += 1
+        async with self._lock:
+            yield
 
 
 def _lifecycle_response(
@@ -302,6 +315,33 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_waits_for_mcp_lifecycle_lock(overrides) -> None:
+    server, _, runtime = overrides
+    server.runtime_status = "stopped"
+    await runtime._lock.acquire()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        request_task = asyncio.create_task(
+            client.patch(
+                f"/api/mcp/servers/{server.id}",
+                headers=ADMIN_HEADERS,
+                json={"command": "node"},
+            )
+        )
+        await asyncio.sleep(0)
+        assert request_task.done() is False
+
+        runtime._lock.release()
+        response = await request_task
+
+    assert response.status_code == 200
+    assert runtime.lock_entries == 1
+
+
+@pytest.mark.asyncio
 async def test_update_stopped_mcp_server_can_clear_nullable_config(
     overrides,
 ) -> None:
@@ -410,3 +450,30 @@ async def test_delete_live_handle_stops_even_when_status_is_error(overrides) -> 
     assert response.status_code == 204
     assert runtime.stopped == [server.id]
     assert repository.deleted is True
+
+
+@pytest.mark.asyncio
+async def test_delete_waits_for_mcp_lifecycle_lock(overrides) -> None:
+    server, repository, runtime = overrides
+    server.runtime_status = "stopped"
+    await runtime._lock.acquire()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        request_task = asyncio.create_task(
+            client.delete(
+                f"/api/mcp/servers/{server.id}",
+                headers=ADMIN_HEADERS,
+            )
+        )
+        await asyncio.sleep(0)
+        assert request_task.done() is False
+
+        runtime._lock.release()
+        response = await request_task
+
+    assert response.status_code == 204
+    assert repository.deleted is True
+    assert runtime.lock_entries == 1

@@ -119,6 +119,13 @@ class FailingProbe(FakeProbe):
         raise RuntimeError("boom")
 
 
+class SecretFailingProbe(FakeProbe):
+    async def start(self, server):
+        raise RuntimeError(
+            "startup failed token=super-secret Authorization: Bearer header-secret"
+        )
+
+
 class FailingListProbe(FakeProbe):
     async def list_tools(self, handle):
         raise RuntimeError("list failed")
@@ -140,6 +147,14 @@ class FailingStopProbe(FakeProbe):
     async def stop(self, handle):
         self.stopped += 1
         raise RuntimeError("stop failed")
+
+
+class SecretFailingStopProbe(FakeProbe):
+    async def stop(self, handle):
+        self.stopped += 1
+        raise RuntimeError(
+            "stop failed token=super-secret Authorization: Bearer header-secret"
+        )
 
 
 class SlowProbe(FakeProbe):
@@ -298,6 +313,43 @@ async def test_start_failure_records_error_status() -> None:
     assert server.last_error == "boom"
     assert server.last_checked_at is not None
     assert repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_start_failure_redacts_secrets_before_storing_error() -> None:
+    server = FakeServer()
+    server.env = {"TOKEN": "super-secret"}
+    server.headers = {"Authorization": "Bearer header-secret"}
+    repository = FakeRepository(server)
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=SecretFailingProbe(),
+    )
+
+    with pytest.raises(RuntimeError):
+        await manager.start(server.id)
+
+    assert "super-secret" not in server.last_error
+    assert "header-secret" not in server.last_error
+    assert "[redacted]" in server.last_error
+
+
+@pytest.mark.asyncio
+async def test_stop_failure_redacts_secrets_before_storing_error() -> None:
+    server = FakeServer()
+    server.env = {"TOKEN": "super-secret"}
+    server.headers = {"Authorization": "Bearer header-secret"}
+    repository = FakeRepository(server)
+    probe = SecretFailingStopProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await manager.start(server.id)
+    with pytest.raises(RuntimeError):
+        await manager.stop(server.id)
+
+    assert "super-secret" not in server.last_error
+    assert "header-secret" not in server.last_error
+    assert "[redacted]" in server.last_error
 
 
 @pytest.mark.asyncio
