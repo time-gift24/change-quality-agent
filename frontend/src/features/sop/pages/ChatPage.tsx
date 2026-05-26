@@ -133,7 +133,10 @@ export function ChatPage({
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex flex-1 flex-col overflow-hidden">
+        <main
+          aria-label="SOP 质检主内容"
+          className="flex flex-1 flex-col overflow-hidden"
+        >
           {observedRunId ? (
             <RunCanvas
               runId={observedRunId}
