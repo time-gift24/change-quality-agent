@@ -1,5 +1,5 @@
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -199,19 +199,30 @@ async def run_agent_test(
             node="start",
         )
         await _commit_if_available(run_repository)
-        result = await runtime.run(
-            version=version,
-            messages=list(run.subject_snapshot.get("messages", [])),
-        )
-        result_messages = to_jsonable(result.messages)
-        raw_graph_output = to_jsonable(result.raw_output)
-        await run_repository.append_event(
-            run_id,
-            event_type="messages",
-            thread_id=run.thread_id,
-            payload={"messages": result_messages},
-            node="agent",
-        )
+        input_messages = list(run.subject_snapshot.get("messages", []))
+        stream = getattr(runtime, "stream", None)
+        if stream is not None:
+            result_messages, raw_graph_output = await _consume_runtime_stream(
+                run_repository,
+                run,
+                stream,
+                version=version,
+                messages=input_messages,
+            )
+        else:
+            result = await runtime.run(
+                version=version,
+                messages=input_messages,
+            )
+            result_messages = to_jsonable(result.messages)
+            raw_graph_output = to_jsonable(result.raw_output)
+            await run_repository.append_event(
+                run_id,
+                event_type="messages",
+                thread_id=run.thread_id,
+                payload={"messages": result_messages},
+                node="agent",
+            )
         await run_repository.append_event(
             run_id,
             event_type="done",
@@ -285,3 +296,66 @@ async def _commit_if_available(repository: RunRepository) -> None:
     result = commit()
     if inspect.isawaitable(result):
         await result
+
+
+async def _consume_runtime_stream(
+    repository: RunRepository,
+    run: Any,
+    stream: Callable[..., Any],
+    *,
+    version: Any,
+    messages: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    result_messages: list[dict[str, Any]] = []
+    raw_events: list[Any] = []
+    events = stream(version=version, messages=messages)
+    if inspect.isawaitable(events):
+        events = await events
+
+    async for event in events:
+        json_event = to_jsonable(event)
+        raw_events.append(json_event)
+        event_parts = _stream_event_parts(json_event)
+        if event_parts is None:
+            continue
+
+        await repository.append_event(
+            run.id,
+            event_type=event_parts["event_type"],
+            thread_id=run.thread_id,
+            payload=event_parts["payload"],
+            node=event_parts["node"],
+            checkpoint_id=event_parts["checkpoint_id"],
+            task_id=event_parts["task_id"],
+        )
+        await _commit_if_available(repository)
+
+        payload = event_parts["payload"]
+        if isinstance(payload.get("messages"), list):
+            result_messages = to_jsonable(payload["messages"])
+
+    return result_messages, {"stream_events": raw_events}
+
+
+def _stream_event_parts(event: Any) -> dict[str, Any] | None:
+    if not isinstance(event, Mapping):
+        return None
+
+    event_type = event.get("type")
+    payload = event.get("payload")
+    if not isinstance(event_type, str) or not isinstance(payload, Mapping):
+        return None
+
+    return {
+        "event_type": event_type,
+        "payload": dict(payload),
+        "node": _optional_str(event.get("node")),
+        "checkpoint_id": _optional_str(event.get("checkpoint_id")),
+        "task_id": _optional_str(event.get("task_id")),
+    }
+
+
+def _optional_str(value: Any) -> str | None:
+    if isinstance(value, str):
+        return value
+    return None

@@ -123,6 +123,32 @@ class FakeRuntime:
         return self.result
 
 
+class FakeStreamingRuntime:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def stream(self, *, version, messages):
+        self.calls.append({"version": version, "messages": messages})
+        yield {
+            "type": "messages",
+            "node": "agent",
+            "payload": {"delta": "alpha"},
+        }
+        yield {
+            "type": "messages",
+            "node": "agent",
+            "payload": {"delta": "beta"},
+        }
+        yield {
+            "type": "messages",
+            "node": "agent",
+            "payload": {
+                "final": True,
+                "messages": [{"role": "assistant", "content": "alphabeta"}],
+            },
+        }
+
+
 @pytest.mark.asyncio
 async def test_run_agent_test_appends_messages_and_marks_success() -> None:
     version = FakeVersion(version_number=7)
@@ -173,6 +199,77 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
         },
     )
     assert run_repository.commits == 2
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_persists_runtime_stream_events() -> None:
+    version = FakeVersion(version_number=7)
+    run = FakeRun(version)
+    run_repository = FakeRunRepository(run)
+    agent_repository = FakeAgentRepository(version)
+    runtime = FakeStreamingRuntime()
+
+    await run_agent_test(
+        run.id,
+        run_repository=run_repository,
+        agent_repository=agent_repository,
+        runtime=runtime,
+    )
+
+    assert runtime.calls == [
+        {
+            "version": version,
+            "messages": [{"role": "user", "content": "Can this deploy?"}],
+        }
+    ]
+    assert [event["event_type"] for event in run_repository.events] == [
+        "custom",
+        "messages",
+        "messages",
+        "messages",
+        "done",
+    ]
+    assert run_repository.events[1]["payload"] == {"delta": "alpha"}
+    assert run_repository.events[2]["payload"] == {"delta": "beta"}
+    assert run_repository.events[3]["payload"] == {
+        "final": True,
+        "messages": [{"role": "assistant", "content": "alphabeta"}],
+    }
+    assert run_repository.terminal == (
+        RunStatus.success,
+        {
+            "structured_result": {
+                "messages": [{"role": "assistant", "content": "alphabeta"}]
+            },
+            "raw_graph_output": {
+                "stream_events": [
+                    {
+                        "type": "messages",
+                        "node": "agent",
+                        "payload": {"delta": "alpha"},
+                    },
+                    {
+                        "type": "messages",
+                        "node": "agent",
+                        "payload": {"delta": "beta"},
+                    },
+                    {
+                        "type": "messages",
+                        "node": "agent",
+                        "payload": {
+                            "final": True,
+                            "messages": [
+                                {"role": "assistant", "content": "alphabeta"}
+                            ],
+                        },
+                    },
+                ]
+            },
+            "result_status": "success",
+        },
+    )
+    assert run.status == RunStatus.success.value
+    assert run_repository.commits == 5
 
 
 @pytest.mark.asyncio
