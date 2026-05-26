@@ -216,20 +216,42 @@ async def test_create_agent_returns_detail_and_commits() -> None:
     repository = FakeAgentRepository()
     session = FakeSession()
     override_dependencies(repository, session)
+    payload = create_payload()
+    provider_id = payload["draft"]["provider_id"]
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.post("/api/agents", json=create_payload())
+        response = await client.post("/api/agents", json=payload)
 
     assert response.status_code == 201
     body = response.json()
     assert body["key"] == "release-reviewer"
     assert body["has_draft"] is True
+    assert body["draft"]["provider_id"] == provider_id
     assert body["draft"]["model_config"] == {"temperature": 0}
     assert body["latest_version"] is None
     assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_create_agent_rejects_stale_model_field() -> None:
+    repository = FakeAgentRepository()
+    session = FakeSession()
+    override_dependencies(repository, session)
+    payload = create_payload()
+    payload["draft"]["model"] = "openai:gpt-5-mini"
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post("/api/agents", json=payload)
+
+    assert response.status_code == 422
+    assert session.commits == 0
+    assert repository.agents == {}
 
 
 @pytest.mark.asyncio

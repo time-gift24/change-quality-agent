@@ -1587,6 +1587,7 @@ components:
             additionalProperties: true
     AgentDraftConfig:
       type: object
+      additionalProperties: false
       required:
       - system_prompt
       - provider_id
@@ -1600,12 +1601,15 @@ components:
         model_config:
           type: object
           additionalProperties: true
+          default: {}
         tool_allowlist:
           type: array
+          default: []
           items:
             type: string
         mcp_server_ids:
           type: array
+          default: []
           items:
             type: string
     AgentCreate:
