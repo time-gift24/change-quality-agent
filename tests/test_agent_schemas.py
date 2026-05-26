@@ -84,9 +84,9 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
     class AgentVersionRecord:
         id = uuid4()
         agent_id = uuid4()
+        provider_id = uuid4()
         version_number = 3
         system_prompt = "You are careful."
-        model = "openai:gpt-5-mini"
         model_config = {"temperature": 0}
         tool_allowlist = ["search_sop"]
         mcp_server_ids = ["change-docs"]
@@ -97,6 +97,8 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
     payload = detail.model_dump(mode="json")
 
     assert detail.model_parameters == {"temperature": 0}
+    assert payload["provider_id"] == str(AgentVersionRecord.provider_id)
+    assert "model" not in payload
     assert payload["model_config"] == {"temperature": 0}
     assert "model_parameters" not in payload
 
