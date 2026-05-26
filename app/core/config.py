@@ -31,6 +31,8 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/"
         "change_quality_agent"
     )
+    log_level: str = "INFO"
+    access_log_enabled: bool = True
     environments: list[EnvironmentConfig] = Field(
         default_factory=lambda: [
             EnvironmentConfig(
