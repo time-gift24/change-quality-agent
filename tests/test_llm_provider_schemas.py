@@ -51,6 +51,23 @@ def test_llm_provider_update_metadata_exclude_unset_semantics():
     ] == {}
 
 
+@pytest.mark.parametrize("field_name", ["name", "api_key", "metadata", "is_active"])
+def test_llm_provider_update_rejects_explicit_null_for_non_nullable_fields(
+    field_name,
+):
+    with pytest.raises(ValidationError) as exc_info:
+        LlmProviderUpdate(**{field_name: None})
+
+    assert exc_info.value.errors()[0]["loc"] == (field_name,)
+
+
+@pytest.mark.parametrize("field_name", ["provider", "base_url", "model"])
+def test_llm_provider_update_allows_explicit_null_for_nullable_fields(field_name):
+    payload = LlmProviderUpdate(**{field_name: None})
+
+    assert payload.model_dump(exclude_unset=True) == {field_name: None}
+
+
 @pytest.mark.parametrize(
     ("schema_cls", "field_name", "payload"),
     [

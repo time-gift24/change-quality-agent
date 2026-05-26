@@ -251,8 +251,12 @@ def test_llm_provider_schemas_do_not_expose_secrets() -> None:
     )
     assert "api_key" in schemas["LlmProviderCreate"]["properties"]
     assert "api_key" in schemas["LlmProviderUpdate"]["properties"]
-    update_metadata = schemas["LlmProviderUpdate"]["properties"]["metadata"]
-    assert "default" not in update_metadata
+    update_properties = schemas["LlmProviderUpdate"]["properties"]
+    for field_name in ["name", "api_key", "metadata", "is_active"]:
+        assert update_properties[field_name].get("nullable") is not True
+        assert "default" not in update_properties[field_name]
+    for field_name in ["provider", "base_url", "model"]:
+        assert update_properties[field_name]["nullable"] is True
 
     detail_schema = schemas["LlmProviderDetail"]
     assert {

@@ -19,13 +19,13 @@ class LlmProviderCreate(BaseModel):
 class LlmProviderUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    name: str | None = Field(default=None, min_length=1)
+    name: str = Field(default=None, min_length=1)
     provider: str | None = Field(default=None, min_length=1)
     base_url: str | None = Field(default=None, min_length=1)
-    api_key: str | None = Field(default=None, min_length=1)
+    api_key: str = Field(default=None, min_length=1)
     model: str | None = Field(default=None, min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    is_active: bool | None = None
+    is_active: bool = None
 
 
 class LlmProviderDetail(BaseModel):

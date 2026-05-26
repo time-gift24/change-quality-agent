@@ -1521,7 +1521,6 @@ components:
           additionalProperties: true
         is_active:
           type: boolean
-          nullable: true
     LlmProviderDetail:
       type: object
       required:

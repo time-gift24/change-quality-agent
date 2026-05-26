@@ -372,6 +372,34 @@ async def test_admin_patch_llm_provider_with_api_key_updates_secret_fields() -> 
     assert repository.commits == 1
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [{"name": None}, {"api_key": None}, {"is_active": None}],
+)
+@pytest.mark.asyncio
+async def test_admin_patch_llm_provider_rejects_explicit_null_before_repository_update(
+    payload,
+) -> None:
+    provider = FakeProviderCredential()
+    repository = FakeProviderCredentialRepository(providers=[provider])
+    override_repository(repository)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            f"/api/admin/llm-providers/{provider.id}",
+            json=payload,
+            headers=admin_headers(),
+        )
+
+    assert response.status_code == 422
+    assert repository.updated_provider_id is None
+    assert repository.updated_kwargs is None
+    assert repository.commits == 0
+
+
 @pytest.mark.asyncio
 async def test_admin_delete_llm_provider_soft_deletes_and_returns_no_content() -> None:
     provider = FakeProviderCredential()
