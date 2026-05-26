@@ -41,3 +41,16 @@ def test_provider_credentials_migration_exists() -> None:
     assert (
         'down_revision: str | Sequence[str] | None = "20260526_0003"' in migration
     )
+    assert "ck_provider_credentials_scope_owner" in migration
+    assert "ck_provider_credentials_type" in migration
+    assert "ck_provider_credentials_scope" in migration
+    assert "uq_provider_credentials_user_active_name" in migration
+    assert "uq_provider_credentials_global_active_name" in migration
+    assert "ix_provider_credentials_lookup" in migration
+    assert '''server_default=sa.text("'{}'::jsonb")''' in migration
+    assert 'server_default=sa.text("true")' in migration
+    assert '''postgresql_where=sa.text("scope = 'user' AND is_active")''' in migration
+    assert (
+        '''postgresql_where=sa.text("scope = 'global' AND is_active")'''
+        in migration
+    )

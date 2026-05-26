@@ -28,14 +28,14 @@ class ProviderCredential(Base):
         ),
         CheckConstraint(
             "credential_type IN ('llm_provider', 'api_key')",
-            name="ck_provider_credentials_credential_type",
+            name="ck_provider_credentials_type",
         ),
         CheckConstraint(
             "scope IN ('user', 'global')",
             name="ck_provider_credentials_scope",
         ),
         Index(
-            "uq_provider_credentials_user_name_active",
+            "uq_provider_credentials_user_active_name",
             "credential_type",
             "owner_user_id",
             "name",
@@ -43,7 +43,7 @@ class ProviderCredential(Base):
             postgresql_where=text("scope = 'user' AND is_active"),
         ),
         Index(
-            "uq_provider_credentials_global_name_active",
+            "uq_provider_credentials_global_active_name",
             "credential_type",
             "name",
             unique=True,

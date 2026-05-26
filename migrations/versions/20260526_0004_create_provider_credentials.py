@@ -64,7 +64,7 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "credential_type IN ('llm_provider', 'api_key')",
-            name="ck_provider_credentials_credential_type",
+            name="ck_provider_credentials_type",
         ),
         sa.CheckConstraint(
             "scope IN ('user', 'global')",
@@ -73,14 +73,14 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
-        "uq_provider_credentials_user_name_active",
+        "uq_provider_credentials_user_active_name",
         "provider_credentials",
         ["credential_type", "owner_user_id", "name"],
         unique=True,
         postgresql_where=sa.text("scope = 'user' AND is_active"),
     )
     op.create_index(
-        "uq_provider_credentials_global_name_active",
+        "uq_provider_credentials_global_active_name",
         "provider_credentials",
         ["credential_type", "name"],
         unique=True,
@@ -96,11 +96,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_provider_credentials_lookup", table_name="provider_credentials")
     op.drop_index(
-        "uq_provider_credentials_global_name_active",
+        "uq_provider_credentials_global_active_name",
         table_name="provider_credentials",
     )
     op.drop_index(
-        "uq_provider_credentials_user_name_active",
+        "uq_provider_credentials_user_active_name",
         table_name="provider_credentials",
     )
     op.drop_table("provider_credentials")
