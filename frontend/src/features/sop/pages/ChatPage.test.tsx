@@ -46,6 +46,25 @@ describe("ChatPage", () => {
     expect(screen.getByTestId("environment-select-chevron"))
       .toBeInTheDocument();
   });
+
+  it("places the recent history chevron on the right side", async () => {
+    vi.stubGlobal("fetch", fetchByRequest());
+
+    render(<ChatPage />);
+
+    const button = await screen.findByRole("button", {
+      name: "切换最近质检SOP",
+    });
+    const label = screen.getByText("最近质检SOP");
+    const chevron = button.querySelector("svg");
+
+    expect(button.className).toContain("justify-between");
+    expect(chevron).not.toBeNull();
+    expect(
+      label.compareDocumentPosition(chevron!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 });
 
 function fetchByRequest() {

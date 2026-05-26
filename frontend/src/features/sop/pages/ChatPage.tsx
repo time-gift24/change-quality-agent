@@ -229,12 +229,12 @@ function Sidebar({
             <button
               aria-expanded={recentOpen}
               aria-label="切换最近质检SOP"
-              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-mute transition-colors hover:text-body"
+              className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-mute transition-colors hover:text-body"
               onClick={() => setRecentOpen((value) => !value)}
               type="button"
             >
-              <ChevronIcon open={recentOpen} />
               <span>最近质检SOP</span>
+              <ChevronIcon open={recentOpen} />
             </button>
           </div>
 
