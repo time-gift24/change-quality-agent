@@ -39,7 +39,7 @@ function renderCreateDrawer(overrides: Partial<React.ComponentProps<typeof McpSe
   const onUpdate = vi.fn().mockResolvedValue(undefined);
 
   render(
-    <MemoryRouter initialEntries={["/mcp/new"]}>
+    <MemoryRouter initialEntries={["/mcp?action=create"]}>
       <McpServerFormDrawer
         mode="create"
         onClose={onClose}
@@ -131,7 +131,7 @@ describe("McpServerFormDrawer", () => {
     const onCreate = vi.fn().mockResolvedValue({ id: "new-srv" });
 
     render(
-      <MemoryRouter initialEntries={["/mcp/new"]}>
+      <MemoryRouter initialEntries={["/mcp?action=create"]}>
         <McpServerFormDrawer
           mode="create"
           onClose={onClose}

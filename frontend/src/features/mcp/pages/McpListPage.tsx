@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Outlet, useMatch, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { McpServerRuntimeStatus } from "../types";
 
 import { WorkspaceSidebar } from "../../../app/WorkspaceSidebar";
@@ -20,7 +20,8 @@ export function McpListPage() {
   const [adminTokenSaved, setAdminTokenSaved] = useState(false);
   const navigate = useNavigate();
 
-  const isCreateDrawerOpen = useMatch("/mcp/new") !== null;
+  const [searchParams] = useSearchParams();
+  const isCreateDrawerOpen = searchParams.get("action") === "create";
 
   const mutations = useMcpMutations();
 
@@ -108,7 +109,7 @@ export function McpListPage() {
               <McpServerTable
                 error={serversState.error}
                 loading={serversState.loading}
-                onCreateServer={() => navigate("/mcp/new")}
+                onCreateServer={() => navigate("/mcp?action=create")}
                 onDeleteServer={(id) => {
                   if (window.confirm(`确认删除 ${getServerName(id)}？`)) {
                     void runMutation(() => mutations.deleteServer(id));
@@ -148,8 +149,6 @@ export function McpListPage() {
         pending={mutations.pending}
         server={null}
       />
-
-      <Outlet />
     </div>
   );
 }

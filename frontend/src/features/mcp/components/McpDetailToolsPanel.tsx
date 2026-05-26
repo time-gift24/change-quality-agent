@@ -11,9 +11,9 @@ function ToolRow({ tool }: { tool: McpServerTool }) {
   return (
     <>
       <tr className="border-b border-hairline last:border-0">
-        <td className="w-[240px] px-3 py-2 font-mono text-xs text-ink">{tool.name}</td>
-        <td className="px-3 py-2 text-xs text-body">{tool.description ?? "无描述"}</td>
-        <td className="w-[120px] px-3 py-2">
+        <td className="w-[280px] px-4 py-2.5 font-mono text-xs text-ink">{tool.name}</td>
+        <td className="px-4 py-2.5 text-xs text-body">{tool.description ?? "无描述"}</td>
+        <td className="w-[110px] shrink-0 px-4 py-2.5 text-right">
           <button
             className="text-2xs text-mute transition-colors hover:text-ink"
             onClick={() => setExpanded((v) => !v)}
@@ -25,7 +25,7 @@ function ToolRow({ tool }: { tool: McpServerTool }) {
       </tr>
       {expanded ? (
         <tr>
-          <td className="px-3 pb-2" colSpan={3}>
+          <td className="px-4 pb-3" colSpan={3}>
             <pre className="overflow-x-auto rounded-md border border-hairline bg-canvas-soft px-3 py-2 font-mono text-2xs text-body">
               {JSON.stringify(tool.input_schema, null, 2)}
             </pre>
@@ -50,13 +50,13 @@ export function McpDetailToolsPanel({ tools }: McpDetailToolsPanelProps) {
       <table className="w-full">
         <thead>
           <tr className="border-b border-hairline bg-canvas-soft">
-            <th className="h-10 w-[240px] px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            <th className="h-10 px-4 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
               工具名
             </th>
-            <th className="h-10 px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            <th className="h-10 px-4 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
               描述
             </th>
-            <th className="h-10 w-[120px] px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            <th className="h-10 w-[110px] shrink-0 px-4 text-right text-2xs font-medium uppercase tracking-wide text-mute font-mono">
               Schema
             </th>
           </tr>

@@ -14,9 +14,7 @@ export function App() {
           <Route element={<Navigate replace to="/sop" />} index />
           <Route element={<ChatPage />} path="sop" />
           <Route element={<ProtectedRoute />}>
-            <Route element={<McpListPage />} path="mcp">
-              <Route element={null} path="new" />
-            </Route>
+            <Route element={<McpListPage />} path="mcp" />
             <Route element={<McpDetailPage />} path="mcp/:serverId">
               <Route element={null} path="edit" />
             </Route>

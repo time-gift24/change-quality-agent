@@ -42,11 +42,11 @@ export function McpStatusBadge({ status }: McpStatusBadgeProps) {
 
   return (
     <span
-      className={`inline-flex h-5 items-center gap-1 rounded-full px-2 text-2xs ${style.pill} ${style.text}`}
+      className={`inline-flex h-4 items-center gap-1 rounded-full px-1.5 text-2xs font-medium ${style.pill} ${style.text}`}
     >
       <span
         aria-hidden="true"
-        className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${style.dot}`}
+        className={`inline-block h-1 w-1 shrink-0 rounded-full ${style.dot}`}
         data-status={status}
         data-testid="status-dot"
       />
