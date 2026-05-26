@@ -1519,7 +1519,6 @@ components:
         metadata:
           type: object
           additionalProperties: true
-          default: {}
         is_active:
           type: boolean
           nullable: true
@@ -1528,7 +1527,10 @@ components:
       required:
       - id
       - name
+      - provider
+      - base_url
       - api_key_hint
+      - model
       - metadata
       - is_active
       - created_at

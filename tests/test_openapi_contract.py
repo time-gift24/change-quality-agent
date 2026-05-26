@@ -166,6 +166,7 @@ def test_agent_test_runs_response_reuses_run_start_response() -> None:
 def test_llm_provider_paths_are_documented() -> None:
     contract = load_contract()
     paths = contract["paths"]
+    admin_security = [{"FakeUserHeaders": [], "FakeUserRole": []}]
 
     expected_operations = {
         ("/api/llm-providers", "get"): {"200", "401", "422"},
@@ -220,12 +221,14 @@ def test_llm_provider_paths_are_documented() -> None:
     assert paths["/api/llm-providers/{provider_id}"]["patch"]["parameters"] == [
         {"$ref": "#/components/parameters/ProviderId"}
     ]
-    assert paths["/api/admin/llm-providers"]["post"]["security"] == [
-        {"FakeUserHeaders": [], "FakeUserRole": []}
-    ]
     assert paths["/api/admin/llm-providers/{provider_id}"]["delete"][
         "parameters"
     ] == [{"$ref": "#/components/parameters/ProviderId"}]
+    for path, methods in paths.items():
+        if not path.startswith("/api/admin/llm-providers"):
+            continue
+        for operation in methods.values():
+            assert operation["security"] == admin_security
 
     security_schemes = contract["components"]["securitySchemes"]
     assert security_schemes["FakeUserHeaders"] == {
@@ -248,8 +251,24 @@ def test_llm_provider_schemas_do_not_expose_secrets() -> None:
     )
     assert "api_key" in schemas["LlmProviderCreate"]["properties"]
     assert "api_key" in schemas["LlmProviderUpdate"]["properties"]
+    update_metadata = schemas["LlmProviderUpdate"]["properties"]["metadata"]
+    assert "default" not in update_metadata
 
-    detail_properties = schemas["LlmProviderDetail"]["properties"]
+    detail_schema = schemas["LlmProviderDetail"]
+    assert {
+        "id",
+        "name",
+        "provider",
+        "base_url",
+        "api_key_hint",
+        "model",
+        "metadata",
+        "is_active",
+        "created_at",
+        "updated_at",
+    } <= set(detail_schema["required"])
+
+    detail_properties = detail_schema["properties"]
     assert "api_key_hint" in detail_properties
     assert "api_key" not in detail_properties
     assert "api_key_ciphertext" not in detail_properties
