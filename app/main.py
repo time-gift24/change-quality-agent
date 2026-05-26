@@ -4,8 +4,12 @@ from fastapi import FastAPI
 
 from app.api.deps import get_mcp_runtime_manager
 from app.api.v1 import agents, mcp, runs, sop
+from app.core.config import settings
 from app.core.database import async_session
+from app.core.logging import configure_logging
 from app.repositories.runs import RunRepository
+
+configure_logging(settings)
 
 
 async def interrupt_leftover_runs() -> None:
