@@ -1,9 +1,20 @@
-import re
+import ast
 from pathlib import Path
 
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations" / "versions"
-REVISION_RE = re.compile(r'^revision: str = "([^"]+)"$', re.MULTILINE)
+
+
+def _read_revision_id(path: Path) -> str | None:
+    module = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in module.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.target.id == "revision" and isinstance(node.value, ast.Constant):
+                return node.value.value if isinstance(node.value.value, str) else None
+        if isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "revision" for target in node.targets):
+                return node.value.value if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) else None
+    return None
 
 
 def test_alembic_revision_ids_are_unique() -> None:
@@ -11,9 +22,8 @@ def test_alembic_revision_ids_are_unique() -> None:
     duplicates: list[str] = []
 
     for path in MIGRATIONS_DIR.glob("*.py"):
-        match = REVISION_RE.search(path.read_text(encoding="utf-8"))
-        assert match is not None, f"{path.name} does not define revision"
-        revision = match.group(1)
+        revision = _read_revision_id(path)
+        assert revision is not None, f"{path.name} does not define revision"
         if revision in revisions:
             duplicates.append(revision)
         revisions[revision] = path
