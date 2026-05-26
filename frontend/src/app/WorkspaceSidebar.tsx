@@ -1,4 +1,11 @@
 import type { ReactNode } from "react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+} from "../components/ui/sidebar";
 
 type WorkspaceSidebarProps = {
   open: boolean;
@@ -35,13 +42,13 @@ export function WorkspaceSidebar({
   }
 
   return (
-    <aside
+    <Sidebar
       aria-label="工作台侧边栏"
       className={`flex shrink-0 flex-col border-r border-hairline bg-canvas/60 backdrop-blur-sm transition-[width] duration-200 ${
         open ? "w-64" : "w-14"
       }`}
     >
-      <div className="flex h-14 shrink-0 items-center gap-2 px-3">
+      <SidebarHeader>
         <button
           aria-label={open ? "收起侧边栏" : "展开侧边栏"}
           className="flex h-9 w-9 items-center justify-center rounded-full text-mute transition-colors hover:bg-canvas-soft hover:text-ink"
@@ -55,9 +62,9 @@ export function WorkspaceSidebar({
             质量检查
           </span>
         ) : null}
-      </div>
+      </SidebarHeader>
 
-      <nav aria-label="工作台导航" className="flex flex-col gap-1 px-2 pt-2">
+      <SidebarMenu aria-label="工作台导航">
         <SidebarNavButton
           active={activeKey === "sop"}
           aria-label="发起新SOP质检"
@@ -74,14 +81,14 @@ export function WorkspaceSidebar({
           onClick={handleMcpClick}
           open={open}
         />
-      </nav>
+      </SidebarMenu>
 
       {open ? (
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+        <SidebarContent>{children}</SidebarContent>
       ) : (
         <div className="flex-1" />
       )}
-    </aside>
+    </Sidebar>
   );
 }
 
@@ -102,21 +109,13 @@ function SidebarNavButton({
   open,
   "aria-label": ariaLabel,
 }: SidebarNavButtonProps) {
-  const base =
-    "flex h-9 items-center gap-2 rounded-xl text-xs font-medium transition-colors";
-  const sizing = open ? "w-full px-2" : "w-10 justify-center px-0";
-  const visual = active
-    ? "bg-canvas text-ink shadow-sm ring-1 ring-primary/30"
-    : "text-body hover:bg-canvas-soft hover:text-ink";
-
   return (
-    <button
-      aria-current={active ? "page" : undefined}
+    <SidebarMenuButton
       aria-label={ariaLabel}
-      className={`${base} ${sizing} ${visual}`}
+      isActive={active}
       onClick={onClick}
+      open={open}
       title={open ? undefined : label}
-      type="button"
     >
       <span
         aria-hidden="true"
@@ -125,7 +124,7 @@ function SidebarNavButton({
         {icon}
       </span>
       {open ? <span className="truncate">{label}</span> : null}
-    </button>
+    </SidebarMenuButton>
   );
 }
 

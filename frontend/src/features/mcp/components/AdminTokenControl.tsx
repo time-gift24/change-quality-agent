@@ -1,3 +1,5 @@
+import { Button } from "../../../components/ui/button";
+
 type AdminTokenControlProps = {
   value: string;
   saved: boolean;
@@ -23,13 +25,9 @@ export function AdminTokenControl({
         type="password"
         value={value}
       />
-      <button
-        className="h-9 shrink-0 rounded-xl border border-hairline bg-canvas px-3 text-xs font-medium text-body transition-colors hover:border-hairline-strong hover:text-ink"
-        onClick={onSave}
-        type="button"
-      >
+      <Button onClick={onSave} variant="secondary">
         保存 Token
-      </button>
+      </Button>
       {saved ? (
         <span className="text-2xs text-mute" role="status">
           已保存

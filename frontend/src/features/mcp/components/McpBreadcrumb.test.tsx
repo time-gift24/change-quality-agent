@@ -28,6 +28,24 @@ describe("McpBreadcrumb", () => {
     expect(screen.getByText("Alpha Server")).toHaveAttribute("aria-current", "page");
   });
 
+  it("renders custom breadcrumb segments for page actions", () => {
+    render(
+      <MemoryRouter>
+        <McpBreadcrumb
+          items={[
+            { label: "MCP 管理", to: "/mcp" },
+            { label: "Alpha Server", to: "/mcp/srv-1" },
+            { label: "编辑" },
+          ]}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "MCP 管理" })).toHaveAttribute("href", "/mcp");
+    expect(screen.getByRole("link", { name: "Alpha Server" })).toHaveAttribute("href", "/mcp/srv-1");
+    expect(screen.getByText("编辑")).toHaveAttribute("aria-current", "page");
+  });
+
   it("truncates long server names", () => {
     render(
       <MemoryRouter>

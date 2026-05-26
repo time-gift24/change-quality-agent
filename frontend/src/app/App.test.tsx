@@ -10,6 +10,19 @@ vi.mock("../features/sop/pages/ChatPage", () => ({
   ChatPage: () => <div>SOP 质检</div>,
 }));
 
+vi.mock("../features/sop/hooks", () => ({
+  useRecentSopRuns: () => ({
+    data: [],
+    error: null,
+    loading: false,
+  }),
+  useSopEnvironments: () => ({
+    data: [],
+    error: null,
+    loading: false,
+  }),
+}));
+
 vi.mock("../features/mcp/pages/McpListPage", () => ({
   McpListPage: () => (
     <div role="region" aria-label="MCP 管理 mock">
@@ -32,6 +45,6 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText(/质量检查|SOP/i)).toBeInTheDocument();
+    expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
   });
 });

@@ -9,10 +9,8 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
 
 import { App } from "../../../app/App";
-import { ChatPage } from "./ChatPage";
 
 vi.mock("../../../app/routing/useAuthz", () => ({
   useAuthz: () => ({ isAdmin: true }),
@@ -26,12 +24,9 @@ vi.mock("../../mcp/pages/McpPage", () => ({
   ),
 }));
 
-function renderChatPage() {
-  return render(
-    <MemoryRouter>
-      <ChatPage />
-    </MemoryRouter>,
-  );
+function renderAppAt(path = "/sop") {
+  window.history.pushState({}, "", path);
+  return render(<App />);
 }
 
 afterEach(() => {
@@ -41,8 +36,8 @@ afterEach(() => {
 
 describe("ChatPage", () => {
   it("renders chat page on /sop", async () => {
-    window.history.pushState({}, "", "/sop");
-    render(<App />);
+    vi.stubGlobal("fetch", fetchByRequest());
+    renderAppAt();
     expect(
       await screen.findByRole("form", { name: "SOP 运行表单" }),
     ).toBeInTheDocument();
@@ -51,7 +46,7 @@ describe("ChatPage", () => {
   it("loads seeded mock history without pre-filling the SOP input", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     expect(await screen.findByPlaceholderText("输入 SOP ID")).toHaveValue("");
     expect(
@@ -62,7 +57,7 @@ describe("ChatPage", () => {
   it("uses a concise SOP ID placeholder", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     expect(await screen.findByPlaceholderText("输入 SOP ID")).toBeInTheDocument();
     expect(
@@ -73,7 +68,7 @@ describe("ChatPage", () => {
   it("renders the environment select as a polished native control", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     const select = await screen.findByLabelText("环境");
 
@@ -86,7 +81,7 @@ describe("ChatPage", () => {
   it("places the recent history chevron on the right side", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     const button = await screen.findByRole("button", {
       name: "切换最近质检SOP",
@@ -105,7 +100,7 @@ describe("ChatPage", () => {
   it("shows the MCP 管理 entry inside the same sidebar as 发起新SOP质检", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     const sidebar = await screen.findByRole("complementary", {
       name: "工作台侧边栏",
@@ -125,7 +120,7 @@ describe("ChatPage", () => {
   it("collapses and expands the sidebar while keeping both nav entries visible", async () => {
     vi.stubGlobal("fetch", fetchByRequest());
 
-    renderChatPage();
+    renderAppAt();
 
     const collapse = await screen.findByRole("button", {
       name: "收起侧边栏",
@@ -150,8 +145,8 @@ describe("ChatPage", () => {
   });
 
   it("navigates to /mcp when MCP 管理 is clicked in the sidebar", async () => {
-    window.history.pushState({}, "", "/sop");
-    render(<App />);
+    vi.stubGlobal("fetch", fetchByRequest());
+    renderAppAt();
 
     const sidebar = await screen.findByRole("complementary", {
       name: "工作台侧边栏",
@@ -192,6 +187,10 @@ function fetchByRequest() {
     }
 
     if (url.startsWith("/api/sop/") && url.endsWith("/runs?env=dev")) {
+      return Promise.resolve(jsonResponse([]));
+    }
+
+    if (url === "/api/mcp/servers") {
       return Promise.resolve(jsonResponse([]));
     }
 

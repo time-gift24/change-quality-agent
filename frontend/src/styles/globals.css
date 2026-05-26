@@ -4,19 +4,19 @@
 
 @theme {
   --color-canvas: #ffffff;
-  --color-canvas-soft: #f5f7fb;
-  --color-canvas-soft-2: #eef2f9;
-  --color-ink: #0f172a;
+  --color-canvas-soft: #eeece7;
+  --color-canvas-soft-2: #f2f2f2;
+  --color-ink: #212121;
   --color-on-primary: #ffffff;
-  --color-body: #475569;
-  --color-mute: #94a3b8;
-  --color-hairline: #e5e9f0;
-  --color-hairline-strong: #c7d0de;
-  --color-primary: #3673dc;
-  --color-primary-soft: #e8f0fc;
-  --color-primary-deep: #1d5bbd;
-  --color-link: #3673dc;
-  --color-link-deep: #1d5bbd;
+  --color-body: #616161;
+  --color-mute: #93939f;
+  --color-hairline: #d9d9dd;
+  --color-hairline-strong: #75758a;
+  --color-primary: #17171c;
+  --color-primary-soft: #edfce9;
+  --color-primary-deep: #003c33;
+  --color-link: #003c33;
+  --color-link-deep: #071829;
   --color-error: #ef4444;
   --color-error-soft: #fde2e2;
   --color-error-deep: #b91c1c;
@@ -72,9 +72,9 @@ select {
 
 .bg-aurora {
   background:
-    radial-gradient(60% 40% at 70% 20%, rgba(54, 115, 220, 0.18) 0%, transparent 70%),
-    radial-gradient(50% 50% at 20% 80%, rgba(54, 115, 220, 0.10) 0%, transparent 70%),
-    linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+    radial-gradient(60% 40% at 72% 18%, rgba(0, 60, 51, 0.12) 0%, transparent 70%),
+    radial-gradient(50% 50% at 18% 82%, rgba(238, 236, 231, 0.86) 0%, transparent 70%),
+    linear-gradient(180deg, #ffffff 0%, #eeece7 100%);
 }
 
 [data-testid="stream-markdown"] {

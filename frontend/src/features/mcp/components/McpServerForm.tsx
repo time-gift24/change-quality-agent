@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { Button } from "../../../components/ui/button";
+import { Select } from "../../../components/ui/select";
 import type {
   McpDesiredState,
   McpServerCreate,
@@ -15,32 +17,30 @@ import type {
   McpTransport,
 } from "../types";
 
-type McpServerFormDrawerProps = {
-  open: boolean;
-  mode: "create" | "edit";
+type McpServerFormMode = "create" | "edit" | "view";
+
+type McpServerFormProps = {
+  mode: McpServerFormMode;
   server: McpServerDetail | null;
-  pending: boolean;
-  onClose: () => void;
-  onCreate: (payload: McpServerCreate) => Promise<void>;
-  onUpdate: (serverId: string, payload: McpServerUpdate) => Promise<void>;
+  pending?: boolean;
+  onCancel?: () => void;
+  onCreate?: (payload: McpServerCreate) => Promise<void>;
+  onUpdate?: (serverId: string, payload: McpServerUpdate) => Promise<void>;
 };
 
 const DEFAULT_TRANSPORT: McpTransport = "stdio";
 const DEFAULT_DESIRED_STATE: McpDesiredState = "stopped";
 const DEFAULT_ENABLED = false;
 const REDACTED_VALUE = "********";
-const FOCUSABLE_SELECTOR =
-  "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])";
 
-export function McpServerFormDrawer({
-  open,
+export function McpServerForm({
   mode,
   server,
-  pending,
-  onClose,
+  pending = false,
+  onCancel,
   onCreate,
   onUpdate,
-}: McpServerFormDrawerProps) {
+}: McpServerFormProps) {
   const [name, setName] = useState("");
   const [transport, setTransport] = useState<McpTransport>(DEFAULT_TRANSPORT);
   const [command, setCommand] = useState("");
@@ -51,11 +51,11 @@ export function McpServerFormDrawer({
   const [enabled, setEnabled] = useState(DEFAULT_ENABLED);
   const [desiredState, setDesiredState] = useState<McpDesiredState>(DEFAULT_DESIRED_STATE);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const drawerRef = useRef<HTMLDivElement | null>(null);
+
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const commandInputRef = useRef<HTMLInputElement | null>(null);
   const urlInputRef = useRef<HTMLInputElement | null>(null);
-  const titleId = useId();
+  const formId = useId();
   const nameErrorId = useId();
   const commandErrorId = useId();
   const urlErrorId = useId();
@@ -63,13 +63,13 @@ export function McpServerFormDrawer({
   const headersErrorId = useId();
   const globalErrorId = useId();
 
-  // Initialize / reset form state
-  useEffect(() => {
-    if (!open) return;
+  const readOnly = mode === "view";
+  const canSubmit = mode !== "view";
 
+  useEffect(() => {
     setFieldErrors({});
 
-    if (mode === "edit" && server) {
+    if ((mode === "edit" || mode === "view") && server) {
       setName(server.name);
       setTransport(server.transport);
       setCommand(server.command ?? "");
@@ -91,63 +91,13 @@ export function McpServerFormDrawer({
     setHeadersText("");
     setEnabled(DEFAULT_ENABLED);
     setDesiredState(DEFAULT_DESIRED_STATE);
-  }, [mode, open, server]);
+  }, [mode, server]);
 
-  // Auto-focus first input
   useEffect(() => {
-    if (!open) return;
-    nameInputRef.current?.focus();
-  }, [open]);
-
-  // Focus trap
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const drawerElement = drawerRef.current;
-      if (!drawerElement) return;
-
-      const focusableElements = Array.from(
-        drawerElement.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      );
-
-      if (focusableElements.length === 0) return;
-
-      const first = focusableElements[0];
-      const last = focusableElements[focusableElements.length - 1];
-      const active = document.activeElement as HTMLElement | null;
-
-      if (!active || !drawerElement.contains(active)) {
-        event.preventDefault();
-        (event.shiftKey ? last : first)?.focus();
-        return;
-      }
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last?.focus();
-        return;
-      }
-
-      if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, open]);
-
-  if (!open) return null;
+    if (mode === "create") {
+      nameInputRef.current?.focus();
+    }
+  }, [mode]);
 
   function validateForm(): boolean {
     if (!name.trim()) {
@@ -194,7 +144,7 @@ export function McpServerFormDrawer({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!validateForm()) return;
+    if (readOnly || !validateForm()) return;
 
     const parsedEnv = parseKeyValueText("env", envText);
     const parsedHeaders = parseKeyValueText("headers", headersText);
@@ -218,11 +168,10 @@ export function McpServerFormDrawer({
         payload.url = url.trim() || null;
       }
 
-      await onCreate(payload);
+      await onCreate?.(payload);
       return;
     }
 
-    // Edit mode
     if (!server) return;
 
     if (
@@ -258,7 +207,7 @@ export function McpServerFormDrawer({
       payload.command = null;
     }
 
-    await onUpdate(server.id, payload);
+    await onUpdate?.(server.id, payload);
   }
 
   function clearFieldError(field: string) {
@@ -276,68 +225,45 @@ export function McpServerFormDrawer({
   const hasEnvError = !!fieldErrors.env;
   const hasHeadersError = !!fieldErrors.headers;
   const hasGlobalError = !!fieldErrors._global;
+  const inputClass =
+    "h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20";
+  const textAreaClass =
+    "min-h-[72px] w-full rounded-lg border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20 resize-y";
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-ink/25">
-      <div
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className="flex h-full w-full flex-col border-l border-hairline bg-canvas shadow-xl sm:w-[420px]"
-        ref={drawerRef}
-        role="dialog"
+    <section className="rounded-xl border border-hairline bg-canvas">
+      <form
+        className="px-4 py-4"
+        id={formId}
+        noValidate
+        onSubmit={(event) => { void handleSubmit(event); }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-          <div>
-            <h2 className="text-sm font-semibold text-ink" id={titleId}>
-              {mode === "create" ? "新增 MCP 服务" : "编辑 MCP 服务"}
-            </h2>
-            <p className="text-2xs text-mute font-mono">
-              {mode === "create" ? "NEW SERVER" : `EDIT · ${server?.id ?? "..."}`}
-            </p>
-          </div>
-          <button
-            className="rounded-lg px-2 py-1 text-sm text-mute transition-colors hover:bg-canvas-soft hover:text-ink"
-            onClick={onClose}
-            type="button"
+        {hasGlobalError ? (
+          <p
+            className="mb-3 rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep"
+            id={globalErrorId}
+            role="alert"
           >
-            关闭
-          </button>
-        </div>
+            {fieldErrors._global}
+          </p>
+        ) : null}
 
-        {/* Body */}
-        <form
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
-          id="mcp-drawer-form"
-          noValidate
-          onSubmit={(event) => { void handleSubmit(event); }}
-        >
-          {/* Global error */}
-          {hasGlobalError ? (
-            <p
-              className="mb-3 rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep"
-              id={globalErrorId}
-              role="alert"
-            >
-              {fieldErrors._global}
-            </p>
-          ) : null}
+        <SectionHeader>基本信息</SectionHeader>
 
-          {/* Section: 基本信息 */}
-          <SectionHeader>基本信息</SectionHeader>
-
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
           <div className="space-y-1">
             <label className="text-xs font-medium text-ink" htmlFor="mcp-form-name">
-              服务名称 <span className="text-error">*</span>
+              服务名称 {canSubmit ? <span className="text-error">*</span> : null}
             </label>
             <input
               aria-describedby={hasNameError ? nameErrorId : undefined}
               aria-invalid={hasNameError}
-              className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-error aria-invalid:ring-error/20"
+              className={inputClass}
               id="mcp-form-name"
               onChange={(e) => { setName(e.target.value); clearFieldError("name"); }}
+              readOnly={readOnly}
               ref={nameInputRef}
-              required
+              required={canSubmit}
               value={name}
             />
             {hasNameError ? (
@@ -347,85 +273,90 @@ export function McpServerFormDrawer({
             ) : null}
           </div>
 
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <label className="text-xs font-medium text-ink" htmlFor="mcp-form-transport">
               传输方式
             </label>
-            <select
-              className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 appearance-none"
-              disabled={mode === "edit"}
+            <Select
+              aria-label="传输方式"
+              className="w-full"
+              disabled={mode !== "create"}
               id="mcp-form-transport"
               onChange={(e) => setTransport(e.target.value as McpTransport)}
               value={transport}
             >
               <option value="stdio">stdio</option>
               <option value="http">http</option>
-            </select>
+            </Select>
           </div>
+        </div>
 
-          {/* Section: 连接 */}
-          <SectionHeader>连接</SectionHeader>
+        <SectionHeader>连接</SectionHeader>
 
-          {transport === "stdio" ? (
-            <>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-ink" htmlFor="mcp-form-command">
-                  command <span className="text-error">*</span>
-                </label>
-                <input
-                  aria-describedby={hasCommandError ? commandErrorId : undefined}
-                  aria-invalid={hasCommandError}
-                  className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-error aria-invalid:ring-error/20"
-                  id="mcp-form-command"
-                  onChange={(e) => { setCommand(e.target.value); clearFieldError("command"); }}
-                  ref={commandInputRef}
-                  value={command}
-                />
-                {hasCommandError ? (
-                  <p className="text-2xs text-error-deep" id={commandErrorId} role="alert">
-                    {fieldErrors.command}
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-3 space-y-1">
-                <label className="text-xs font-medium text-ink" htmlFor="mcp-form-args">
-                  args
-                </label>
-                <textarea
-                  className="min-h-[72px] w-full rounded-lg border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 resize-y"
-                  id="mcp-form-args"
-                  onChange={(e) => setArgsText(e.target.value)}
-                  placeholder="每行一个参数"
-                  value={argsText}
-                />
-              </div>
-            </>
-          ) : (
+        {transport === "stdio" ? (
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-url">
-                url <span className="text-error">*</span>
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-command">
+                command {canSubmit ? <span className="text-error">*</span> : null}
               </label>
               <input
-                aria-describedby={hasUrlError ? urlErrorId : undefined}
-                aria-invalid={hasUrlError}
-                className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-error aria-invalid:ring-error/20"
-                id="mcp-form-url"
-                onChange={(e) => { setUrl(e.target.value); clearFieldError("url"); }}
-                ref={urlInputRef}
-                type="url"
-                value={url}
+                aria-describedby={hasCommandError ? commandErrorId : undefined}
+                aria-invalid={hasCommandError}
+                className={inputClass}
+                id="mcp-form-command"
+                onChange={(e) => { setCommand(e.target.value); clearFieldError("command"); }}
+                readOnly={readOnly}
+                ref={commandInputRef}
+                value={command}
               />
-              {hasUrlError ? (
-                <p className="text-2xs text-error-deep" id={urlErrorId} role="alert">
-                  {fieldErrors.url}
+              {hasCommandError ? (
+                <p className="text-2xs text-error-deep" id={commandErrorId} role="alert">
+                  {fieldErrors.command}
                 </p>
               ) : null}
             </div>
-          )}
 
-          {/* Section: 环境与请求头 */}
-          <SectionHeader>环境与请求头</SectionHeader>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-args">
+                args
+              </label>
+              <textarea
+                className={textAreaClass}
+                id="mcp-form-args"
+                onChange={(e) => setArgsText(e.target.value)}
+                placeholder="每行一个参数"
+                readOnly={readOnly}
+                value={argsText}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-url">
+              url {canSubmit ? <span className="text-error">*</span> : null}
+            </label>
+            <input
+              aria-describedby={hasUrlError ? urlErrorId : undefined}
+              aria-invalid={hasUrlError}
+              className={inputClass}
+              id="mcp-form-url"
+              onChange={(e) => { setUrl(e.target.value); clearFieldError("url"); }}
+              readOnly={readOnly}
+              ref={urlInputRef}
+              type="url"
+              value={url}
+            />
+            {hasUrlError ? (
+              <p className="text-2xs text-error-deep" id={urlErrorId} role="alert">
+                {fieldErrors.url}
+              </p>
+            ) : null}
+          </div>
+        )}
 
+        <SectionHeader>环境与请求头</SectionHeader>
+
+        <div className="grid gap-3 lg:grid-cols-2">
           <div className="space-y-1">
             <label className="text-xs font-medium text-ink" htmlFor="mcp-form-env">
               env
@@ -433,10 +364,11 @@ export function McpServerFormDrawer({
             <textarea
               aria-describedby={hasEnvError ? envErrorId : undefined}
               aria-invalid={hasEnvError}
-              className="min-h-[72px] w-full rounded-lg border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-error aria-invalid:ring-error/20 resize-y"
+              className={textAreaClass}
               id="mcp-form-env"
               onChange={(e) => { setEnvText(e.target.value); clearFieldError("env"); }}
               placeholder="KEY=VALUE"
+              readOnly={readOnly}
               value={envText}
             />
             {hasEnvError ? (
@@ -446,17 +378,18 @@ export function McpServerFormDrawer({
             ) : null}
           </div>
 
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <label className="text-xs font-medium text-ink" htmlFor="mcp-form-headers">
               headers
             </label>
             <textarea
               aria-describedby={hasHeadersError ? headersErrorId : undefined}
               aria-invalid={hasHeadersError}
-              className="min-h-[72px] w-full rounded-lg border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-error aria-invalid:ring-error/20 resize-y"
+              className={textAreaClass}
               id="mcp-form-headers"
               onChange={(e) => { setHeadersText(e.target.value); clearFieldError("headers"); }}
               placeholder="KEY=VALUE"
+              readOnly={readOnly}
               value={headersText}
             />
             {hasHeadersError ? (
@@ -465,67 +398,72 @@ export function McpServerFormDrawer({
               </p>
             ) : null}
           </div>
+        </div>
 
-          {/* Section: 启动行为 */}
-          <SectionHeader>启动行为</SectionHeader>
+        <SectionHeader>启动行为</SectionHeader>
 
-          <label className="flex cursor-pointer items-start gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-hairline bg-canvas-soft px-3 py-2">
             <input
               checked={desiredState === "running"}
-              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary"
+              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
+              disabled={readOnly}
               onChange={(e) => setDesiredState(e.target.checked ? "running" : "stopped")}
               type="checkbox"
             />
             <span>
               <span className="text-xs text-ink">创建后立即启动</span>
               <span className="block text-2xs text-mute">
-                服务保存后将立即拉起 (desired_state=running)
+                desired_state={desiredState}
               </span>
             </span>
           </label>
 
-          <label className="mt-2 flex cursor-pointer items-start gap-2">
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-hairline bg-canvas-soft px-3 py-2">
             <input
               checked={enabled}
-              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary"
+              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
+              disabled={readOnly}
               onChange={(e) => setEnabled(e.target.checked)}
               type="checkbox"
             />
             <span>
               <span className="text-xs text-ink">启用</span>
               <span className="block text-2xs text-mute">
-                启用该服务供 agent 使用
+                {enabled ? "可供 agent 使用" : "暂不供 agent 使用"}
               </span>
             </span>
           </label>
-        </form>
+        </div>
+      </form>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-hairline bg-canvas px-4 py-3">
-          <button
-            className="h-9 rounded-lg border border-hairline bg-canvas px-3 text-xs text-body transition-colors hover:border-hairline-strong hover:text-ink"
-            onClick={onClose}
-            type="button"
-          >
-            取消
-          </button>
-          <button
-            className="h-9 rounded-lg bg-primary px-3 text-xs font-medium text-on-primary transition-colors hover:bg-primary-deep disabled:cursor-not-allowed disabled:opacity-50"
+      {canSubmit ? (
+        <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3">
+          {onCancel ? (
+            <Button
+              onClick={onCancel}
+              variant="secondary"
+            >
+              取消
+            </Button>
+          ) : null}
+          <Button
             disabled={pending}
-            form="mcp-drawer-form"
+            form={formId}
             type="submit"
+            variant="primary"
           >
             {pending ? "提交中..." : "保存"}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      ) : null}
+    </section>
   );
 }
 
 function SectionHeader({ children }: { children: ReactNode }) {
   return (
-    <h3 className="mt-4 mb-2 border-b border-hairline pb-1.5 text-2xs font-mono uppercase tracking-wide text-mute first:mt-0">
+    <h3 className="mb-2 mt-4 border-b border-hairline pb-1.5 font-mono text-2xs uppercase tracking-wide text-mute first:mt-0">
       {children}
     </h3>
   );

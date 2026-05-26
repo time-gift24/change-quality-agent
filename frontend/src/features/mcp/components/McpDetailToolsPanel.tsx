@@ -1,4 +1,12 @@
 import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import type { McpServerTool } from "../types";
 
 type McpDetailToolsPanelProps = {
@@ -10,10 +18,10 @@ function ToolRow({ tool }: { tool: McpServerTool }) {
 
   return (
     <>
-      <tr className="border-b border-hairline last:border-0">
-        <td className="w-[280px] px-4 py-2.5 font-mono text-xs text-ink">{tool.name}</td>
-        <td className="px-4 py-2.5 text-xs text-body">{tool.description ?? "无描述"}</td>
-        <td className="w-[110px] shrink-0 px-4 py-2.5 text-right">
+      <TableRow>
+        <TableCell className="w-[280px] px-4 font-mono text-xs text-ink">{tool.name}</TableCell>
+        <TableCell className="px-4 text-xs text-body">{tool.description ?? "无描述"}</TableCell>
+        <TableCell className="w-[110px] shrink-0 px-4 text-right">
           <button
             className="text-2xs text-mute transition-colors hover:text-ink"
             onClick={() => setExpanded((v) => !v)}
@@ -21,16 +29,16 @@ function ToolRow({ tool }: { tool: McpServerTool }) {
           >
             查看 schema {expanded ? "▴" : "▾"}
           </button>
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {expanded ? (
-        <tr>
-          <td className="px-4 pb-3" colSpan={3}>
+        <TableRow>
+          <TableCell className="px-4 pb-3" colSpan={3}>
             <pre className="overflow-x-auto rounded-md border border-hairline bg-canvas-soft px-3 py-2 font-mono text-2xs text-body">
               {JSON.stringify(tool.input_schema, null, 2)}
             </pre>
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       ) : null}
     </>
   );
@@ -47,26 +55,26 @@ export function McpDetailToolsPanel({ tools }: McpDetailToolsPanelProps) {
 
   return (
     <div className="rounded-xl border border-hairline bg-canvas">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-hairline bg-canvas-soft">
-            <th className="h-10 px-4 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-canvas-soft">
+            <TableHead className="px-4">
               工具名
-            </th>
-            <th className="h-10 px-4 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            </TableHead>
+            <TableHead className="px-4">
               描述
-            </th>
-            <th className="h-10 w-[110px] shrink-0 px-4 text-right text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            </TableHead>
+            <TableHead className="w-[110px] shrink-0 px-4 text-right">
               Schema
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {tools.map((tool) => (
             <ToolRow key={tool.name} tool={tool} />
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

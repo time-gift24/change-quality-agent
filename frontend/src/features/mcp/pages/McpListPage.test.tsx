@@ -7,10 +7,9 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { useMcpMutations, useMcpServers } from "../hooks";
 import type { McpServerSummary } from "../types";
@@ -19,7 +18,10 @@ import { McpListPage } from "./McpListPage";
 function renderListPage() {
   return render(
     <MemoryRouter initialEntries={["/mcp"]}>
-      <McpListPage />
+      <Routes>
+        <Route element={<McpListPage />} path="/mcp" />
+        <Route element={<div>新增 MCP Server 页面</div>} path="/mcp/new" />
+      </Routes>
     </MemoryRouter>,
   );
 }
@@ -83,23 +85,17 @@ afterEach(() => {
 });
 
 describe("McpListPage", () => {
-  it("renders sidebar with MCP marked active", () => {
+  it("renders MCP main content without owning the workspace sidebar", () => {
     renderListPage();
 
-    const sidebar = screen.getByRole("complementary", { name: "工作台侧边栏" });
-    const nav = within(sidebar).getByRole("navigation", { name: "工作台导航" });
-
-    expect(within(nav).getByRole("button", { name: "发起新SOP质检" })).toBeInTheDocument();
-    expect(within(nav).getByRole("button", { name: "MCP 管理" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("main", { name: "MCP 管理主内容" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "工作台侧边栏" })).not.toBeInTheDocument();
   });
 
-  it("keeps the table visible after toggling the sidebar", () => {
+  it("keeps the table visible in the page scroll area", () => {
     renderListPage();
 
-    fireEvent.click(screen.getByRole("button", { name: "收起侧边栏" }));
-
     expect(screen.getByRole("table")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
   });
 
   it("renders server names as links in table rows", () => {
@@ -122,12 +118,12 @@ describe("McpListPage", () => {
     expect(screen.getByText("Beta Server")).toBeInTheDocument();
   });
 
-  it("opens the create drawer when clicking 新增 Server", () => {
+  it("navigates to the create page when clicking 新增 Server", () => {
     renderListPage();
 
     fireEvent.click(screen.getByRole("button", { name: "新增 MCP Server" }));
 
-    expect(screen.getByRole("dialog", { name: "新增 MCP 服务" })).toBeInTheDocument();
+    expect(screen.getByText("新增 MCP Server 页面")).toBeInTheDocument();
   });
 
   it("filters servers by search text", () => {

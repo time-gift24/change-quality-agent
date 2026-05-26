@@ -116,7 +116,8 @@ describe("McpDetailPage", () => {
 
     const nav = screen.getByRole("navigation", { name: "面包屑" });
     expect(within(nav).getByRole("link", { name: "MCP 管理" })).toHaveAttribute("href", "/mcp");
-    expect(within(nav).getByText("Alpha Server")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Alpha Server" })).toHaveAttribute("href", "/mcp/srv-1");
+    expect(within(nav).getByText("查看")).toHaveAttribute("aria-current", "page");
   });
 
   it("renders H1 with server name", () => {
@@ -124,11 +125,11 @@ describe("McpDetailPage", () => {
     expect(screen.getByRole("heading", { name: "Alpha Server" })).toBeInTheDocument();
   });
 
-  it("shows tools after switching to tools tab", () => {
+  it("shows tools snapshot below the read-only form", () => {
     renderDetailPage();
 
-    fireEvent.click(screen.getByRole("tab", { name: /工具快照/ }));
-
+    expect(screen.getByRole("textbox", { name: /服务名称/ })).toHaveValue("Alpha Server");
+    expect(screen.getByRole("textbox", { name: /服务名称/ })).toHaveAttribute("readonly");
     expect(screen.getByText("alpha.search")).toBeInTheDocument();
   });
 
@@ -165,11 +166,11 @@ describe("McpDetailPage", () => {
     expect(refetchDetail).not.toHaveBeenCalled();
   });
 
-  it("shows config tab by default", () => {
+  it("shows server configuration as a read-only form by default", () => {
     renderDetailPage();
 
-    expect(screen.getByRole("tab", { name: "配置" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("Transport")).toBeInTheDocument();
+    expect(screen.getByLabelText("传输方式")).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: /command/ })).toHaveValue("echo");
   });
 
   it("shows status badge and transport in subtitle", () => {
@@ -200,7 +201,7 @@ describe("McpDetailPage", () => {
   it("shows env and headers in config panel", () => {
     renderDetailPage();
 
-    expect(screen.getByText("API_KEY=********")).toBeInTheDocument();
-    expect(screen.getByText("Authorization=********")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: /env/ })).toHaveValue("API_KEY=********");
+    expect(screen.getByRole("textbox", { name: /headers/ })).toHaveValue("Authorization=********");
   });
 });

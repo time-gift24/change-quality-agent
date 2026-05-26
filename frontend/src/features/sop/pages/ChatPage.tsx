@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { WorkspaceSidebar } from "../../../app/WorkspaceSidebar";
+import { useWorkspaceLayout } from "../../../app/WorkspaceLayoutContext";
 import { RunObserver } from "../../runs/components/RunObserver";
 import { startSopQualityRun } from "../api";
-import { useRecentSopRuns, useSopEnvironments } from "../hooks";
-import type { SopRunHistoryItem } from "../types";
+import { useSopEnvironments } from "../hooks";
 
 type ChatPageProps = {
   initialSopId?: string;
@@ -29,17 +28,17 @@ export function ChatPage({
   const [startError, setStartError] = useState<string | null>(null);
   const [startMessage, setStartMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
-  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const startRequestRef = useRef(0);
   const observedRunIdRef = useRef(observedRunId);
   observedRunIdRef.current = observedRunId;
 
   const environments = useSopEnvironments();
-  const history = useRecentSopRuns(selectedEnv, historyRefreshKey);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { refreshRecentSopRuns, setNewConversationHandler, setSidebarContent } = useWorkspaceLayout();
+  const routeRunId = searchParams.get("runId");
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
@@ -80,7 +79,8 @@ export function ChatPage({
       }
 
       setObservedRunId(result.runId);
-      setHistoryRefreshKey((value) => value + 1);
+      refreshRecentSopRuns();
+      navigate(`/sop?runId=${result.runId}`, { replace: true });
 
       if (result.kind === "active") {
         setStartMessage(`已存在进行中的运行，已加入对话 ${result.runId}。`);
@@ -107,7 +107,7 @@ export function ChatPage({
     setStarting(false);
   }
 
-  function handleNewConversation() {
+  const handleNewConversation = useCallback(() => {
     startRequestRef.current += 1;
     setObservedRunId(null);
     setStartError(null);
@@ -115,139 +115,55 @@ export function ChatPage({
     setStarting(false);
     setSopId(initialSopId);
     setPendingSopId(initialSopId);
-  }
+    navigate("/sop", { replace: true });
+  }, [initialSopId, navigate]);
 
-  function handleSelectHistory(runId: string) {
-    setObservedRunId(runId);
+  useEffect(() => {
+    setNewConversationHandler(handleNewConversation);
+    setSidebarContent(null);
+
+    return () => {
+      setNewConversationHandler(null);
+      setSidebarContent(null);
+    };
+  }, [handleNewConversation, setNewConversationHandler, setSidebarContent]);
+
+  useEffect(() => {
+    if (!routeRunId) return;
+    setObservedRunId(routeRunId);
     setStartError(null);
     setStartMessage(null);
-  }
+  }, [routeRunId]);
 
   return (
-    <div className="flex min-h-screen flex-1 text-ink">
-      <WorkspaceSidebar
-        activeKey="sop"
-        onNavigateMcp={() => navigate("/mcp")}
-        onNavigateSop={() => navigate("/sop")}
-        onNewConversation={handleNewConversation}
-        onToggle={() => setSidebarOpen((value) => !value)}
-        open={sidebarOpen}
-      >
-        <HistoryPanel
-          error={history.error}
-          history={history.data}
-          loading={history.loading}
-          observedRunId={observedRunId}
-          onSelect={handleSelectHistory}
+    <main
+      aria-label="SOP 质检主内容"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      {observedRunId ? (
+        <RunCanvas
+          runId={observedRunId}
+          registeredNodeIds={registeredNodeIds}
+          startError={startError}
+          startMessage={startMessage}
         />
-      </WorkspaceSidebar>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main
-          aria-label="SOP 质检主内容"
-          className="flex flex-1 flex-col overflow-hidden"
-        >
-          {observedRunId ? (
-            <RunCanvas
-              runId={observedRunId}
-              registeredNodeIds={registeredNodeIds}
-              startError={startError}
-              startMessage={startMessage}
-            />
-          ) : (
-            <EmptyState
-              envs={environments.data}
-              envsLoading={environments.loading}
-              envsError={environments.error}
-              selectedEnv={selectedEnv}
-              onEnvChange={handleEnvironmentChange}
-              sopId={pendingSopId}
-              onSopIdChange={setPendingSopId}
-              onConfirm={handleSend}
-              canSend={canSend}
-              starting={starting}
-              startError={startError}
-              startMessage={startMessage}
-            />
-          )}
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function HistoryPanel({
-  history,
-  loading,
-  error,
-  observedRunId,
-  onSelect,
-}: {
-  history: SopRunHistoryItem[];
-  loading: boolean;
-  error: Error | null;
-  observedRunId: string | null;
-  onSelect: (runId: string) => void;
-}) {
-  const [recentOpen, setRecentOpen] = useState(true);
-
-  return (
-    <div className="flex h-full flex-col">
-      <div className="mt-2 px-3">
-        <button
-          aria-expanded={recentOpen}
-          aria-label="切换最近质检SOP"
-          className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-mute transition-colors hover:text-body"
-          onClick={() => setRecentOpen((value) => !value)}
-          type="button"
-        >
-          <span>最近质检SOP</span>
-          <ChevronIcon open={recentOpen} />
-        </button>
-      </div>
-
-      {recentOpen ? (
-        <div className="mt-1 flex-1 overflow-y-auto px-2 pb-4">
-          {error ? (
-            <p className="px-2 py-1 text-xs text-error-deep" role="alert">
-              {error.message}
-            </p>
-          ) : null}
-          {loading ? (
-            <p className="px-2 py-1 text-xs text-mute">加载中...</p>
-          ) : null}
-          {!loading && history.length === 0 && !error ? (
-            <p className="px-2 py-1 text-xs text-mute">暂无历史。</p>
-          ) : null}
-          <ul className="space-y-0.5">
-            {history.map((run) => {
-              const active = observedRunId === run.run_id;
-              return (
-                <li key={run.run_id}>
-                  <button
-                    aria-pressed={active}
-                    className={`group flex w-full items-center gap-2 truncate rounded-full px-3 py-2 text-left text-xs transition-colors ${
-                      active
-                        ? "border border-primary/40 bg-canvas text-ink shadow-sm"
-                        : "border border-transparent text-body hover:bg-canvas-soft"
-                    }`}
-                    onClick={() => onSelect(run.run_id)}
-                    title={run.subject_id ?? run.run_id}
-                    type="button"
-                  >
-                    <span className="block flex-1 truncate">
-                      {historyTitle(run)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
       ) : (
-        <div className="flex-1" />
+        <EmptyState
+          envs={environments.data}
+          envsLoading={environments.loading}
+          envsError={environments.error}
+          selectedEnv={selectedEnv}
+          onEnvChange={handleEnvironmentChange}
+          sopId={pendingSopId}
+          onSopIdChange={setPendingSopId}
+          onConfirm={handleSend}
+          canSend={canSend}
+          starting={starting}
+          startError={startError}
+          startMessage={startMessage}
+        />
       )}
-    </div>
+    </main>
   );
 }
 
@@ -279,7 +195,7 @@ function EmptyState({
   startMessage: string | null;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4">
       <div className="w-full max-w-3xl space-y-6 text-center">
         <form
           aria-label="SOP 运行表单"
@@ -382,7 +298,7 @@ function RunCanvas({
   startMessage: string | null;
 }) {
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto px-4 py-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         {startError ? (
           <p
@@ -407,23 +323,6 @@ function RunCanvas({
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={`h-3 w-3 transition-transform ${open ? "rotate-90" : ""}`}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="M9 6l6 6-6 6" />
-    </svg>
-  );
-}
-
 function SelectChevronIcon() {
   return (
     <svg
@@ -439,10 +338,6 @@ function SelectChevronIcon() {
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
-}
-
-function historyTitle(run: SopRunHistoryItem): string {
-  return run.subject_id || run.run_id;
 }
 
 function statusLabel(status: string | null | undefined): string {

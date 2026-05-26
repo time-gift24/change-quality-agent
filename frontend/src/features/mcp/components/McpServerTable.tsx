@@ -1,4 +1,14 @@
 import { Link } from "react-router-dom";
+import { Button } from "../../../components/ui/button";
+import { Select } from "../../../components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../../components/ui/table";
 import type { McpServerSummary } from "../types";
 import { McpRowActionsMenu } from "./McpRowActionsMenu";
 import { McpStatusBadge } from "./McpStatusBadge";
@@ -69,9 +79,8 @@ export function McpServerTable({
           />
         </div>
 
-        <select
+        <Select
           aria-label="状态筛选"
-          className="h-9 rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
           onChange={(e) => onStatusFilterChange(e.target.value as McpStatusFilter)}
           value={statusFilter}
         >
@@ -82,105 +91,100 @@ export function McpServerTable({
           <option value="starting">Starting</option>
           <option value="stopping">Stopping</option>
           <option value="unknown">Unknown</option>
-        </select>
+        </Select>
 
         <div className="flex-1" />
 
-        <button
-          className="h-9 rounded-lg border border-hairline bg-canvas px-3 text-xs text-body transition-colors hover:border-hairline-strong"
-          onClick={onRefresh}
-          type="button"
-        >
+        <Button onClick={onRefresh} variant="secondary">
           刷新
-        </button>
+        </Button>
 
-        <button
+        <Button
           aria-label="新增 MCP Server"
-          className="h-9 rounded-lg bg-primary px-3 text-xs font-medium text-on-primary transition-colors hover:bg-primary-deep"
           onClick={onCreateServer}
-          type="button"
+          variant="primary"
         >
           + 新增 Server
-        </button>
+        </Button>
       </div>
 
       {/* Table */}
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-hairline bg-canvas-soft">
-            <th className="h-10 px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-canvas-soft">
+            <TableHead>
               名称
-            </th>
-            <th className="hidden h-10 w-[120px] px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono sm:table-cell">
+            </TableHead>
+            <TableHead className="hidden w-[120px] sm:table-cell">
               状态
-            </th>
-            <th className="hidden h-10 w-[80px] px-3 text-right text-2xs font-medium uppercase tracking-wide text-mute font-mono sm:table-cell">
+            </TableHead>
+            <TableHead className="hidden w-[80px] text-right sm:table-cell">
               工具
-            </th>
-            <th className="hidden h-10 w-[160px] px-3 text-left text-2xs font-medium uppercase tracking-wide text-mute font-mono sm:table-cell">
+            </TableHead>
+            <TableHead className="hidden w-[160px] sm:table-cell">
               最近检查
-            </th>
-            <th className="h-10 w-[56px] px-2 text-center text-2xs font-medium uppercase tracking-wide text-mute font-mono">
+            </TableHead>
+            <TableHead className="w-[56px] px-2 text-center">
               <span className="sr-only">操作</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {loading ? (
-            <tr>
-              <td className="py-8 text-center text-xs text-mute" colSpan={5}>
+            <TableRow>
+              <TableCell className="py-8 text-center text-xs text-mute" colSpan={5}>
                 加载中…
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : errorMessage ? (
-            <tr>
-              <td className="border border-error-soft bg-canvas px-3 py-2 text-xs text-error-deep" colSpan={5} role="alert">
+            <TableRow>
+              <TableCell className="border border-error-soft bg-canvas px-3 py-2 text-xs text-error-deep" colSpan={5} role="alert">
                 {errorMessage}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : servers.length === 0 ? (
-            <tr>
-              <td className="py-12 text-center text-xs text-mute" colSpan={5}>
+            <TableRow>
+              <TableCell className="py-12 text-center text-xs text-mute" colSpan={5}>
                 暂无 MCP 服务，点击
-                <button
-                  className="mx-1 font-medium text-primary hover:underline"
+                <Button
+                  className="mx-1 h-auto px-1 py-0"
                   onClick={onCreateServer}
-                  type="button"
+                  variant="ghost"
                 >
                   + 新增 Server
-                </button>
+                </Button>
                 开始添加。
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ) : (
             servers.map((server) => (
-              <tr
+              <TableRow
                 key={server.id}
-                className="border-b border-hairline transition-colors last:border-0 hover:bg-canvas-soft"
+                className="transition-colors hover:bg-canvas-soft"
               >
-                <td className="px-3 py-2.5">
+                <TableCell>
                   <Link
                     className="block rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                     to={`/mcp/${server.id}`}
                   >
                     <p className="text-sm font-medium text-ink">{server.name}</p>
-                    <p className="text-2xs text-mute font-mono">{server.transport}</p>
-                  </Link>
-                </td>
-                <td className="hidden px-3 py-2.5 sm:table-cell">
+                      <p className="text-2xs text-mute font-mono">{server.transport}</p>
+                    </Link>
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
                   <McpStatusBadge status={server.runtime_status} />
-                </td>
-                <td className="hidden px-3 py-2.5 text-right sm:table-cell">
+                </TableCell>
+                <TableCell className="hidden text-right sm:table-cell">
                   <span className="text-2xs tabular-nums font-mono text-body">
                     {server.tool_count}
                   </span>
-                </td>
-                <td className="hidden px-3 py-2.5 sm:table-cell">
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
                   <span className="text-2xs text-mute">
                     {server.last_checked_at ?? "-"}
                   </span>
-                </td>
-                <td className="px-2 py-2.5 text-center">
+                </TableCell>
+                <TableCell className="px-2 text-center">
                   <McpRowActionsMenu
                     onCheck={onCheckServer}
                     onDelete={onDeleteServer}
@@ -191,12 +195,12 @@ export function McpServerTable({
                     serverId={server.id}
                     serverName={server.name}
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
 
       {/* Footer */}
       <div className="flex items-center justify-between border-t border-hairline px-3 py-2 text-2xs text-mute font-mono">
