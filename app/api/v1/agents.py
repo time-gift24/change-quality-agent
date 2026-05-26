@@ -1,13 +1,23 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import JSONResponse
 
-from app.api.deps import AgentRepositoryDep, SessionDep
+from app.api.deps import AgentRepositoryDep, RunRepositoryDep, SessionDep
 from app.repositories.agents import (
     AgentRepository,
     AgentDraftInvalidError,
     AgentKeyExistsError,
     AgentNotFoundError,
+    AgentVersionNotFoundError,
 )
 from app.schemas.agents import (
     AgentCreate,
@@ -15,10 +25,12 @@ from app.schemas.agents import (
     AgentDraftConfig,
     AgentDraftUpdate,
     AgentSummary,
+    AgentTestRunCreate,
     AgentVersionDetail,
     AgentVersionSummary,
 )
-from app.services.agents import AgentService
+from app.schemas.runs import RunStartResponse
+from app.services.agents import AgentService, run_agent_test_with_new_session
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -86,6 +98,48 @@ async def publish_agent(
     except AgentDraftInvalidError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
     return version_to_detail(version)
+
+
+@router.post("/{agent_key}/test-runs")
+async def start_agent_test_run(
+    agent_key: str,
+    payload: AgentTestRunCreate,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: SessionDep,
+    repository: AgentRepositoryDep,
+    run_repository: RunRepositoryDep,
+) -> RunStartResponse:
+    def schedule_run(run_id):
+        executor = getattr(
+            request.app.state,
+            "agent_test_run_executor",
+            run_agent_test_with_new_session,
+        )
+        background_tasks.add_task(executor, run_id)
+
+    service = AgentService(
+        repository=repository,
+        run_repository=run_repository,
+        schedule_test_run=schedule_run,
+        commit=session.commit,
+    )
+    try:
+        result = await service.start_test_run(agent_key, payload)
+    except AgentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except AgentVersionNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
+
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=RunStartResponse(
+            run_id=result.run_id,
+            status=result.status,
+            status_url=result.status_url,
+            events_url=result.events_url,
+        ).model_dump(mode="json"),
+    )
 
 
 @router.get("/{agent_key}/versions")
