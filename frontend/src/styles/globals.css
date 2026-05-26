@@ -241,6 +241,13 @@ select {
   background: transparent !important;
   padding: 0 !important;
   box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Need horizontal margin so the shadow halo isn't clipped by the wrapper */
+[data-testid="stream-markdown"] [data-streamdown="table-wrapper"] {
+  padding: 0.25rem !important;
+  margin: 0.5rem 0 !important;
 }
 
 /* Force table itself to be the sole owner of border and shadow */
