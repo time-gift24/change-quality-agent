@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.v1 import runs, sop
+from app.api.deps import get_mcp_runtime_manager
+from app.api.v1 import mcp, runs, sop
 from app.core.database import async_session
 from app.repositories.runs import RunRepository
 
@@ -17,10 +18,16 @@ async def interrupt_leftover_runs() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await interrupt_leftover_runs()
-    yield
+    mcp_runtime = get_mcp_runtime_manager()
+    await mcp_runtime.start_enabled_servers()
+    try:
+        yield
+    finally:
+        await mcp_runtime.shutdown()
 
 
 app = FastAPI(title="Change Quality Agent", lifespan=lifespan)
+app.include_router(mcp.router)
 app.include_router(runs.router)
 app.include_router(sop.router)
 

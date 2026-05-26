@@ -12,6 +12,8 @@ tags:
     description: SOP entry points and SOP-scoped run history.
   - name: runs
     description: Generic run observation APIs.
+  - name: mcp
+    description: MCP server configuration and runtime management APIs.
 paths:
   /api/sop/environments:
     get:
@@ -200,7 +202,254 @@ paths:
           $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers:
+    get:
+      tags:
+        - mcp
+      summary: List MCP servers
+      operationId: listMcpServers
+      security:
+        - McpAdminToken: []
+      responses:
+        "200":
+          description: MCP servers with redacted config values.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/McpServerSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      tags:
+        - mcp
+      summary: Create an MCP server configuration
+      operationId: createMcpServer
+      security:
+        - McpAdminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpServerCreate"
+      responses:
+        "201":
+          description: Created MCP server with redacted config values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpServerDetail"
+        "409":
+          description: An MCP server with this name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers/{server_id}:
+    get:
+      tags:
+        - mcp
+      summary: Get MCP server details
+      operationId: getMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "200":
+          description: MCP server details and latest tool snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpServerDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    patch:
+      tags:
+        - mcp
+      summary: Update an MCP server configuration
+      operationId: updateMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpServerUpdate"
+      responses:
+        "200":
+          description: Updated MCP server with redacted config values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpServerDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Running MCP servers must be stopped before config updates.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - mcp
+      summary: Delete an MCP server configuration
+      operationId: deleteMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "204":
+          description: MCP server deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers/{server_id}/start:
+    post:
+      tags:
+        - mcp
+      summary: Start an MCP server
+      operationId: startMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "200":
+          description: Runtime status after start attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpLifecycleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers/{server_id}/stop:
+    post:
+      tags:
+        - mcp
+      summary: Stop an MCP server
+      operationId: stopMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "200":
+          description: Runtime status after stop attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpLifecycleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers/{server_id}/restart:
+    post:
+      tags:
+        - mcp
+      summary: Restart an MCP server
+      operationId: restartMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "200":
+          description: Runtime status after restart attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpLifecycleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /api/mcp/servers/{server_id}/check:
+    post:
+      tags:
+        - mcp
+      summary: Check an MCP server and refresh tools
+      operationId: checkMcpServer
+      security:
+        - McpAdminToken: []
+      parameters:
+        - $ref: "#/components/parameters/McpServerId"
+      responses:
+        "200":
+          description: Runtime status after check attempt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpLifecycleResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        "422":
+          $ref: "#/components/responses/ValidationError"
 components:
+  securitySchemes:
+    McpAdminToken:
+      type: apiKey
+      in: header
+      name: X-MCP-Admin-Token
   parameters:
     SopId:
       name: sop_id
@@ -211,6 +460,13 @@ components:
       example: release-checklist
     RunId:
       name: run_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    McpServerId:
+      name: server_id
       in: path
       required: true
       schema:
@@ -231,7 +487,19 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     BadGateway:
-      description: SOP client failure before a run is created.
+      description: Upstream dependency or lifecycle failure before completion.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Missing or invalid MCP admin token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: MCP runtime is not configured or not enabled.
       content:
         application/json:
           schema:
@@ -447,6 +715,212 @@ components:
         created_at:
           type: string
           format: date-time
+    McpTransport:
+      type: string
+      enum:
+        - stdio
+        - http
+    McpDesiredState:
+      type: string
+      enum:
+        - running
+        - stopped
+    McpRuntimeStatus:
+      type: string
+      enum:
+        - unknown
+        - starting
+        - running
+        - stopping
+        - stopped
+        - error
+    McpServerCreate:
+      type: object
+      required:
+        - name
+        - transport
+      properties:
+        name:
+          type: string
+          example: filesystem
+        transport:
+          $ref: "#/components/schemas/McpTransport"
+        command:
+          type: string
+          nullable: true
+          example: uvx
+        args:
+          type: array
+          items:
+            type: string
+          default: []
+          example:
+            - mcp-server-filesystem
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          default: {}
+          example:
+            TOKEN: secret
+        url:
+          type: string
+          nullable: true
+          example: https://example.com/mcp
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          default: {}
+        enabled:
+          type: boolean
+          default: false
+        desired_state:
+          allOf:
+            - $ref: "#/components/schemas/McpDesiredState"
+          default: stopped
+    McpServerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        command:
+          type: string
+          nullable: true
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+        url:
+          type: string
+          nullable: true
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+        desired_state:
+          $ref: "#/components/schemas/McpDesiredState"
+    McpServerTool:
+      type: object
+      required:
+        - name
+        - input_schema
+      properties:
+        name:
+          type: string
+          example: search
+        description:
+          type: string
+          nullable: true
+        input_schema:
+          type: object
+          additionalProperties: true
+          default: {}
+        discovered_at:
+          type: string
+          format: date-time
+          nullable: true
+    McpServerSummary:
+      type: object
+      required:
+        - id
+        - name
+        - transport
+        - args
+        - env
+        - headers
+        - enabled
+        - desired_state
+        - runtime_status
+        - tool_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        transport:
+          $ref: "#/components/schemas/McpTransport"
+        command:
+          type: string
+          nullable: true
+        args:
+          type: array
+          items:
+            type: string
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            TOKEN: "********"
+        url:
+          type: string
+          nullable: true
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            Authorization: "********"
+        enabled:
+          type: boolean
+        desired_state:
+          $ref: "#/components/schemas/McpDesiredState"
+        runtime_status:
+          $ref: "#/components/schemas/McpRuntimeStatus"
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        tool_count:
+          type: integer
+          minimum: 0
+    McpServerDetail:
+      allOf:
+        - $ref: "#/components/schemas/McpServerSummary"
+        - type: object
+          required:
+            - tools
+          properties:
+            tools:
+              type: array
+              items:
+                $ref: "#/components/schemas/McpServerTool"
+    McpLifecycleResponse:
+      type: object
+      required:
+        - server_id
+        - desired_state
+        - runtime_status
+        - tool_count
+      properties:
+        server_id:
+          type: string
+          format: uuid
+        desired_state:
+          $ref: "#/components/schemas/McpDesiredState"
+        runtime_status:
+          $ref: "#/components/schemas/McpRuntimeStatus"
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+          nullable: true
+        tool_count:
+          type: integer
+          minimum: 0
     ErrorResponse:
       type: object
       required:
