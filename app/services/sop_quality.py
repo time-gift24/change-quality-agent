@@ -110,6 +110,7 @@ async def run_sop_quality_graph(
             payload={"message": "Started mock SOP quality graph."},
             node="start",
         )
+        await _commit_if_available(repository)
         raw_graph_output: dict[str, Any] | None = None
         async for event in stream_mock_sop_quality_graph(
             run_id=str(run_id),
@@ -123,8 +124,9 @@ async def run_sop_quality_graph(
                 payload=event["payload"],
                 node=event.get("node"),
             )
+            await _commit_if_available(repository)
         if raw_graph_output is None:
-            raw_graph_output = {"status": "mock_success"}
+            raise RuntimeError("SOP quality stream ended without raw graph output")
         await repository.append_event(
             run_id,
             event_type="done",
