@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
@@ -16,6 +16,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findAllByText(/质量检查|SOP/i)).not.toHaveLength(0);
+    const main = screen.getByRole("main");
+    expect(
+      await within(main).findByText(/质量检查|SOP/i),
+    ).toBeInTheDocument();
   });
 });

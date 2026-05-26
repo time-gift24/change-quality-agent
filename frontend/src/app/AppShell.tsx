@@ -8,9 +8,6 @@ export function AppShell() {
           <NavLink className="rounded px-3 py-2 text-sm" to="/sop">
             质量检查
           </NavLink>
-          <NavLink className="rounded px-3 py-2 text-sm" to="/mcp">
-            MCP 管理
-          </NavLink>
         </nav>
       </aside>
       <main className="min-w-0 flex-1">
