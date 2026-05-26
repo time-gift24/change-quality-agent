@@ -99,11 +99,18 @@ export function reduceRunEvent(
     return updateNode(
       nextState,
       event.node,
-      (node) => ({
-        ...node,
-        status: node.status === "idle" ? "running" : node.status,
-        streamText: `${node.streamText}${messageDelta(event)}`,
-      }),
+      (node) => {
+        const finalText = finalMessageText(event);
+
+        return {
+          ...node,
+          status: node.status === "idle" ? "running" : node.status,
+          streamText:
+            finalText === undefined
+              ? `${node.streamText}${messageDelta(event)}`
+              : mergeFinalMessageText(node.streamText, finalText),
+        };
+      },
       event.sequence,
     );
   }
@@ -266,6 +273,77 @@ function messageDelta(event: RunEvent): string {
   );
 }
 
+function finalMessageText(event: RunEvent): string | undefined {
+  const messages = event.payload.messages;
+  if (!Array.isArray(messages)) {
+    return stringPayloadValue(event, "final_text");
+  }
+
+  return (
+    findMessageText(messages, isAssistantMessage) ??
+    findMessageText(messages, () => true)
+  );
+}
+
+function findMessageText(
+  messages: unknown[],
+  predicate: (message: Record<string, unknown>) => boolean,
+): string | undefined {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!isRecord(message) || !predicate(message)) {
+      continue;
+    }
+
+    const text = messageContentText(message.content);
+    if (text !== undefined) {
+      return text;
+    }
+  }
+
+  return undefined;
+}
+
+function isAssistantMessage(message: Record<string, unknown>): boolean {
+  return message.role === "assistant" || message.type === "ai";
+}
+
+function messageContentText(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    return content;
+  }
+
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  const parts = content.flatMap((part) => {
+    if (typeof part === "string") {
+      return [part];
+    }
+
+    if (isRecord(part) && typeof part.text === "string") {
+      return [part.text];
+    }
+
+    return [];
+  });
+
+  return parts.length > 0 ? parts.join("") : undefined;
+}
+
+function mergeFinalMessageText(currentText: string, finalText: string): string {
+  if (currentText === finalText || finalText.startsWith(currentText)) {
+    return finalText;
+  }
+
+  if (currentText.endsWith(finalText)) {
+    return currentText;
+  }
+
+  return finalText;
+}
+
 function updateValue(event: RunEvent): unknown {
   if ("value" in event.payload) {
     return event.payload.value;
@@ -278,4 +356,8 @@ function stringPayloadValue(event: RunEvent, key: string): string | undefined {
   const value = event.payload[key];
 
   return typeof value === "string" ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
