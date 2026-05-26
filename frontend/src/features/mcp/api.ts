@@ -1,4 +1,4 @@
-import { requestJson } from "../../lib/apiClient";
+import { apiErrorFromResponse, requestJson } from "../../lib/apiClient";
 import type {
   McpLifecycleResponse,
   McpServerCreate,
@@ -41,15 +41,16 @@ export function updateMcpServer(
 }
 
 export async function deleteMcpServer(serverId: string): Promise<void> {
-  try {
-    await requestJson<null>(buildServerUrl(serverId), {
-      method: "DELETE",
-    });
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      return;
-    }
-    throw error;
+  const headers = new Headers();
+  headers.set("Accept", "application/json");
+
+  const response = await fetch(buildServerUrl(serverId), {
+    headers,
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
   }
 }
 

@@ -30,7 +30,7 @@ export type McpServerCreate = {
 };
 
 export type McpServerUpdate = {
-  name?: string;
+  name?: string | null;
   command?: string | null;
   args?: string[];
   env?: Record<string, string>;

@@ -92,16 +92,36 @@ describe("MCP API", () => {
     );
   });
 
-  it("calls delete endpoint with DELETE", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(null));
+  it("calls delete endpoint with DELETE and accepts 204 no-content", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(deleteMcpServer("server-1")).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/mcp/servers/server-1",
-      expect.objectContaining({ method: "DELETE" }),
+      expect.objectContaining({
+        headers: expect.any(Headers),
+        method: "DELETE",
+      }),
     );
+  });
+
+  it("throws ApiError with detail when delete fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          errorResponse(404, "Not Found", "MCP server not found."),
+        ),
+    );
+
+    await expect(deleteMcpServer("missing")).rejects.toMatchObject({
+      detail: "MCP server not found.",
+      status: 404,
+      statusText: "Not Found",
+    } satisfies Partial<ApiError>);
   });
 
   it("calls lifecycle endpoints with POST", async () => {
@@ -236,5 +256,12 @@ function errorResponse(
     headers: { "Content-Type": "application/json" },
     status,
     statusText,
+  });
+}
+
+function noContentResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    statusText: "No Content",
   });
 }
