@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getCurrentUser } from "../features/auth/api";
+import { devLogin, getCurrentUser } from "../features/auth/api";
 import type { CurrentUser } from "../features/auth/types";
 import { ApiError } from "../lib/apiClient";
 import { App } from "./App";
@@ -56,6 +56,7 @@ describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getCurrentUser).mockResolvedValue(buildUser());
+    vi.mocked(devLogin).mockResolvedValue(buildUser());
   });
 
   it("renders sop route by default", async () => {
@@ -76,6 +77,49 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /common/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /admin/i })).toBeInTheDocument();
   });
+
+  it("submits common dev login and disables choices while pending", async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(
+      new ApiError(401, "Unauthorized", "Authentication required."),
+    );
+    const loginComplete = createDeferred<CurrentUser>();
+    vi.mocked(devLogin).mockReturnValue(loginComplete.promise);
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Common" }));
+
+    expect(devLogin).toHaveBeenCalledWith("common");
+    expect(screen.getByRole("button", { name: /signing in…/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Admin" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
+
+    loginComplete.resolve(buildUser());
+    await waitFor(() => {
+      expect(screen.getByText("SOP 质检")).toBeInTheDocument();
+    });
+  });
+
+  it("shows dev login API error and re-enables choices", async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(
+      new ApiError(401, "Unauthorized", "Authentication required."),
+    );
+    vi.mocked(devLogin).mockRejectedValue(
+      new ApiError(500, "Internal Server Error", "Unable to switch to the requested account."),
+    );
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+
+    expect(devLogin).toHaveBeenCalledWith("admin");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Unable to switch to the requested account.",
+    );
+    expect(screen.getByRole("alert")).toHaveClass("break-words");
+    expect(screen.getByRole("button", { name: "Common" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Admin" })).toBeEnabled();
+  });
 });
 
 function buildUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
@@ -86,4 +130,13 @@ function buildUser(overrides: Partial<CurrentUser> = {}): CurrentUser {
     meta: {},
     ...overrides,
   };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
 }

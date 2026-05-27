@@ -13,6 +13,40 @@ vi.mock("../../features/sop/pages/ChatPage", () => ({
   ChatPage: () => <div>SOP Page</div>,
 }));
 
+vi.mock("../../features/sop/hooks", () => ({
+  useRecentSopRuns: () => ({
+    data: [],
+    error: null,
+    loading: false,
+  }),
+  useSopEnvironments: () => ({
+    data: [],
+    error: null,
+    loading: false,
+  }),
+}));
+
+vi.mock("../../features/mcp/pages/McpListPage", () => ({
+  McpListPage: () => (
+    <div role="region" aria-label="MCP 管理 mock">
+      <h1>MCP 管理</h1>
+    </div>
+  ),
+}));
+
+vi.mock("../../features/mcp/pages/McpDetailPage", () => ({
+  McpDetailPage: () => (
+    <div role="region" aria-label="MCP 详情 mock">
+      <h1>MCP 详情</h1>
+    </div>
+  ),
+}));
+
+vi.mock("../../features/mcp/pages/McpServerFormPage", () => ({
+  McpCreatePage: () => <div>新增 MCP Server</div>,
+  McpEditPage: () => <div>编辑 MCP Server</div>,
+}));
+
 vi.mock("../../features/auth/AuthContext", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useAuth: vi.fn(),
@@ -33,7 +67,13 @@ describe("ProtectedRoute", () => {
 
     render(<App />);
 
-    expect(screen.getByText("403 Forbidden")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: "403 Forbidden",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/admin access is required/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to sop/i })).toHaveAttribute("href", "/sop");
   });
 
   it("allows admin route access", () => {

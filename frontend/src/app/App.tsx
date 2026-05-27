@@ -46,7 +46,7 @@ function AuthenticatedWorkspace() {
   const { status } = useAuth();
 
   if (status === "loading") {
-    return <AuthStatus message="Loading..." />;
+    return <AuthStatus busy message="Loading…" />;
   }
 
   if (status === "anonymous") {
@@ -60,10 +60,12 @@ function AuthenticatedWorkspace() {
   return <WorkspaceFrame />;
 }
 
-function AuthStatus({ message }: { message: string }) {
+function AuthStatus({ busy = false, message }: { busy?: boolean; message: string }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-aurora px-4 text-sm text-body">
-      {message}
+      <p aria-busy={busy} role={busy ? "status" : undefined}>
+        {message}
+      </p>
     </main>
   );
 }

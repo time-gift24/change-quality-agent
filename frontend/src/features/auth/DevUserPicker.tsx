@@ -29,7 +29,7 @@ export function DevUserPicker() {
     <main className="flex min-h-screen items-center justify-center bg-aurora px-4 py-6 text-ink">
       <section
         aria-labelledby="dev-user-picker-title"
-        className="w-full max-w-sm rounded-2xl border border-hairline-soft bg-canvas/95 p-4 shadow-sm shadow-primary/5"
+        className="min-w-0 w-full max-w-sm rounded-2xl border border-hairline-soft bg-canvas/95 p-4 shadow-sm shadow-primary/5"
       >
         <div className="mb-4">
           <p className="text-2xs font-semibold uppercase tracking-normal text-primary-deep">
@@ -48,17 +48,21 @@ export function DevUserPicker() {
 
         {errorMessage ? (
           <p
-            className="mb-3 rounded-xl border border-error-soft bg-canvas px-3 py-2 text-xs text-error-deep"
+            className="mb-3 min-w-0 break-words rounded-xl border border-error-soft bg-canvas px-3 py-2 text-xs text-error-deep"
             role="alert"
           >
             {errorMessage}
           </p>
         ) : null}
 
+        <p aria-busy={pendingAccount !== null} className="sr-only" role="status">
+          {pendingAccount ? "Signing in…" : "Ready"}
+        </p>
+
         <div className="grid gap-2">
           {DEV_ACCOUNTS.map(({ account, label }) => (
             <button
-              className="h-10 rounded-full border border-transparent bg-primary px-5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-deep disabled:cursor-not-allowed disabled:bg-mute"
+              className="h-10 min-w-0 rounded-full border border-transparent bg-primary px-5 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-deep disabled:cursor-not-allowed disabled:bg-mute"
               disabled={pendingAccount !== null}
               key={account}
               onClick={() => {
@@ -66,7 +70,7 @@ export function DevUserPicker() {
               }}
               type="button"
             >
-              {pendingAccount === account ? "Signing in..." : label}
+              {pendingAccount === account ? "Signing in…" : label}
             </button>
           ))}
         </div>
