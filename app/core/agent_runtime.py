@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from langchain.agents import create_agent as langchain_create_agent
-from langchain.chat_models import init_chat_model
 
+from app.core.llm_models import create_chat_model
 from app.core.stream_events import runtime_stream_event
 
 
@@ -31,7 +31,7 @@ class AgentRuntime:
         create_agent=langchain_create_agent,
         tool_resolver: StaticToolResolver | None = None,
         *,
-        model_factory=init_chat_model,
+        model_factory=create_chat_model,
     ) -> None:
         self._create_agent = create_agent
         self._tool_resolver = tool_resolver or StaticToolResolver()

@@ -6,6 +6,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.core.agent_runtime import AgentRuntime
+from app.core.llm_models import create_chat_model
 
 
 class FakeVersion:
@@ -48,6 +49,10 @@ def test_openai_provider_integration_is_available_without_network() -> None:
     spec = importlib.util.find_spec("langchain_openai")
 
     assert spec is not None
+
+
+def test_runtime_uses_project_chat_model_factory_by_default() -> None:
+    assert AgentRuntime.__init__.__kwdefaults__["model_factory"] is create_chat_model
 
 
 @pytest.mark.asyncio

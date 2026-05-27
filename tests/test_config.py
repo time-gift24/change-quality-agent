@@ -83,6 +83,20 @@ def test_logging_settings_can_be_overridden_by_environment(
     assert settings.access_log_enabled is False
 
 
+def test_codeagent_settings_can_be_overridden_by_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CODEAGENT_BASE_URL", "https://llm.internal/v1")
+    monkeypatch.setenv("CODEAGENT_TOKEN_PROVIDER", "codeagent")
+
+    settings = Settings()
+
+    assert settings.codeagent_base_url == "https://llm.internal/v1"
+    assert settings.codeagent_token_provider == "codeagent"
+
+
 def test_environment_lookup_by_key() -> None:
     settings = Settings(
         environments=[

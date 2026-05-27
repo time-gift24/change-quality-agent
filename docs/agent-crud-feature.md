@@ -56,8 +56,14 @@ An agent draft stores the editable runtime configuration:
 ```json
 {
   "system_prompt": "You are a careful release reviewer.",
-  "model": "openai:gpt-5-mini",
-  "model_config": {"temperature": 0},
+  "model": "codeagent:codeagent-v4-pro",
+  "model_config": {
+    "temperature": 0,
+    "reasoning_effort": "high",
+    "model_kwargs": {
+      "stream_options": {"include_usage": true}
+    }
+  },
   "tool_allowlist": ["search_sop", "read_change"],
   "mcp_server_ids": ["change-docs"]
 }
@@ -74,6 +80,13 @@ Published versions copy the draft into immutable fields:
 The API exposes the JSON key `model_config`. Internally, Pydantic schemas avoid
 the `BaseModel.model_config` naming collision by mapping that external field to
 an internal `model_parameters` attribute where needed.
+
+CodeAgent models use the `codeagent:<model-name>` convention. Internal CodeAgent
+base URL and token provider are configured globally with `CODEAGENT_BASE_URL`
+and `CODEAGENT_TOKEN_PROVIDER=codeagent`; agent drafts do not store provider
+credentials. Token headers are resolved before each model HTTP request so
+long-running agent executions do not reuse headers captured at model construction
+time.
 
 ## Persistence Model
 
@@ -209,7 +222,8 @@ This feature deliberately does not include:
 - React frontend screens.
 - Tool CRUD or real tool registry validation.
 - MCP server CRUD or real MCP server validation.
-- LLM provider configuration UI or provider-specific policy.
+- LLM provider configuration UI or provider-specific policy beyond the v1
+  CodeAgent runtime factory.
 - Dynamic LangGraph node composition.
 - Auth, workspace scoping, sharing, or per-agent permissions.
 - Token-level streaming.
