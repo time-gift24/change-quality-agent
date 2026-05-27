@@ -1,8 +1,7 @@
 from contextlib import asynccontextmanager
-from secrets import compare_digest
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -52,23 +51,16 @@ def get_user_repository(session: SessionDep) -> UserRepository:
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
-def require_mcp_admin(
-    token: Annotated[str | None, Header(alias="X-MCP-Admin-Token")] = None,
-) -> None:
-    if not settings.mcp_admin_token:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="MCP admin token is not configured.",
-        )
-    if token is None or not compare_digest(token, settings.mcp_admin_token):
+def require_mcp_admin(request: Request) -> None:
+    if not settings.auth_enabled:
+        return
+
+    current_user = getattr(request.state, "current_user", None)
+    if current_user is None or not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid MCP admin token.",
+            detail="MCP admin access required.",
         )
-
-
-McpAdminDep = Annotated[None, Depends(require_mcp_admin)]
-
 
 @asynccontextmanager
 async def mcp_runtime_repository_context():

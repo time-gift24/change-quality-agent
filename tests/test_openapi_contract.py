@@ -73,12 +73,9 @@ def test_openapi_includes_mcp_server_routes() -> None:
         for method in methods:
             operation = paths[path][method]
             responses = operation["responses"]
-            assert operation["security"] == [
-                {"CookieAuth": [], "McpAdminToken": []}
-            ]
+            assert operation["security"] == [{"CookieAuth": []}]
             assert "401" in responses
             assert "403" in responses
-            assert "503" in responses
 
     schemas = spec["components"]["schemas"]
     assert {
@@ -88,11 +85,7 @@ def test_openapi_includes_mcp_server_routes() -> None:
         "McpServerDetail",
         "McpLifecycleResponse",
     } <= set(schemas)
-    assert spec["components"]["securitySchemes"]["McpAdminToken"] == {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-MCP-Admin-Token",
-    }
+    assert "McpAdminToken" not in spec["components"]["securitySchemes"]
     lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
         "responses"
     ]

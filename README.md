@@ -13,10 +13,9 @@ checks, managing ReAct agent definitions, and observing long-running work.
 - Exposes generic run observation so clients can inspect status without
   depending on subject-specific fields.
 - Streams persisted run events for replay and progress observation.
-- Manages MCP server configuration and stdio runtime lifecycle behind an
-  authenticated user cookie plus the `X-MCP-Admin-Token` header. Set
-  `mcp_admin_token`, allow commands with `mcp_allowed_stdio_commands`, pin
-  launchable command/first-arg pairs with `mcp_allowed_stdio_specs` such as
+- Manages MCP server configuration and stdio runtime lifecycle for admin users.
+  Allow commands with `mcp_allowed_stdio_commands`, pin launchable
+  command/first-arg pairs with `mcp_allowed_stdio_specs` such as
   `uvx:mcp-server-filesystem`, and only set `mcp_runtime_single_instance=true`
   when the API is deployed as a single process owning MCP child processes.
 - Uses in-process v1 runners while worker leases, checkpoint resume, tool/MCP

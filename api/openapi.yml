@@ -296,7 +296,6 @@ paths:
       operationId: listMcpServers
       security:
       - CookieAuth: []
-        McpAdminToken: []
       responses:
         '200':
           description: MCP servers with redacted config values.
@@ -319,7 +318,6 @@ paths:
       operationId: createMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       requestBody:
         required: true
         content:
@@ -355,7 +353,6 @@ paths:
       operationId: getMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -382,7 +379,6 @@ paths:
       operationId: updateMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       requestBody:
@@ -421,7 +417,6 @@ paths:
       operationId: deleteMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -445,7 +440,6 @@ paths:
       operationId: startMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -475,7 +469,6 @@ paths:
       operationId: stopMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -505,7 +498,6 @@ paths:
       operationId: restartMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -535,7 +527,6 @@ paths:
       operationId: checkMcpServer
       security:
       - CookieAuth: []
-        McpAdminToken: []
       parameters:
       - $ref: '#/components/parameters/McpServerId'
       responses:
@@ -814,10 +805,6 @@ components:
       type: apiKey
       in: cookie
       name: cqa_user
-    McpAdminToken:
-      type: apiKey
-      in: header
-      name: X-MCP-Admin-Token
   parameters:
     SopId:
       name: sop_id
@@ -882,7 +869,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     Forbidden:
-      description: Missing or invalid MCP admin token.
+      description: Authenticated user does not have admin access.
       content:
         application/json:
           schema:

@@ -2,11 +2,9 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { McpServerRuntimeStatus } from "../types";
 
-import { AdminTokenControl } from "../components/AdminTokenControl";
 import { McpBreadcrumb } from "../components/McpBreadcrumb";
 import { McpServerTable } from "../components/McpServerTable";
 import { useMcpMutations, useMcpServers } from "../hooks";
-import { getMcpAdminToken, setMcpAdminToken } from "../adminToken";
 
 export type McpStatusFilter = "all" | McpServerRuntimeStatus;
 
@@ -14,8 +12,6 @@ export function McpListPage() {
   const serversState = useMcpServers();
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<McpStatusFilter>("all");
-  const [adminTokenInput, setAdminTokenInput] = useState(() => getMcpAdminToken());
-  const [adminTokenSaved, setAdminTokenSaved] = useState(false);
   const navigate = useNavigate();
 
   const mutations = useMcpMutations();
@@ -35,15 +31,6 @@ export function McpListPage() {
     if (err instanceof Error) return err.message;
     return String(err);
   })();
-
-  async function handleSaveAdminToken() {
-    setMcpAdminToken(adminTokenInput);
-    setAdminTokenInput(getMcpAdminToken());
-    setAdminTokenSaved(true);
-    if (getMcpAdminToken()) {
-      await serversState.refetch();
-    }
-  }
 
   const runMutation = useCallback(
     async (action: () => Promise<unknown>) => {
@@ -75,12 +62,6 @@ export function McpListPage() {
               管理 MCP server 生命周期与工具快照
             </p>
           </div>
-          <AdminTokenControl
-            onChange={(next) => { setAdminTokenInput(next); setAdminTokenSaved(false); }}
-            onSave={() => { void handleSaveAdminToken(); }}
-            saved={adminTokenSaved}
-            value={adminTokenInput}
-          />
         </div>
       </header>
 

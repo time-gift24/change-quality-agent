@@ -14,11 +14,10 @@ import {
   stopMcpServer,
   updateMcpServer,
 } from "./api";
-import { clearMcpAdminToken, setMcpAdminToken } from "./adminToken";
 import type { McpServerCreate, McpServerDetail, McpServerSummary } from "./types";
 
 afterEach(() => {
-  clearMcpAdminToken();
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
 });
 
@@ -37,15 +36,15 @@ describe("MCP API", () => {
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBeUndefined();
   });
 
-  it("includes MCP admin token header when configured", async () => {
+  it("does not send legacy MCP admin token header from session storage", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
     vi.stubGlobal("fetch", fetchMock);
-    setMcpAdminToken("session-token-1");
+    window.sessionStorage.setItem("mcp-admin-token", "session-token-1");
 
     await listMcpServers();
 
     const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
-    expect(headers.get("X-MCP-Admin-Token")).toBe("session-token-1");
+    expect(headers.get("X-MCP-Admin-Token")).toBeNull();
   });
 
   it("calls get endpoint with GET", async () => {

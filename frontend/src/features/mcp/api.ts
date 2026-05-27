@@ -6,28 +6,27 @@ import type {
   McpServerSummary,
   McpServerUpdate,
 } from "./types";
-import { getMcpAdminToken } from "./adminToken";
 
 const MCP_SERVERS_BASE = "/api/mcp/servers";
 
 export function listMcpServers(): Promise<McpServerSummary[]> {
-  return requestJson<McpServerSummary[]>(MCP_SERVERS_BASE, withMcpAdminToken());
+  return requestJson<McpServerSummary[]>(MCP_SERVERS_BASE);
 }
 
 export function getMcpServer(serverId: string): Promise<McpServerDetail> {
-  return requestJson<McpServerDetail>(buildServerUrl(serverId), withMcpAdminToken());
+  return requestJson<McpServerDetail>(buildServerUrl(serverId));
 }
 
 export function createMcpServer(payload: McpServerCreate): Promise<McpServerDetail> {
   return requestJson<McpServerDetail>(
     MCP_SERVERS_BASE,
-    withMcpAdminToken({
+    {
       body: JSON.stringify(payload),
       headers: {
         "Content-Type": "application/json",
       },
       method: "POST",
-    }),
+    },
   );
 }
 
@@ -37,18 +36,18 @@ export function updateMcpServer(
 ): Promise<McpServerDetail> {
   return requestJson<McpServerDetail>(
     buildServerUrl(serverId),
-    withMcpAdminToken({
+    {
       body: JSON.stringify(payload),
       headers: {
         "Content-Type": "application/json",
       },
       method: "PATCH",
-    }),
+    },
   );
 }
 
 export async function deleteMcpServer(serverId: string): Promise<void> {
-  const init = withMcpAdminToken({ method: "DELETE" });
+  const init: RequestInit = { method: "DELETE" };
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
 
@@ -88,26 +87,8 @@ function postLifecycle(
 ): Promise<McpLifecycleResponse> {
   return requestJson<McpLifecycleResponse>(
     `${buildServerUrl(serverId)}/${action}`,
-    withMcpAdminToken({
+    {
       method: "POST",
-    }),
+    },
   );
-}
-
-type RequestInitWithHeaders = RequestInit & {
-  headers?: HeadersInit;
-};
-
-function withMcpAdminToken(init: RequestInitWithHeaders = {}): RequestInit {
-  const headers = new Headers(init.headers);
-  const adminToken = getMcpAdminToken();
-
-  if (adminToken) {
-    headers.set("X-MCP-Admin-Token", adminToken);
-  }
-
-  return {
-    ...init,
-    headers,
-  };
 }
