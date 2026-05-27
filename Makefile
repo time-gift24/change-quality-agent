@@ -34,7 +34,7 @@ test:
 
 
 dev:
-	LOG_LEVEL=$${LOG_LEVEL:-INFO} ACCESS_LOG_ENABLED=$${ACCESS_LOG_ENABLED:-true} uv run fastapi dev --host $(HOST) --port $(PORT)
+	LOG_LEVEL=$${LOG_LEVEL:-INFO} ACCESS_LOG_ENABLED=$${ACCESS_LOG_ENABLED:-true} AUTH_DEV_MODE=$${AUTH_DEV_MODE:-true} uv run fastapi dev --host $(HOST) --port $(PORT)
 
 
 run:

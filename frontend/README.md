@@ -24,8 +24,11 @@ Implementation notes:
   - `/` redirects to `/sop`.
   - `/sop` renders the SOP quality page.
   - `/mcp` renders the route-guarded MCP management page for server CRUD,
-    lifecycle actions, and tool snapshots. Real administrator authorization and
-    MCP admin token wiring are pending.
+    lifecycle actions, and tool snapshots. Access requires an authenticated
+    admin user; MCP API calls also use the MCP admin token gate.
+- In Vite dev mode, an unauthenticated browser session shows a `common` /
+  `admin` user picker backed by `POST /api/auth/dev-login`. Choosing a user
+  creates the `cqa_user` dev session cookie and reloads the auth bootstrap.
 - Tailwind scans frontend-local Streamdown classes via
   `@source "../../node_modules/streamdown/dist/*.js"` in
   `src/styles/globals.css`.

@@ -10,6 +10,27 @@ def load_contract() -> dict:
     return yaml.safe_load(CONTRACT_PATH.read_text())
 
 
+def test_auth_paths_are_documented() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+
+    assert "/api/auth/me" in paths
+    assert "/api/auth/dev-login" in paths
+    assert "/api/auth/logout" in paths
+    assert {
+        "name": "auth",
+        "description": "Cookie-backed user authentication APIs for local development.",
+    } in contract["tags"]
+    assert contract["components"]["securitySchemes"]["CookieAuth"] == {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cqa_user",
+    }
+    assert "UserPublic" in contract["components"]["schemas"]
+    assert "DevLoginRequest" in contract["components"]["schemas"]
+    assert "401" in paths["/api/auth/me"]["get"]["responses"]
+
+
 def test_openapi_includes_mcp_server_routes() -> None:
     spec = load_contract()
     paths = spec["paths"]
@@ -28,6 +49,7 @@ def test_openapi_includes_mcp_server_routes() -> None:
         assert methods <= set(paths[path])
         for method in methods:
             responses = paths[path][method]["responses"]
+            assert "401" in responses
             assert "403" in responses
             assert "503" in responses
 
@@ -44,7 +66,9 @@ def test_openapi_includes_mcp_server_routes() -> None:
         "in": "header",
         "name": "X-MCP-Admin-Token",
     }
-    assert paths["/api/mcp/servers"]["get"]["security"] == [{"McpAdminToken": []}]
+    assert paths["/api/mcp/servers"]["get"]["security"] == [
+        {"CookieAuth": [], "McpAdminToken": []}
+    ]
 
     lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
         "responses"

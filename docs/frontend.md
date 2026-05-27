@@ -104,6 +104,12 @@ Sidebar rules:
 
 ## Routing And Authorization
 
+The app bootstraps auth before rendering the workspace. In Vite dev mode, a
+401 from `GET /api/auth/me` renders the development user picker for `common`
+and `admin`. Selecting a user calls `POST /api/auth/dev-login`, which creates
+the `cqa_user` dev session cookie, then the frontend refreshes the current-user
+state and enters the app.
+
 MCP routes are protected as a route group in `App.tsx`:
 
 ```tsx
@@ -115,9 +121,9 @@ MCP routes are protected as a route group in `App.tsx`:
 </Route>
 ```
 
-`ProtectedRoute` delegates policy to `useAuthz()`. The current implementation is
-an admin placeholder so MCP pages can be developed locally. Real administrator
-policy should replace `useAuthz()` without changing MCP page components.
+`ProtectedRoute` delegates policy to `useAuthz()`, which reads the authenticated
+user from the auth context. Non-admin users can load SOP pages but receive the
+MCP route-level 403 state.
 
 Navigation rules:
 
@@ -213,8 +219,9 @@ The MCP frontend sends `X-MCP-Admin-Token` for MCP API calls. The token control
 stores the value in browser local state for local testing. Backend enforcement is
 configured through `MCP_ADMIN_TOKEN`.
 
-This admin token is an API access gate for MCP management endpoints. It is not a
-user login session and should not be treated as full application auth.
+This admin token is an MCP-specific API access gate. It is separate from the
+cookie user session, so MCP management requires both an authenticated admin user
+and the configured MCP admin token when backend enforcement is enabled.
 
 ## Local MCP HTTP Echo Server
 
