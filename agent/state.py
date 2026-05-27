@@ -1,7 +1,5 @@
-from typing import Any, TypedDict
+"""Deprecated compatibility wrapper for the SOP quality graph state."""
 
+from agent.sop_quality.state import SopQualityState
 
-class SopQualityState(TypedDict, total=False):
-    run_id: str
-    sop_snapshot: dict[str, Any]
-    status: str
+__all__ = ["SopQualityState"]

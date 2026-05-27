@@ -1,58 +1,15 @@
-from collections.abc import AsyncIterator
-from typing import Any
+"""Deprecated compatibility wrapper for the SOP quality mock graph."""
 
-from langgraph.graph import END, START, StateGraph
+from agent.sop_quality.graph import (
+    build_sop_quality_graph,
+    run_mock_sop_quality_graph,
+    stream_mock_sop_quality_graph,
+    validate_sop_snapshot,
+)
 
-from agent.state import SopQualityState
-
-
-def validate_sop_snapshot(state: SopQualityState) -> dict[str, str]:
-    sop_snapshot = state.get("sop_snapshot")
-    if not isinstance(sop_snapshot, dict) or not sop_snapshot.get("payload"):
-        raise ValueError("SOP snapshot payload is required")
-    return {"status": "mock_success"}
-
-
-def build_sop_quality_graph():
-    graph = StateGraph(SopQualityState)
-    graph.add_node("validate_sop", validate_sop_snapshot)
-    graph.add_edge(START, "validate_sop")
-    graph.add_edge("validate_sop", END)
-    return graph.compile()
-
-
-async def run_mock_sop_quality_graph(
-    *,
-    run_id: str,
-    sop_snapshot: dict[str, Any],
-) -> dict[str, Any]:
-    graph = build_sop_quality_graph()
-    result = await graph.ainvoke(
-        {
-            "run_id": run_id,
-            "sop_snapshot": sop_snapshot,
-        }
-    )
-    return {"status": result["status"]}
-
-
-async def stream_mock_sop_quality_graph(
-    *,
-    run_id: str,
-    sop_snapshot: dict[str, Any],
-) -> AsyncIterator[dict[str, Any]]:
-    yield {
-        "type": "messages",
-        "payload": {"delta": "Validating SOP snapshot."},
-        "node": "validate_sop",
-    }
-    raw_graph_output = await run_mock_sop_quality_graph(
-        run_id=run_id,
-        sop_snapshot=sop_snapshot,
-    )
-    yield {
-        "type": "updates",
-        "payload": {"status": raw_graph_output["status"]},
-        "node": "validate_sop",
-        "raw_graph_output": raw_graph_output,
-    }
+__all__ = [
+    "build_sop_quality_graph",
+    "run_mock_sop_quality_graph",
+    "stream_mock_sop_quality_graph",
+    "validate_sop_snapshot",
+]
