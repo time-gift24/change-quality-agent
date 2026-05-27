@@ -1,7 +1,7 @@
 """create mcp servers
 
-Revision ID: 20260526_0003
-Revises: 20260526_0002
+Revision ID: 20260526_0002
+Revises: 20260525_0001
 Create Date: 2026-05-26
 
 """
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = "20260526_0003"
-down_revision: str | Sequence[str] | None = "20260526_0002"
+revision: str = "20260526_0002"
+down_revision: str | Sequence[str] | None = "20260525_0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
