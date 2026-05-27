@@ -3,9 +3,8 @@ from uuid import uuid4
 import pytest
 
 from app.models.agents import Agent
-from app.agent.sop_quality import stream_sop_quality_agent
+from app.agent.sop_quality import run_sop_quality_graph, stream_sop_quality_agent
 from app.schemas.runs import RunStatus
-from app.services.sop_quality import run_sop_quality_graph
 
 
 class FakeVersion:
