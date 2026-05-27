@@ -49,6 +49,63 @@ describe("run event reducer", () => {
     expect(state.nodes.check_steps?.streamText).toBe("**checking** steps");
   });
 
+  it("uses final assistant messages to replace partial stream text", () => {
+    const streaming = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 2,
+        payload: { delta: "alpha\nbet" },
+      }),
+    );
+
+    const state = reduceRunEvent(
+      streaming,
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 3,
+        payload: {
+          final: true,
+          messages: [
+            { role: "user", content: "check this SOP" },
+            { role: "assistant", content: "alpha\nbeta\ngamma" },
+          ],
+        },
+      }),
+    );
+
+    expect(state.nodes.check_steps?.streamText).toBe("alpha\nbeta\ngamma");
+  });
+
+  it("does not duplicate final assistant messages after complete deltas", () => {
+    const streaming = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 2,
+        payload: { delta: "alpha\nbeta\ngamma" },
+      }),
+    );
+
+    const state = reduceRunEvent(
+      streaming,
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 3,
+        payload: {
+          final: true,
+          messages: [{ role: "assistant", content: "alpha\nbeta\ngamma" }],
+        },
+      }),
+    );
+
+    expect(state.nodes.check_steps?.streamText).toBe("alpha\nbeta\ngamma");
+  });
+
   it("stores update values and marks the node done", () => {
     const value = { checked_steps: 3 };
     const state = reduceRunEvent(
@@ -104,6 +161,21 @@ describe("run event reducer", () => {
     );
 
     expect(state.nodes.check_steps?.progress).toEqual(progress);
+  });
+
+  it("does not show custom start log events as assistant output nodes", () => {
+    const state = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "custom",
+        node: "start",
+        sequence: 1,
+        payload: { message: "Started SOP quality agent." },
+      }),
+    );
+
+    expect(state.nodes.start).toBeUndefined();
+    expect(state.events).toHaveLength(1);
   });
 
   it("marks the run stopped when done arrives", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { useRecentSopRuns, useSopEnvironments } from "../features/sop/hooks";
@@ -12,12 +12,22 @@ export function RecentSopSidebarPanel({ refreshKey = 0 }: { refreshKey?: number 
   const navigate = useNavigate();
   const location = useLocation();
   const activeRunId = new URLSearchParams(location.search).get("runId");
+  const historyScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
       setSelectedEnv(environments.data[0].key);
     }
   }, [environments.data, selectedEnv]);
+
+  useEffect(() => {
+    const scrollArea = historyScrollRef.current;
+    if (!recentOpen || history.loading || history.data.length === 0 || !scrollArea) {
+      return;
+    }
+
+    scrollArea.scrollTop = scrollArea.scrollHeight;
+  }, [history.data.length, history.loading, recentOpen]);
 
   return (
     <div className="flex h-full flex-col">
@@ -35,7 +45,11 @@ export function RecentSopSidebarPanel({ refreshKey = 0 }: { refreshKey?: number 
       </div>
 
       {recentOpen ? (
-        <div className="mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div
+          className="mt-1 min-h-0 flex-1 overflow-y-auto px-2 pb-4"
+          data-testid="recent-sop-scroll-area"
+          ref={historyScrollRef}
+        >
           {environments.error ? (
             <p className="px-2 py-1 text-xs text-error-deep" role="alert">
               {environments.error.message}

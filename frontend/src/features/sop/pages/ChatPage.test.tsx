@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -95,6 +96,25 @@ describe("ChatPage", () => {
       label.compareDocumentPosition(chevron!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it("scrolls recent history to the bottom after loading", async () => {
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get() {
+        return 480;
+      },
+    });
+    vi.stubGlobal("fetch", fetchByRequest());
+
+    renderAppAt();
+
+    await screen.findByRole("button", { name: "release-checklist" });
+    const scrollArea = screen.getByTestId("recent-sop-scroll-area");
+
+    await waitFor(() => {
+      expect(scrollArea.scrollTop).toBe(480);
+    });
   });
 
   it("shows the MCP 管理 entry inside the same sidebar as 发起新SOP质检", async () => {

@@ -3,16 +3,14 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 
+from app.agent.sop_quality import run_sop_quality_graph_with_new_session
 from app.api.deps import RunRepositoryDep, SessionDep, SopClientDep
 from app.api.v1.run_views import run_to_summary
 from app.core.config import settings
 from app.schemas.runs import ActiveRunConflict, RunStartResponse, RunSummary
 from app.schemas.sop import EnvironmentPublic, SopSnapshot
 from app.services.sop_client import SopClientError, SopNotFoundError
-from app.services.sop_quality import (
-    SopQualityService,
-    run_sop_quality_graph_with_new_session,
-)
+from app.services.sop_quality import SopQualityService
 
 router = APIRouter(prefix="/api/sop", tags=["sop"])
 

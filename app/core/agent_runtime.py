@@ -7,9 +7,11 @@ from typing import Any
 from langchain.agents import create_agent as langchain_create_agent
 from langchain.chat_models import init_chat_model
 
+from app.core.stream_events import runtime_stream_event
+
 
 @dataclass(frozen=True)
-class AgentRunResult:
+class AgentRuntimeResult:
     messages: list[dict[str, Any]]
     raw_output: dict[str, Any]
 
@@ -40,7 +42,49 @@ class AgentRuntime:
         *,
         version: Any,
         messages: list[dict[str, Any]],
-    ) -> AgentRunResult:
+    ) -> AgentRuntimeResult:
+        agent = await self._build_agent(version)
+        raw_output = await self._invoke(agent, {"messages": messages})
+        output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
+        return AgentRuntimeResult(
+            messages=_extract_messages(output),
+            raw_output=output,
+        )
+
+    async def stream(
+        self,
+        *,
+        version: Any,
+        messages: list[dict[str, Any]],
+    ):
+        agent = await self._build_agent(version)
+        payload = {"messages": messages}
+
+        astream = getattr(agent, "astream", None)
+        if astream is None:
+            raw_output = await self._invoke(agent, payload)
+            output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
+            yield {
+                "type": "messages",
+                "node": "agent",
+                "payload": {
+                    "final": True,
+                    "messages": _extract_messages(output),
+                },
+            }
+            return
+
+        stream = astream(
+            payload,
+            stream_mode=["messages", "updates", "custom"],
+        )
+        if inspect.isawaitable(stream):
+            stream = await stream
+
+        async for chunk_type, chunk in stream:
+            yield runtime_stream_event(chunk_type, chunk)
+
+    async def _build_agent(self, version: Any) -> Any:
         tools = self._tool_resolver.resolve(
             list(getattr(version, "tool_allowlist", [])),
             list(getattr(version, "mcp_server_ids", [])),
@@ -54,12 +98,7 @@ class AgentRuntime:
             tools=tools,
             system_prompt=version.system_prompt,
         )
-        raw_output = await self._invoke(agent, {"messages": messages})
-        output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
-        return AgentRunResult(
-            messages=_extract_messages(output),
-            raw_output=output,
-        )
+        return agent
 
     async def _invoke(self, agent: Any, payload: dict[str, Any]) -> Any:
         invoke = getattr(agent, "ainvoke", None)

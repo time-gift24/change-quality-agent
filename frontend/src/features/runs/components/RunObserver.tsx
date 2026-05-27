@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { useRun } from "../hooks";
 import { getOrderedNodeIds, type RunViewState } from "../reducer";
 import type { RunSummary } from "../types";
@@ -67,6 +69,27 @@ export function RunObserverView({
   const runError = collectRunError(state, summary);
   const showAssistantPlaceholder =
     orderedNodeIds.length === 0 && !runError && state.isRunning;
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (!bottom) {
+      return;
+    }
+
+    scrollToBottom(bottom);
+    const animationFrame = window.requestAnimationFrame(() => {
+      scrollToBottom(bottom);
+    });
+    const timeout = window.setTimeout(() => {
+      scrollToBottom(bottom);
+    }, 50);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      window.clearTimeout(timeout);
+    };
+  }, [state.latestSequence, summary.run_id]);
 
   return (
     <section
@@ -99,6 +122,7 @@ export function RunObserverView({
       {runError ? <AssistantError message={runError} /> : null}
 
       <RunFootnote summary={summary} state={state} />
+      <div aria-hidden="true" className="h-px" ref={bottomRef} />
     </section>
   );
 }
@@ -153,6 +177,34 @@ function AssistantTurn({
       </div>
     </article>
   );
+}
+
+function scrollToBottom(target: HTMLElement): void {
+  const scrollParent = findScrollParent(target);
+  if (scrollParent) {
+    scrollParent.scrollTop = scrollParent.scrollHeight;
+    return;
+  }
+
+  const scrollIntoView = target.scrollIntoView;
+  if (typeof scrollIntoView === "function") {
+    scrollIntoView.call(target, {
+      block: "end",
+      behavior: "smooth",
+    });
+  }
+}
+
+function findScrollParent(target: HTMLElement): HTMLElement | null {
+  let parent = target.parentElement;
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
 }
 
 function AssistantPlaceholder() {

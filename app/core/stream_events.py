@@ -37,6 +37,29 @@ def normalize_langgraph_chunk(
     }
 
 
+def runtime_stream_event(chunk_type: str, chunk: object) -> dict[str, Any]:
+    event = normalize_langgraph_chunk(
+        chunk_type=chunk_type,
+        chunk=chunk,
+        run_id="",
+        thread_id="",
+        sequence=0,
+    )
+    payload = dict(event["payload"])
+    if chunk_type == "messages":
+        payload["delta"] = _message_delta(chunk)
+
+    runtime_event = {
+        "type": event["type"],
+        "node": event["node"] or "agent",
+        "payload": payload,
+    }
+    for key in ("checkpoint_id", "task_id"):
+        if event[key] is not None:
+            runtime_event[key] = event[key]
+    return runtime_event
+
+
 def _build_payload(
     event_type: str,
     chunk: object,
@@ -81,6 +104,37 @@ def _extract_metadata(chunk: object) -> Mapping[str, object]:
         if isinstance(metadata, Mapping):
             return metadata
     return {}
+
+
+def _message_delta(chunk: object) -> str | None:
+    message = chunk[0] if _is_message_tuple(chunk) else chunk
+    if isinstance(message, str):
+        return message
+    if isinstance(message, Mapping):
+        return _content_delta(message.get("content"))
+    return _content_delta(getattr(message, "content", None))
+
+
+def _content_delta(content: object) -> str | None:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, Sequence) and not isinstance(content, str | bytes):
+        parts = []
+        for block in content:
+            text = _text_block_delta(block)
+            if text:
+                parts.append(text)
+        return "".join(parts) if parts else None
+    return None
+
+
+def _text_block_delta(block: object) -> str | None:
+    if isinstance(block, str):
+        return block
+    if isinstance(block, Mapping):
+        text = block.get("text")
+        return text if isinstance(text, str) else None
+    return None
 
 
 def _is_message_tuple(chunk: object) -> bool:

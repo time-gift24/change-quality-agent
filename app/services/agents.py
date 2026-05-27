@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.react_runtime import AgentRuntime, to_jsonable
+from app.core.agent_runtime import AgentRuntime, to_jsonable
+from app.core.agent_streaming import consume_runtime_stream
 from app.core.database import async_session
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
@@ -199,25 +200,49 @@ async def run_agent_test(
             node="start",
         )
         await _commit_if_available(run_repository)
-        result = await runtime.run(
-            version=version,
-            messages=list(run.subject_snapshot.get("messages", [])),
-        )
-        result_messages = to_jsonable(result.messages)
-        raw_graph_output = to_jsonable(result.raw_output)
-        await run_repository.append_event(
-            run_id,
-            event_type="messages",
-            thread_id=run.thread_id,
-            payload={"messages": result_messages},
-            node="agent",
-        )
-        await run_repository.append_event(
-            run_id,
-            event_type="done",
-            thread_id=run.thread_id,
-            payload={"status": "done", "result_status": "success"},
-        )
+        input_messages = list(run.subject_snapshot.get("messages", []))
+        stream = getattr(runtime, "stream", None)
+        if stream is not None:
+            events = stream(version=version, messages=input_messages)
+            if inspect.isawaitable(events):
+                events = await events
+            stream_result = await consume_runtime_stream(
+                run_repository,
+                run,
+                events,
+            )
+            if stream_result.error is not None:
+                await run_repository.mark_terminal(
+                    run_id,
+                    RunStatus.error,
+                    error=stream_result.error,
+                    result_status="error",
+                )
+                await _commit_if_available(run_repository)
+                return {"status": "error", "error": stream_result.error}
+            result_messages = stream_result.messages
+            raw_graph_output = stream_result.raw_graph_output
+        else:
+            result = await runtime.run(
+                version=version,
+                messages=input_messages,
+            )
+            result_messages = to_jsonable(result.messages)
+            raw_graph_output = to_jsonable(result.raw_output)
+            await run_repository.append_event(
+                run_id,
+                event_type="messages",
+                thread_id=run.thread_id,
+                payload={"messages": result_messages},
+                node="agent",
+            )
+        if stream is None or not stream_result.done_seen:
+            await run_repository.append_event(
+                run_id,
+                event_type="done",
+                thread_id=run.thread_id,
+                payload={"status": "done", "result_status": "success"},
+            )
         await run_repository.mark_terminal(
             run_id,
             RunStatus.success,
