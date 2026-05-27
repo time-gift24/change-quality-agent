@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Index, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -27,7 +28,7 @@ class User(Base):
         server_default=text("false"),
     )
     meta: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
+        MutableDict.as_mutable(JSONB),
         nullable=False,
         default=dict,
         server_default=text("'{}'::jsonb"),
