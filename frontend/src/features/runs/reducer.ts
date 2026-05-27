@@ -129,6 +129,10 @@ export function reduceRunEvent(
   }
 
   if (event.type === "custom") {
+    if (event.node === "start" && event.payload.progress === undefined) {
+      return nextState;
+    }
+
     return updateNode(
       nextState,
       event.node,

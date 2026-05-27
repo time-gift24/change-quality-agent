@@ -163,6 +163,21 @@ describe("run event reducer", () => {
     expect(state.nodes.check_steps?.progress).toEqual(progress);
   });
 
+  it("does not show custom start log events as assistant output nodes", () => {
+    const state = reduceRunEvent(
+      createInitialRunViewState(),
+      event({
+        type: "custom",
+        node: "start",
+        sequence: 1,
+        payload: { message: "Started SOP quality agent." },
+      }),
+    );
+
+    expect(state.nodes.start).toBeUndefined();
+    expect(state.events).toHaveLength(1);
+  });
+
   it("marks the run stopped when done arrives", () => {
     const state = reduceRunEvent(
       { ...createInitialRunViewState(), isRunning: true },

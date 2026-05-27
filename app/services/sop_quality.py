@@ -1,15 +1,20 @@
 import inspect
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.graph import stream_mock_sop_quality_graph
+from agent.react_runtime import AgentRuntime
 from app.core.config import Settings
 from app.core.database import async_session
+from app.repositories.agents import AgentRepository
 from app.repositories.runs import ActiveRunExistsError, RunRepository
 from app.schemas.runs import RunStatus
+from app.services.agents import _consume_runtime_stream
 from app.services.sop_client import SopClient
+
+SOP_QUALITY_AGENT_KEY = "sop-quality-v1"
 
 
 @dataclass(frozen=True)
@@ -100,48 +105,78 @@ class SopQualityService:
 async def run_sop_quality_graph(
     run_id: UUID,
     repository: RunRepository,
+    *,
+    agent_repository: AgentRepository | None = None,
+    runtime: AgentRuntime | None = None,
+    agent_key: str = SOP_QUALITY_AGENT_KEY,
 ) -> dict[str, Any]:
     run = await repository.mark_running(run_id)
+    runtime = runtime or AgentRuntime()
     try:
+        if agent_repository is None:
+            raise RuntimeError("SOP quality agent repository is not configured.")
+        agent = await agent_repository.get_agent(agent_key)
+        if agent is None:
+            raise RuntimeError(f"SOP quality agent not found: {agent_key}")
+        if not agent.enabled:
+            raise RuntimeError(f"SOP quality agent is disabled: {agent_key}")
+        version = agent.latest_version
+        if version is None:
+            raise RuntimeError(f"SOP quality agent has no published version: {agent_key}")
+
         await repository.append_event(
             run_id,
             event_type="custom",
             thread_id=run.thread_id,
-            payload={"message": "Started mock SOP quality graph."},
+            payload={
+                "message": "Started SOP quality agent.",
+                "agent_key": agent_key,
+                "agent_version_number": version.version_number,
+            },
             node="start",
         )
         await _commit_if_available(repository)
-        raw_graph_output: dict[str, Any] | None = None
-        async for event in stream_mock_sop_quality_graph(
-            run_id=str(run_id),
-            sop_snapshot=run.subject_snapshot,
-        ):
-            raw_graph_output = event.get("raw_graph_output", raw_graph_output)
-            await repository.append_event(
+
+        stream = getattr(runtime, "stream", None)
+        if stream is None:
+            raise RuntimeError("SOP quality agent runtime does not support streaming.")
+        stream_result = await _consume_runtime_stream(
+            repository,
+            run,
+            stream,
+            version=version,
+            messages=[_sop_quality_user_message(run)],
+        )
+        if stream_result.error is not None:
+            await repository.mark_terminal(
                 run_id,
-                event_type=event["type"],
-                thread_id=run.thread_id,
-                payload=event["payload"],
-                node=event.get("node"),
+                RunStatus.error,
+                error=stream_result.error,
+                result_status="error",
             )
             await _commit_if_available(repository)
-        if raw_graph_output is None:
-            raise RuntimeError("SOP quality stream ended without raw graph output")
-        await repository.append_event(
-            run_id,
-            event_type="done",
-            thread_id=run.thread_id,
-            payload={"status": "done", "result_status": "mock_success"},
-        )
+            return {"status": "error", "error": stream_result.error}
+
+        if not stream_result.done_seen:
+            await repository.append_event(
+                run_id,
+                event_type="done",
+                thread_id=run.thread_id,
+                payload={"status": "done", "result_status": "success"},
+            )
         await repository.mark_terminal(
             run_id,
             RunStatus.success,
-            raw_graph_output=raw_graph_output,
-            structured_result=None,
-            result_status="mock_success",
+            raw_graph_output=stream_result.raw_graph_output,
+            structured_result={"messages": stream_result.messages},
+            result_status="success",
         )
         await _commit_if_available(repository)
-        return raw_graph_output
+        return {
+            "status": "success",
+            "messages": stream_result.messages,
+            "raw_graph_output": stream_result.raw_graph_output,
+        }
     except Exception as exc:
         error = {"type": type(exc).__name__, "message": str(exc)}
         await repository.append_event(
@@ -163,10 +198,31 @@ async def run_sop_quality_graph(
 async def run_sop_quality_graph_with_new_session(run_id: UUID) -> dict[str, Any]:
     async with async_session() as session:
         repository = RunRepository(session)
-        return await run_sop_quality_graph(run_id, repository)
+        agent_repository = AgentRepository(session)
+        return await run_sop_quality_graph(
+            run_id,
+            repository,
+            agent_repository=agent_repository,
+        )
 
 
 async def _commit_if_available(repository: RunRepository) -> None:
     commit = getattr(repository, "commit", None)
     if commit is not None:
         await commit()
+
+
+def _sop_quality_user_message(run: Any) -> dict[str, str]:
+    sop_snapshot = json.dumps(
+        run.subject_snapshot,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return {
+        "role": "user",
+        "content": (
+            "请对以下 SOP 快照执行质量检查，指出步骤完整性、发布风险和需要补充的验证项。\n\n"
+            f"SOP ID: {run.subject_id}\n"
+            f"SOP Snapshot JSON:\n{sop_snapshot}"
+        ),
+    }

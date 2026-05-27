@@ -2,14 +2,35 @@ from uuid import uuid4
 
 import pytest
 
+from app.models.agents import Agent
 from app.schemas.runs import RunStatus
 from app.services.sop_quality import run_sop_quality_graph
+
+
+class FakeVersion:
+    def __init__(self) -> None:
+        self.id = uuid4()
+        self.agent_id = uuid4()
+        self.version_number = 1
+        self.model = "openai:deepseek-chat"
+        self.system_prompt = "Review SOP quality."
+        self.model_config = {"temperature": 0}
+        self.tool_allowlist = []
+        self.mcp_server_ids = []
+
+
+class FakeAgent:
+    def __init__(self, version: FakeVersion | None) -> None:
+        self.key = "sop-quality-v1"
+        self.enabled = True
+        self.latest_version = version
 
 
 class FakeRun:
     def __init__(self) -> None:
         self.id = uuid4()
         self.thread_id = "thread-1"
+        self.subject_id = "release-checklist"
         self.subject_snapshot = {
             "sop_id": "release-checklist",
             "payload": {"steps": [{"id": "prepare"}]},
@@ -51,97 +72,181 @@ class FakeRepository:
         self.operations.append("commit")
 
 
+class FakeAgentRepository:
+    def __init__(self, agent: Agent | FakeAgent | None) -> None:
+        self.agent = agent
+        self.lookups: list[str] = []
+
+    async def get_agent(self, key: str):
+        self.lookups.append(key)
+        return self.agent
+
+
+class FakeStreamingRuntime:
+    def __init__(self, events: list[dict[str, object]] | None = None) -> None:
+        self.events = events or [
+            {
+                "type": "messages",
+                "node": "model",
+                "payload": {"delta": "SOP looks"},
+            },
+            {
+                "type": "messages",
+                "node": "model",
+                "payload": {"delta": " reviewable."},
+            },
+        ]
+        self.calls: list[dict[str, object]] = []
+
+    async def stream(self, *, version, messages):
+        self.calls.append({"version": version, "messages": messages})
+        for event in self.events:
+            yield event
+
+
 @pytest.mark.asyncio
-async def test_graph_runner_streams_message_before_update_and_done() -> None:
+async def test_graph_runner_streams_sop_quality_agent_events() -> None:
     run = FakeRun()
     repository = FakeRepository(run)
+    version = FakeVersion()
+    agent_repository = FakeAgentRepository(FakeAgent(version))
+    runtime = FakeStreamingRuntime()
 
-    await run_sop_quality_graph(run.id, repository)
+    await run_sop_quality_graph(
+        run.id,
+        repository,
+        agent_repository=agent_repository,
+        runtime=runtime,
+    )
 
     assert repository.marked_running is True
     assert [event["event_type"] for event in repository.events] == [
         "custom",
         "messages",
-        "updates",
+        "messages",
         "done",
     ]
-    assert repository.events[1]["payload"]["delta"]
+    assert agent_repository.lookups == ["sop-quality-v1"]
+    assert runtime.calls[0]["version"] is version
+    assert runtime.calls[0]["messages"][0]["role"] == "user"
+    assert "release-checklist" in runtime.calls[0]["messages"][0]["content"]
+    assert repository.events[1]["payload"]["delta"] == "SOP looks"
     assert repository.operations == [
         "append_event:custom",
         "commit",
         "append_event:messages",
         "commit",
-        "append_event:updates",
+        "append_event:messages",
         "commit",
         "append_event:done",
         "mark_terminal:success",
         "commit",
     ]
-    assert repository.raw_graph_output == {"status": "mock_success"}
+    assert repository.terminal_kwargs["structured_result"] == {
+        "messages": [{"role": "assistant", "content": "SOP looks reviewable."}]
+    }
     assert repository.terminal_status == RunStatus.success
     assert repository.committed is True
 
 
 @pytest.mark.asyncio
-async def test_graph_runner_persists_error_event(monkeypatch) -> None:
-    async def fail_stream(*, run_id, sop_snapshot):
-        raise ValueError("invalid SOP payload")
-        yield
-
-    monkeypatch.setattr("app.services.sop_quality.stream_mock_sop_quality_graph", fail_stream)
+async def test_graph_runner_marks_error_when_sop_quality_agent_is_missing() -> None:
     run = FakeRun()
     repository = FakeRepository(run)
 
-    result = await run_sop_quality_graph(run.id, repository)
-
-    assert result["status"] == "error"
-    assert repository.terminal_status == RunStatus.error
-    assert repository.terminal_kwargs["error"] == {
-        "type": "ValueError",
-        "message": "invalid SOP payload",
-    }
-    assert repository.events[-1]["event_type"] == "error"
-    assert repository.events[-1]["payload"] == {
-        "type": "ValueError",
-        "message": "invalid SOP payload",
-    }
-    assert repository.committed is True
-
-
-@pytest.mark.asyncio
-async def test_graph_runner_marks_error_when_stream_has_no_raw_graph_output(
-    monkeypatch,
-) -> None:
-    async def stream_without_raw_output(*, run_id, sop_snapshot):
-        yield {
-            "type": "messages",
-            "payload": {"delta": "Validating SOP snapshot."},
-            "node": "validate_sop",
-        }
-        yield {
-            "type": "updates",
-            "payload": {"status": "mock_success"},
-            "node": "validate_sop",
-        }
-
-    monkeypatch.setattr(
-        "app.services.sop_quality.stream_mock_sop_quality_graph",
-        stream_without_raw_output,
+    result = await run_sop_quality_graph(
+        run.id,
+        repository,
+        agent_repository=FakeAgentRepository(None),
+        runtime=FakeStreamingRuntime(),
     )
-    run = FakeRun()
-    repository = FakeRepository(run)
-
-    result = await run_sop_quality_graph(run.id, repository)
 
     assert result["status"] == "error"
     assert repository.terminal_status == RunStatus.error
     assert repository.terminal_kwargs["error"] == {
         "type": "RuntimeError",
-        "message": "SOP quality stream ended without raw graph output",
+        "message": "SOP quality agent not found: sop-quality-v1",
+    }
+    assert repository.events[-1]["event_type"] == "error"
+    assert repository.events[-1]["payload"] == {
+        "type": "RuntimeError",
+        "message": "SOP quality agent not found: sop-quality-v1",
+    }
+    assert repository.committed is True
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_marks_error_when_agent_stream_yields_error() -> None:
+    run = FakeRun()
+    repository = FakeRepository(run)
+    version = FakeVersion()
+    runtime = FakeStreamingRuntime(
+        [
+            {
+                "type": "messages",
+                "payload": {"delta": "partial"},
+                "node": "model",
+            },
+            {
+                "type": "error",
+                "payload": {"type": "RuntimeError", "message": "agent failed"},
+                "node": "model",
+            },
+        ]
+    )
+
+    result = await run_sop_quality_graph(
+        run.id,
+        repository,
+        agent_repository=FakeAgentRepository(FakeAgent(version)),
+        runtime=runtime,
+    )
+
+    assert result["status"] == "error"
+    assert repository.terminal_status == RunStatus.error
+    assert repository.terminal_kwargs["error"] == {
+        "type": "RuntimeError",
+        "message": "agent failed",
     }
     assert [event["event_type"] for event in repository.events] == [
         "custom",
         "messages",
-        "updates",
         "error",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_graph_runner_does_not_duplicate_streamed_done_event() -> None:
+    run = FakeRun()
+    repository = FakeRepository(run)
+    version = FakeVersion()
+    runtime = FakeStreamingRuntime(
+        [
+            {
+                "type": "messages",
+                "payload": {
+                    "final": True,
+                    "messages": [{"role": "assistant", "content": "done"}],
+                },
+                "node": "model",
+            },
+            {
+                "type": "done",
+                "payload": {"status": "done", "result_status": "success"},
+            },
+        ]
+    )
+
+    result = await run_sop_quality_graph(
+        run.id,
+        repository,
+        agent_repository=FakeAgentRepository(FakeAgent(version)),
+        runtime=runtime,
+    )
+
+    assert result["status"] == "success"
+    assert [event["event_type"] for event in repository.events] == [
+        "custom",
+        "messages",
+        "done",
     ]
