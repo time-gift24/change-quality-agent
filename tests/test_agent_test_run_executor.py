@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
-from app.core.agent_runtime import AgentRunResult
+from app.core.agent_runtime import AgentRuntimeResult
 from app.schemas.runs import RunStatus
 from app.services.agents import run_agent_test
 
@@ -104,7 +104,7 @@ class FakeAgentRepository:
 class FakeRuntime:
     def __init__(
         self,
-        result: AgentRunResult | None = None,
+        result: AgentRuntimeResult | None = None,
         exc: Exception | None = None,
         order: list[str] | None = None,
     ):
@@ -166,7 +166,7 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
     run = FakeRun(version)
     run_repository = FakeRunRepository(run)
     agent_repository = FakeAgentRepository(version)
-    result = AgentRunResult(
+    result = AgentRuntimeResult(
         messages=[{"role": "assistant", "content": "Review passed."}],
         raw_output={"messages": [{"role": "assistant", "content": "Review passed."}]},
     )
@@ -485,7 +485,7 @@ async def test_run_agent_test_commits_running_start_before_runtime() -> None:
     run = FakeRun(version)
     run_repository = FakeRunRepository(run, order=order)
     agent_repository = FakeAgentRepository(version)
-    result = AgentRunResult(
+    result = AgentRuntimeResult(
         messages=[{"role": "assistant", "content": "Review passed."}],
         raw_output={"messages": [{"role": "assistant", "content": "Review passed."}]},
     )
@@ -516,7 +516,7 @@ async def test_run_agent_test_sanitizes_raw_graph_output_before_persistence() ->
     run = FakeRun(version)
     run_repository = FakeRunRepository(run)
     agent_repository = FakeAgentRepository(version)
-    result = AgentRunResult(
+    result = AgentRuntimeResult(
         messages=[{"role": "assistant", "content": "Review passed."}],
         raw_output={
             "messages": [AIMessage(content="Review passed.")],
@@ -578,7 +578,7 @@ async def test_run_agent_test_marks_error_when_version_is_missing() -> None:
     version = FakeVersion()
     run = FakeRun(version)
     run_repository = FakeRunRepository(run)
-    runtime = FakeRuntime(result=AgentRunResult(messages=[], raw_output={}))
+    runtime = FakeRuntime(result=AgentRuntimeResult(messages=[], raw_output={}))
 
     await run_agent_test(
         run.id,

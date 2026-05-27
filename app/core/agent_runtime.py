@@ -11,7 +11,7 @@ from app.core.stream_events import runtime_stream_event
 
 
 @dataclass(frozen=True)
-class AgentRunResult:
+class AgentRuntimeResult:
     messages: list[dict[str, Any]]
     raw_output: dict[str, Any]
 
@@ -42,11 +42,11 @@ class AgentRuntime:
         *,
         version: Any,
         messages: list[dict[str, Any]],
-    ) -> AgentRunResult:
+    ) -> AgentRuntimeResult:
         agent = await self._build_agent(version)
         raw_output = await self._invoke(agent, {"messages": messages})
         output = to_jsonable(raw_output) if isinstance(raw_output, Mapping) else {}
-        return AgentRunResult(
+        return AgentRuntimeResult(
             messages=_extract_messages(output),
             raw_output=output,
         )
