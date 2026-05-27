@@ -19,6 +19,13 @@ import { RecentSopSidebarPanel } from "./RecentSopSidebarPanel";
 import { WorkspaceLayoutProvider } from "./WorkspaceLayoutContext";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { ProtectedRoute } from "./routing/ProtectedRoute";
+import { useAuthz } from "./routing/useAuthz";
+import {
+  getVisibleWorkspaceSidebarRoutes,
+  getWorkspaceRouteKey,
+  workspaceRoutes,
+  type WorkspaceRouteKey,
+} from "./routing/workspaceRoutes";
 
 export function App() {
   return (
@@ -28,7 +35,7 @@ export function App() {
           <Route element={<AuthenticatedWorkspace />} path="/">
             <Route element={<Navigate replace to="/sop" />} index />
             <Route element={<ChatPage />} path="sop" />
-            <Route element={<ProtectedRoute />}>
+            <Route element={<ProtectedRoute route={workspaceRoutes.mcp} />}>
               <Route element={<McpListPage />} path="mcp" />
               <Route element={<McpCreatePage />} path="mcp/new" />
               <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
@@ -77,7 +84,12 @@ function WorkspaceFrame() {
   const [recentRefreshKey, setRecentRefreshKey] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const activeKey = location.pathname.startsWith("/mcp") ? "mcp" : "sop";
+  const authz = useAuthz();
+  const activeKey = getWorkspaceRouteKey(location.pathname);
+  const navRoutes = useMemo(
+    () => getVisibleWorkspaceSidebarRoutes(authz),
+    [authz],
+  );
   const registerNewConversationHandler = useCallback((handler: (() => void) | null) => {
     setNewConversationHandler(() => handler);
   }, []);
@@ -100,13 +112,17 @@ function WorkspaceFrame() {
     navigate("/sop");
   }
 
+  function handleNavigate(routeKey: WorkspaceRouteKey) {
+    navigate(workspaceRoutes[routeKey].path);
+  }
+
   return (
     <WorkspaceLayoutProvider value={layoutContext}>
       <div className="flex h-screen overflow-hidden bg-canvas text-ink bg-aurora">
         <WorkspaceSidebar
           activeKey={activeKey}
-          onNavigateMcp={() => navigate("/mcp")}
-          onNavigateSop={() => navigate("/sop")}
+          navRoutes={navRoutes}
+          onNavigate={handleNavigate}
           onNewConversation={handleNewConversation}
           onToggle={() => setSidebarOpen((value) => !value)}
           open={sidebarOpen}

@@ -1,11 +1,19 @@
 import { Link, Outlet } from "react-router-dom";
 
 import { useAuthz } from "./useAuthz";
+import {
+  canAccessWorkspaceRoute,
+  type WorkspaceRouteDefinition,
+} from "./workspaceRoutes";
 
-export function ProtectedRoute() {
-  const { isAdmin } = useAuthz();
+type ProtectedRouteProps = {
+  route: WorkspaceRouteDefinition;
+};
 
-  if (!isAdmin) {
+export function ProtectedRoute({ route }: ProtectedRouteProps) {
+  const authz = useAuthz();
+
+  if (!canAccessWorkspaceRoute(route, authz)) {
     return (
       <main
         aria-labelledby="forbidden-title"

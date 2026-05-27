@@ -67,6 +67,28 @@ describe("App", () => {
     expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
   });
 
+  it("hides MCP navigation for a common user", async () => {
+    window.history.pushState({}, "", "/sop");
+    vi.mocked(getCurrentUser).mockResolvedValue(buildUser({ is_admin: false }));
+
+    render(<App />);
+
+    expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "MCP 管理" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows MCP navigation for an admin user", async () => {
+    window.history.pushState({}, "", "/sop");
+    vi.mocked(getCurrentUser).mockResolvedValue(buildUser({ is_admin: true }));
+
+    render(<App />);
+
+    expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
+  });
+
   it("shows dev user picker when auth bootstrap is anonymous", async () => {
     vi.mocked(getCurrentUser).mockRejectedValue(
       new ApiError(401, "Unauthorized", "Authentication required."),
