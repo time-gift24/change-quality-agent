@@ -4,27 +4,30 @@
 
 @theme {
   --color-canvas: #ffffff;
-  --color-canvas-soft: #f5f7fb;
-  --color-canvas-soft-2: #eef2f9;
-  --color-ink: #0f172a;
+  --color-canvas-soft: #f1f4f7;
+  --color-canvas-soft-2: #f7f9fc;
+  --color-ink: #1c1e21;
   --color-on-primary: #ffffff;
-  --color-body: #475569;
-  --color-mute: #94a3b8;
-  --color-hairline: #e5e9f0;
-  --color-hairline-strong: #c7d0de;
-  --color-primary: #3673dc;
-  --color-primary-soft: #e8f0fc;
-  --color-primary-deep: #1d5bbd;
-  --color-link: #3673dc;
-  --color-link-deep: #1d5bbd;
-  --color-error: #ef4444;
-  --color-error-soft: #fde2e2;
-  --color-error-deep: #b91c1c;
-  --color-success: #16a34a;
+  --color-body: #4b4c4f;
+  --color-mute: #8595a4;
+  --color-stone: #8595a4;
+  --color-steel: #5d6c7b;
+  --color-hairline: #ced0d4;
+  --color-hairline-soft: #dee3e9;
+  --color-hairline-strong: #5d6c7b;
+  --color-primary: #0064e0;
+  --color-primary-soft: #e7f3ff;
+  --color-primary-deep: #0457cb;
+  --color-link: #0064e0;
+  --color-link-deep: #0457cb;
+  --color-error: #e41e3f;
+  --color-error-soft: #ffe6ea;
+  --color-error-deep: #c01837;
+  --color-success: #31a24c;
 
-  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+  --font-sans: "Optimistic Text", "Optimistic Display", "Inter", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
     monospace;
 
@@ -72,9 +75,46 @@ select {
 
 .bg-aurora {
   background:
-    radial-gradient(60% 40% at 70% 20%, rgba(54, 115, 220, 0.18) 0%, transparent 70%),
-    radial-gradient(50% 50% at 20% 80%, rgba(54, 115, 220, 0.10) 0%, transparent 70%),
-    linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%);
+    radial-gradient(56% 44% at 78% 14%, rgba(0, 100, 224, 0.16) 0%, transparent 70%),
+    radial-gradient(52% 46% at 16% 86%, rgba(0, 145, 255, 0.11) 0%, transparent 72%),
+    linear-gradient(180deg, #ffffff 0%, #f7f9fc 46%, #eef5ff 100%);
+}
+
+.tech-primary-button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(0, 100, 224, 0.24);
+  background:
+    linear-gradient(135deg, #0064e0 0%, #0091ff 52%, #0457cb 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    0 10px 24px rgba(0, 100, 224, 0.24),
+    0 0 0 1px rgba(0, 100, 224, 0.08);
+}
+
+.tech-primary-button::before {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.32) 42%, transparent 58%);
+  opacity: 0;
+  transform: translateX(-45%);
+  transition:
+    opacity 160ms ease,
+    transform 280ms ease;
+}
+
+.tech-primary-button:hover::before {
+  opacity: 1;
+  transform: translateX(45%);
+}
+
+.tech-primary-button:disabled {
+  border-color: transparent;
+  background: var(--color-mute);
+  box-shadow: none;
 }
 
 [data-testid="stream-markdown"] {

@@ -44,6 +44,15 @@ class McpServerRepository:
         )
         return await self._session.scalar(statement)
 
+    async def reload_server(self, server_id: UUID) -> McpServer | None:
+        statement = (
+            select(McpServer)
+            .options(selectinload(McpServer.tools))
+            .where(McpServer.id == server_id)
+            .execution_options(populate_existing=True)
+        )
+        return await self._session.scalar(statement)
+
     async def require_server(self, server_id: UUID) -> McpServer:
         server = await self.get_server(server_id)
         if server is None:

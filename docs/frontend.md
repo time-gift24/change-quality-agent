@@ -1,418 +1,232 @@
-# Frontend Architecture
+# Frontend Architecture And UI Conventions
 
-This document consolidates the former planning notes into the long-lived
-reference for the browser app and its run-observation contract.
+This document records the current frontend implementation contract. For visual
+changes, `DESIGN.md` remains the source of truth; this file explains how the
+current React app applies that design system in layout, routing, breadcrumbs,
+and MCP management pages.
 
 ## Scope
 
-The frontend is the first UI layer for Change Quality Agent. SOP quality checks
-are the first workflow, but the UI is built on a generic run substrate so future
-change quality workflows can reuse the same observer, event reducer, and stream
-renderer.
+The frontend has two primary workspaces:
 
-The v1 backend runs LangGraph in the service process. Postgres stores business
-run history and durable run events. LangGraph checkpoint storage stays separate
-from the business `runs` table.
+- SOP quality check chat workflow.
+- MCP server management workflow for administrator operations.
+
+Both workspaces share the same top-level shell. Page implementations should not
+create their own global sidebar or independent app frame.
 
 ## Stack
 
 - Vite
 - React 19
 - TypeScript
+- React Router
 - Tailwind CSS v4 through `@tailwindcss/vite`
 - Streamdown for streamed markdown
 - Vitest and React Testing Library for frontend tests
-- Playwright smoke scripts for browser-level verification
+- Playwright smoke scripts for browser-level checks
 
-Before implementing UI, read root `DESIGN.md`. It is the mandatory visual
-contract for the frontend.
+## Visual Direction
 
-## Architecture
+The current UI follows the Meta-inspired design tokens in `DESIGN.md`.
 
-The frontend mirrors the backend split:
+Core visual rules:
 
-- `features/runs` is the reusable run observation substrate.
-- `features/sop` is the SOP-specific wrapper.
-- `src/app/App.tsx` mounts the current SOP quality page.
-- `src/styles/globals.css` owns Tailwind, Streamdown, and design-token CSS.
+- Use a bright canvas with a subtle blue aurora background, not a flat gray page.
+- Use Meta blue as the primary action color: `#0064e0`, with `#0091ff` and
+  `#0457cb` for gradient and pressed states.
+- Use `Optimistic Text` / `Optimistic Display` first in the font stack, with
+  Chinese and system fallbacks after it.
+- Use compact application typography. Tables, status text, form helper text,
+  and breadcrumbs should use `text-xs` or `text-sm` unless they are page titles.
+- Use large pill buttons for primary actions and rounded cards for content
+  surfaces.
+- Use `canvas`, `canvas-soft`, `canvas-soft-2`, `hairline`, `hairline-soft`,
+  `ink`, `body`, `mute`, `primary`, `primary-soft`, `success`, and `error`
+  Tailwind tokens rather than ad-hoc colors.
+- Reserve the `tech-primary-button` treatment for high-intent launch/create
+  actions such as starting a SOP quality check or adding an MCP server.
 
-Current structure:
+Shared CSS lives in `frontend/src/styles/globals.css`. The key global utilities
+are:
 
-```text
-frontend/src/
-  app/
-    App.tsx
-  styles/
-    globals.css
-  lib/
-    apiClient.ts
-    sse.ts
-  features/
-    runs/
-      api.ts
-      types.ts
-      reducer.ts
-      hooks.ts
-      components/
-        RunObserver.tsx
-        StreamMarkdown.tsx
-    sop/
-      api.ts
-      types.ts
-      hooks.ts
-      pages/
-        ChatPage.tsx
-```
+- `bg-aurora` for the app-level background gradient.
+- `tech-primary-button` for the gradient primary CTA.
+- Streamdown markdown styling for run output.
 
-`features/runs` only knows generic run concepts:
+## App Shell
 
-- `run_id`
-- `subject_type`
-- `subject_id`
-- `status`
-- `current_node`
-- `completed_nodes`
-- `latest_sequence`
-- normalized run events
+`frontend/src/app/App.tsx` owns the global app shell and all page routing.
 
-It must not read or display SOP `env_key` as a top-level generic run field.
-SOP environment context stays in `features/sop` and SOP entry APIs.
-
-`features/sop` owns:
-
-- environment selection
-- SOP ID input
-- run creation
-- `409 Conflict` join-existing-run behavior
-- recent SOP run history
-- handoff to the generic `RunObserver`
-
-## API Contract
-
-The shared API contract lives in `api/openapi.yml`. Backend and frontend should
-keep that file current when endpoints change.
-
-### SOP Entry APIs
-
-`GET /api/sop/environments`
-
-Returns public configured environments. Internal SOP client settings are never
-returned.
-
-```json
-[
-  {
-    "key": "dev",
-    "name_zh": "开发",
-    "name_en": "Development"
-  }
-]
-```
-
-`GET /api/sop/{sop_id}?env=dev`
-
-Fetches the current SOP from the SOP client for preview. This does not create a
-run and does not write run history.
-
-`POST /api/sop/{sop_id}/runs?env=dev`
-
-Starts a quality run for the requested SOP and environment.
-
-Accepted:
-
-```http
-202 Accepted
-```
-
-```json
-{
-  "run_id": "uuid",
-  "status": "pending",
-  "status_url": "/api/runs/uuid",
-  "events_url": "/api/runs/uuid/events"
-}
-```
-
-Duplicate active run:
-
-```http
-409 Conflict
-```
-
-```json
-{
-  "message": "An active run already exists for this SOP and environment.",
-  "active_run_id": "uuid",
-  "status_url": "/api/runs/uuid",
-  "events_url": "/api/runs/uuid/events"
-}
-```
-
-The frontend treats `409` as a join path, not a hard page error.
-
-`GET /api/sop/{sop_id}/runs?env=dev&limit=20`
-
-Returns historical runs for one SOP and environment, newest first.
-
-`GET /api/sop/recent/runs?env=dev&limit=20`
-
-Returns recent SOP runs for one environment, newest first. The current sidebar
-uses this endpoint so recent history is environment-scoped, not tied to the
-currently typed SOP ID.
-
-### Generic Run APIs
-
-`GET /api/runs/{run_id}`
-
-Returns the stable business projection:
-
-```json
-{
-  "run_id": "uuid",
-  "subject_type": "sop",
-  "subject_id": "payment-release",
-  "status": "running",
-  "current_node": "check_steps",
-  "completed_nodes": ["load_sop"],
-  "latest_sequence": 12,
-  "started_at": "2026-05-25T10:00:00Z",
-  "finished_at": null,
-  "result_status": null,
-  "error_summary": null
-}
-```
-
-Generic run responses intentionally do not expose SOP-specific fields such as
-top-level `env_key`.
-
-`GET /api/runs/{run_id}?debug=true`
-
-Adds internal/debug details such as thread ID, checkpoint pointer, raw graph
-output, and the latest raw event. Default UI should not expose raw debug
-payloads.
-
-`GET /api/runs/{run_id}/events?after=12`
-
-Streams Server-Sent Events. The server first replays persisted events with
-sequence greater than `after`, then follows new events until terminal `done` or
-`error`. Multiple users can subscribe to the same run.
-
-## Event Model
-
-Every stored and streamed event uses the same envelope:
-
-```json
-{
-  "type": "updates",
-  "node": "check_sop_steps",
-  "thread_id": "quality-run:uuid",
-  "run_id": "uuid",
-  "checkpoint_id": "checkpoint-id",
-  "sequence": 12,
-  "payload": {}
-}
-```
-
-Supported event types:
-
-- `tasks`: node lifecycle, retry, failure, and interrupt events.
-- `messages`: LLM or message chunks attributed to a node.
-- `updates`: graph state writes after a node step.
-- `custom`: domain progress emitted by node code.
-- `checkpoints`: checkpoint pointers and state snapshot summaries.
-- `error`: terminal graph or adapter failure.
-- `done`: clean stream termination.
-
-Frontend reducer behavior:
-
-- `tasks` starts, completes, fails, or interrupts nodes.
-- `messages` appends markdown text to the producing node.
-- `updates` stores node output and usually marks the node done.
-- `custom` stores node progress.
-- `checkpoints` stays collapsed by default.
-- `error` marks the run terminal and visible failure.
-- `done` marks the run terminal and triggers summary refresh.
-
-The browser keeps its reconnect cursor local. On reconnect, it uses the last
-received SSE `id` or event `sequence`, keeps prior events visible, and requests:
+The shell structure is:
 
 ```text
-GET /api/runs/{run_id}/events?after={latestSequence}
+BrowserRouter
+  Routes
+    / -> WorkspaceFrame
+      index -> /sop
+      /sop -> ChatPage
+      /mcp -> ProtectedRoute -> McpListPage
+      /mcp/new -> ProtectedRoute -> McpCreatePage
+      /mcp/:serverId/edit -> ProtectedRoute -> McpEditPage
+      /mcp/:serverId -> ProtectedRoute -> McpDetailPage
+      * -> /sop
 ```
 
-## Data And Scheduling
+`WorkspaceFrame` owns:
 
-Postgres 13.22 stores business run state in `runs` and replayable stream data in
-`run_events`.
+- sidebar open/collapse state
+- active workspace detection from `location.pathname`
+- navigation callbacks for SOP and MCP
+- recent SOP refresh events
+- optional per-page sidebar content through `WorkspaceLayoutContext`
 
-`runs` is the historical source of truth. Important fields include:
+Page components should render only their main content area. They should not wrap
+pages in another `BrowserRouter`, duplicate `WorkspaceSidebar`, or own the full
+viewport frame.
 
-- `id`
-- `thread_id`
-- `assistant_id`
-- `subject_type`
-- `subject_id`
-- `env_key`
-- `status`
-- `active_conflict_key`
-- `metadata`
-- `kwargs`
-- `current_checkpoint_id`
-- `current_node`
-- `completed_nodes`
-- `subject_snapshot`
-- `result_status`
-- `structured_result`
-- `raw_graph_output`
-- `error`
-- timestamps
+## Sidebar
 
-`structured_result` is intentionally schema-flexible in v1. Keep the final SOP
-quality report shape as a TODO until that structured data is agreed.
+The global sidebar is `frontend/src/app/WorkspaceSidebar.tsx` and uses the local
+shadcn-style primitives in `frontend/src/components/ui/sidebar.tsx`.
 
-`run_events` stores one row per replayable event. `(run_id, sequence)` is unique
-and sequence numbers are monotonic per run.
+Sidebar rules:
 
-Active SOP scheduling is globally unique for `(sop_id, env_key)` while status is
-`pending` or `running`. Terminal runs remain queryable and do not block future
-scheduling.
+- `发起新SOP质检` is the first navigation item.
+- `MCP 管理` sits directly under `发起新SOP质检` in the same navigation group.
+- The sidebar supports collapsed and expanded states.
+- `RecentSopSidebarPanel` is the default sidebar content and remains available
+  across the workspace shell.
+- Feature pages may set temporary sidebar content through
+  `WorkspaceLayoutContext`, but should clear it on unmount when needed.
+- Left sidebar height and right page content height are independent; page bodies
+  should own their own scrolling.
 
-On service startup, leftover `pending` or `running` runs are marked
-`interrupted`. V1 does not automatically resume from checkpoints.
+## Routing And Authorization
 
-## Components
+MCP routes are protected as a route group in `App.tsx`:
 
-### `RunObserver`
-
-Top-level generic run observation component.
-
-Responsibilities:
-
-- fetch run summary with `useRun(runId)`
-- subscribe to persisted SSE events with `useRunEvents`
-- reduce events into node and timeline state
-- render status, nodes, and event stream
-- refresh the run summary after terminal `done` or `error`
-
-### `StreamMarkdown`
-
-Wraps `Streamdown` from the `streamdown` package. Use it for `messages` event
-content and explicitly markdown event payloads. Do not use raw
-`dangerouslySetInnerHTML` or a custom markdown renderer.
-
-Tailwind scans Streamdown classes from frontend-local dependencies:
-
-```css
-@source "../../node_modules/streamdown/dist/*.js";
-@import "streamdown/styles.css";
+```tsx
+<Route element={<ProtectedRoute />}>
+  <Route element={<McpListPage />} path="mcp" />
+  <Route element={<McpCreatePage />} path="mcp/new" />
+  <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
+  <Route element={<McpDetailPage />} path="mcp/:serverId" />
+</Route>
 ```
 
-If dependencies are later hoisted to the repository root, update the relative
-path and document the choice in `frontend/README.md`.
+`ProtectedRoute` delegates policy to `useAuthz()`. The current implementation is
+an admin placeholder so MCP pages can be developed locally. Real administrator
+policy should replace `useAuthz()` without changing MCP page components.
 
-### `ChatPage`
+Navigation rules:
 
-SOP-specific page that composes:
+- `/` redirects to `/sop`.
+- Unknown routes redirect to `/sop`.
+- Sidebar SOP click navigates to `/sop` or starts a new SOP conversation if the
+  SOP page has registered a handler.
+- Sidebar MCP click navigates to `/mcp`; clicking it while already in MCP is a
+  no-op.
+- MCP row names link to `/mcp/:serverId`.
+- MCP row actions link to detail/edit routes or call lifecycle APIs.
 
-- left rail with new run action and recent SOP run history
-- environment selector
-- SOP ID input
-- run start button
-- generic `RunObserver`
+## Breadcrumbs
 
-The page is a thin wrapper. SOP `env` is used for environment loading, run
-creation, conflict join, and history APIs. It is not passed into `RunObserver`
-as generic run metadata.
+MCP pages use `frontend/src/features/mcp/components/McpBreadcrumb.tsx`.
 
-## UI Rules
+Breadcrumb rules:
 
-Use the Cohere-inspired system in `DESIGN.md`.
+- Every MCP page shows breadcrumbs. The list, create, edit, and detail pages
+  should be consistent.
+- Breadcrumbs render directly on the page background, without an extra divider
+  or boxed header treatment.
+- The current segment uses `aria-current="page"`.
+- Intermediate segments are links, for example `MCP 管理 -> Alpha Server -> 编辑`.
+- Long server names should truncate rather than expanding the header.
 
-- Prefer white and stone work surfaces with thin rules.
-- Keep the observer compact and operational.
-- Avoid marketing heroes, decorative gradients, ornamental backgrounds, and
-  floating page-section cards.
-- Use practical cards only for repeated run/event items.
-- Keep radius near 8px unless a component demands otherwise.
-- Use `action-blue` for links and precise secondary actions.
-- Use warning/accent color sparingly.
-- Ensure text fits on mobile and desktop.
+Current breadcrumb patterns:
 
-## Error Handling
+| Route | Breadcrumb |
+| --- | --- |
+| `/mcp` | `MCP 管理` |
+| `/mcp/new` | `MCP 管理 / 新增 Server` |
+| `/mcp/:serverId` | `MCP 管理 / {server.name}` |
+| `/mcp/:serverId/edit` | `MCP 管理 / {server.name} / 编辑` |
 
-- Run creation `202`: observe returned `run_id`.
-- Run creation `409`: observe returned `active_run_id` and show a short join
-  message.
-- SOP preview or start `404`: show missing SOP or environment.
-- SOP preview or start `502`: show upstream SOP client failure.
-- SSE reconnect: show reconnecting state without clearing previous output.
-- Unknown event type: keep the observer stable and avoid crashing the page.
+## MCP Page Layout
 
-Frontend API errors should preserve FastAPI `detail` when the response provides
-it.
+`frontend/src/features/mcp/pages/McpPageLayout.tsx` is the shared layout for MCP
+create, edit, and detail pages. The list page follows the same header and scroll
+rules directly.
 
-## Testing
+Layout rules:
 
-Frontend coverage should include:
+- `main` uses `flex min-h-0 flex-1 flex-col overflow-hidden`.
+- Header uses transparent background and compact spacing, so breadcrumbs and
+  titles sit directly on the app background.
+- The scrollable body is the page body, not the whole viewport shell:
+  `min-h-0 flex-1 overflow-y-auto p-4`.
+- Page titles use compact sizing (`text-base` currently) to match the chat page
+  density.
+- Form and detail content should be grouped into rounded cards using the design
+  tokens, not large decorative banners.
 
-- API URL construction and SOP-agnostic generic run types.
-- Reducer behavior for each event type.
-- SSE cursor, reconnect, and terminal handling.
-- Streamdown rendering for streamed markdown.
-- Run observer status, node ordering, and event stream behavior.
-- SOP page behavior for environment loading, start, conflict join, recent
-  history, and sidebar interactions.
-- Browser smoke checks for desktop and mobile layout.
+## MCP List Table
 
-Backend coverage should include:
+The MCP list uses a compact operational table/card hybrid in
+`McpServerTable.tsx`.
 
-- public environment listing
-- SOP preview without run creation
-- `202` start response
-- `409` duplicate active run response
-- historical and recent SOP run listings
-- persisted event replay through `after`
-- multiple subscribers observing the same run
-- default run responses omitting raw debug payloads
+Table rules:
 
-## Local Development
+- Toolbar controls are left-aligned: search, status filter, refresh; create CTA
+  stays on the right when space allows.
+- The table uses meaningful columns instead of synthetic health scores:
+  `MCP 服务`, `启用策略`, `连接配置`, `工具`, `运行状态`, `最近检查`, `操作`.
+- Server names link to detail pages.
+- `command` is intentionally visually smaller than `args`; args carry more
+  operational context.
+- Runtime errors are shown as operational status, not as oversized red page
+  banners.
+- Row action menus are portaled to `document.body` to avoid clipping inside
+  scrollable table containers.
 
-Backend:
+## MCP Forms And Feedback
+
+MCP create and edit pages are full pages with breadcrumbs, not blank redirects or
+drawers.
+
+Form rules:
+
+- Create page route: `/mcp/new`.
+- Edit page route: `/mcp/:serverId/edit`.
+- Save success navigates to the detail page with a transient success notice in
+  route state.
+- Detail page displays the success notice with `role="status"`.
+- Stdio forms emphasize `args` over `command`, because args carry the actual MCP
+  package and root configuration.
+- HTTP forms use the configured URL and headers; secrets remain redacted in API
+  responses.
+
+## Admin Token Handling
+
+The MCP frontend sends `X-MCP-Admin-Token` for MCP API calls. The token control
+stores the value in browser local state for local testing. Backend enforcement is
+configured through `MCP_ADMIN_TOKEN`.
+
+This admin token is an API access gate for MCP management endpoints. It is not a
+user login session and should not be treated as full application auth.
+
+## Local MCP HTTP Echo Server
+
+For local streamable HTTP MCP testing, use:
 
 ```bash
-uv sync
-uv run alembic upgrade head
-uv run fastapi dev
+./.venv/bin/python scripts/mcp_http_echo_server.py --host 127.0.0.1 --port 18000 --path /mcp
 ```
 
-Frontend:
+The server exposes one tool:
 
-```bash
-cd frontend
-npm install
-npm run dev
-npm run test
-npm run build
-```
+- `echo(message: str) -> str`
 
-Repository-local verification used by recent work:
-
-```bash
-.venv/bin/python -m pytest
-cd frontend && npm run test -- --run
-cd frontend && npm run build
-```
-
-DB integration tests require `TEST_DATABASE_URL` and a local Postgres instance.
-
-## Open Decisions
-
-- Final structured SOP quality report schema.
-- Authentication and authorization rules for `debug=true`.
-- Whether `created_by` comes from auth middleware, headers, or a future user
-  table.
-- Exact graph node list and whether node registries come from backend metadata.
-- Whether to add Streamdown plugins such as code, math, or mermaid support.
-- Real SOP client implementation and dependency wiring.
-- Whether a future worker or LangGraph Server migration replaces the in-process
-  v1 runner.
+A configured HTTP MCP server pointed at `http://127.0.0.1:18000/mcp` should pass
+`check` and discover the `echo` tool.

@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator, Callable
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from dataclasses import dataclass
 import logging
 import re
@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from uuid import UUID
 
 from mcp import ClientSession, StdioServerParameters
+from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.stdio import stdio_client
 
 from app.schemas.mcp import (
@@ -47,6 +48,24 @@ _BEARER_TOKEN_RE = re.compile(r"(?i)(bearer\s+)([^\s,;'\"}]+)")
 class McpRuntimeHandle:
     exit_stack: AsyncExitStack
     session: ClientSession
+
+
+@dataclass
+class TransportMcpRuntimeHandle:
+    transport: str
+    handle: Any
+
+
+@dataclass
+class TaskOwnedMcpRuntimeHandle:
+    task: asyncio.Task[None]
+    commands: asyncio.Queue[Any]
+
+
+@dataclass
+class _TaskOwnedMcpCommand:
+    name: str
+    future: asyncio.Future[Any]
 
 
 class McpRepository(Protocol):
@@ -128,21 +147,13 @@ class StdioMcpProbe:
             )
             await session.initialize()
             handle = McpRuntimeHandle(exit_stack=exit_stack, session=session)
-            return handle, await self.list_tools(handle)
+            return handle, await _list_session_tools(handle)
         except BaseException:
-            await asyncio.shield(exit_stack.aclose())
+            await _close_failed_startup_stack(exit_stack)
             raise
 
     async def list_tools(self, handle: McpRuntimeHandle) -> list[dict[str, Any]]:
-        tools_result = await handle.session.list_tools()
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "input_schema": tool.inputSchema or {},
-            }
-            for tool in tools_result.tools
-        ]
+        return await _list_session_tools(handle)
 
     async def stop(self, handle: McpRuntimeHandle) -> None:
         await handle.exit_stack.aclose()
@@ -150,6 +161,175 @@ class StdioMcpProbe:
     def _stdio_spec(self, server: Any) -> str:
         first_arg = server.args[0] if server.args else ""
         return f"{server.command}:{first_arg}"
+
+
+class StreamableHttpMcpProbe:
+    async def start(
+        self,
+        server: Any,
+    ) -> tuple[McpRuntimeHandle, list[dict[str, Any]]]:
+        exit_stack = AsyncExitStack()
+        try:
+            read_stream, write_stream, _get_session_id = await exit_stack.enter_async_context(
+                streamablehttp_client(server.url, headers=server.headers or {})
+            )
+            session = await exit_stack.enter_async_context(
+                ClientSession(read_stream, write_stream)
+            )
+            await session.initialize()
+            handle = McpRuntimeHandle(exit_stack=exit_stack, session=session)
+            return handle, await _list_session_tools(handle)
+        except BaseException:
+            await _close_failed_startup_stack(exit_stack)
+            raise
+
+    async def list_tools(self, handle: McpRuntimeHandle) -> list[dict[str, Any]]:
+        return await _list_session_tools(handle)
+
+    async def stop(self, handle: McpRuntimeHandle) -> None:
+        await handle.exit_stack.aclose()
+
+
+class TransportMcpProbe:
+    def __init__(
+        self,
+        *,
+        stdio_probe: McpProbe | None = None,
+        http_probe: McpProbe | None = None,
+    ) -> None:
+        self._stdio_probe = stdio_probe or StdioMcpProbe()
+        self._http_probe = http_probe or StreamableHttpMcpProbe()
+
+    async def start(
+        self,
+        server: Any,
+    ) -> tuple[TransportMcpRuntimeHandle, list[dict[str, Any]]]:
+        probe = self._probe_for_transport(server.transport)
+        handle, tools = await probe.start(server)
+        return TransportMcpRuntimeHandle(transport=server.transport, handle=handle), tools
+
+    async def list_tools(self, handle: TransportMcpRuntimeHandle) -> list[dict[str, Any]]:
+        return await self._probe_for_transport(handle.transport).list_tools(handle.handle)
+
+    async def stop(self, handle: TransportMcpRuntimeHandle) -> None:
+        await self._probe_for_transport(handle.transport).stop(handle.handle)
+
+    def _probe_for_transport(self, transport: str) -> McpProbe:
+        if transport == "stdio":
+            return self._stdio_probe
+        if transport == "http":
+            return self._http_probe
+        raise UnsupportedMcpTransportError(transport)
+
+
+class TaskOwnedMcpProbe:
+    def __init__(self, probe: McpProbe) -> None:
+        self.inner_probe = probe
+
+    async def start(
+        self,
+        server: Any,
+    ) -> tuple[TaskOwnedMcpRuntimeHandle, list[dict[str, Any]]]:
+        loop = asyncio.get_running_loop()
+        started: asyncio.Future[list[dict[str, Any]]] = loop.create_future()
+        commands: asyncio.Queue[Any] = asyncio.Queue()
+        task = asyncio.create_task(self._run(server, started, commands))
+        handle = TaskOwnedMcpRuntimeHandle(task=task, commands=commands)
+
+        try:
+            tools = await started
+        except BaseException:
+            task.cancel()
+            with suppress(BaseException):
+                await task
+            raise
+        return handle, tools
+
+    async def list_tools(
+        self,
+        handle: TaskOwnedMcpRuntimeHandle,
+    ) -> list[dict[str, Any]]:
+        return await self._send(handle, "list_tools")
+
+    async def stop(self, handle: TaskOwnedMcpRuntimeHandle) -> None:
+        try:
+            await self._send(handle, "stop")
+        finally:
+            if handle.task.done():
+                with suppress(BaseException):
+                    await handle.task
+
+    async def _run(
+        self,
+        server: Any,
+        started: asyncio.Future[list[dict[str, Any]]],
+        commands: asyncio.Queue[Any],
+    ) -> None:
+        inner_handle = None
+        try:
+            inner_handle, tools = await self.inner_probe.start(server)
+            _set_future_result(started, tools)
+
+            while True:
+                command = await commands.get()
+                if command.name == "list_tools":
+                    try:
+                        tools = await self.inner_probe.list_tools(inner_handle)
+                    except Exception as exc:
+                        _set_future_exception(command.future, exc)
+                    except BaseException as exc:
+                        _set_future_exception(command.future, exc)
+                        raise
+                    else:
+                        _set_future_result(command.future, tools)
+                    continue
+
+                if command.name == "stop":
+                    try:
+                        await self.inner_probe.stop(inner_handle)
+                    except Exception as exc:
+                        _set_future_exception(command.future, exc)
+                    except BaseException as exc:
+                        _set_future_exception(command.future, exc)
+                        raise
+                    else:
+                        _set_future_result(command.future, None)
+                        return
+        except BaseException as exc:
+            _set_future_exception(started, exc)
+            raise
+
+    async def _send(self, handle: TaskOwnedMcpRuntimeHandle, name: str) -> Any:
+        if handle.task.done():
+            await handle.task
+            raise RuntimeError("MCP runtime worker is not running.")
+
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[Any] = loop.create_future()
+        await handle.commands.put(_TaskOwnedMcpCommand(name=name, future=future))
+        return await future
+
+
+async def _list_session_tools(handle: McpRuntimeHandle) -> list[dict[str, Any]]:
+    tools_result = await handle.session.list_tools()
+    return [
+        {
+            "name": tool.name,
+            "description": tool.description,
+            "input_schema": tool.inputSchema or {},
+        }
+        for tool in tools_result.tools
+    ]
+
+
+async def _close_failed_startup_stack(exit_stack: AsyncExitStack) -> None:
+    try:
+        await exit_stack.aclose()
+    except BaseException:
+        logger.debug(
+            "Failed to close MCP startup resources after start failure.",
+            exc_info=True,
+        )
 
 
 class McpRuntimeManager:
@@ -162,7 +342,7 @@ class McpRuntimeManager:
         single_instance_confirmed: bool = True,
     ) -> None:
         self._repository_factory = repository_factory
-        self._probe = probe or StdioMcpProbe()
+        self._probe = _task_owned_probe(probe or TransportMcpProbe())
         self._operation_timeout_seconds = operation_timeout_seconds
         self._single_instance_confirmed = single_instance_confirmed
         self._handles: dict[UUID, Any] = {}
@@ -399,7 +579,7 @@ class McpRuntimeManager:
         )
 
     def _require_supported_transport(self, server: Any) -> None:
-        if server.transport != "stdio":
+        if server.transport not in {"stdio", "http"}:
             raise UnsupportedMcpTransportError(server.transport)
 
     def _require_runtime_enabled(self) -> None:
@@ -436,6 +616,22 @@ class McpRuntimeManager:
             return
 
         yield repository_or_context
+
+
+def _task_owned_probe(probe: McpProbe) -> TaskOwnedMcpProbe:
+    if isinstance(probe, TaskOwnedMcpProbe):
+        return probe
+    return TaskOwnedMcpProbe(probe)
+
+
+def _set_future_result(future: asyncio.Future[Any], result: Any) -> None:
+    if not future.done():
+        future.set_result(result)
+
+
+def _set_future_exception(future: asyncio.Future[Any], exc: BaseException) -> None:
+    if not future.done():
+        future.set_exception(exc)
 
 
 def sanitize_mcp_error(exc: Exception, server: Any | None = None) -> str:

@@ -1,0 +1,282 @@
+// @vitest-environment jsdom
+
+import { StrictMode, type ReactNode } from "react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  checkMcpServer,
+  createMcpServer,
+  deleteMcpServer,
+  getMcpServer,
+  listMcpServers,
+  restartMcpServer,
+  startMcpServer,
+  stopMcpServer,
+  updateMcpServer,
+} from "./api";
+import { useMcpMutations, useMcpServerDetail, useMcpServers } from "./hooks";
+import type { McpServerCreate, McpServerDetail, McpServerSummary } from "./types";
+
+vi.mock("./api", () => ({
+  checkMcpServer: vi.fn(),
+  createMcpServer: vi.fn(),
+  deleteMcpServer: vi.fn(),
+  getMcpServer: vi.fn(),
+  listMcpServers: vi.fn(),
+  restartMcpServer: vi.fn(),
+  startMcpServer: vi.fn(),
+  stopMcpServer: vi.fn(),
+  updateMcpServer: vi.fn(),
+}));
+
+describe("mcp hooks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("loads server list on initial render", async () => {
+    vi.mocked(listMcpServers).mockResolvedValueOnce([
+      buildSummary({ id: "srv-1", name: "Server 1" }),
+    ]);
+
+    const { result } = renderHook(() => useMcpServers());
+
+    expect(result.current.loading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data[0]?.id).toBe("srv-1");
+    expect(listMcpServers).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads server list under React StrictMode", async () => {
+    vi.mocked(listMcpServers).mockResolvedValue([
+      buildSummary({ id: "srv-1", name: "Server 1" }),
+    ]);
+
+    const { result } = renderHook(() => useMcpServers(), {
+      wrapper: StrictModeWrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.data[0]?.id).toBe("srv-1");
+  });
+
+  it("refreshes list after mutation success", async () => {
+    vi.mocked(listMcpServers)
+      .mockResolvedValueOnce([buildSummary({ id: "srv-1", name: "Server 1" })])
+      .mockResolvedValueOnce([
+        buildSummary({ id: "srv-1", name: "Server 1" }),
+        buildSummary({ id: "srv-2", name: "Server 2" }),
+      ]);
+
+    vi.mocked(createMcpServer).mockResolvedValueOnce(
+      buildDetail({ id: "srv-2", name: "Server 2" }),
+    );
+
+    const { result } = renderHook(() => {
+      const servers = useMcpServers();
+      const mutations = useMcpMutations({
+        onSuccess: async () => {
+          await servers.refetch();
+        },
+      });
+
+      return { mutations, servers };
+    });
+
+    await waitFor(() => {
+      expect(result.current.servers.data).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.mutations.createServer({
+        command: "echo",
+        name: "Server 2",
+        transport: "stdio",
+      } satisfies McpServerCreate);
+    });
+
+    await waitFor(() => {
+      expect(result.current.servers.data).toHaveLength(2);
+    });
+
+    expect(result.current.mutations.pending).toBe(false);
+    expect(result.current.mutations.error).toBeNull();
+    expect(createMcpServer).toHaveBeenCalledTimes(1);
+    expect(listMcpServers).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes selected detail after mutation success", async () => {
+    vi.mocked(getMcpServer)
+      .mockResolvedValueOnce(
+        buildDetail({ id: "srv-1", name: "Server 1", tool_count: 0 }),
+      )
+      .mockResolvedValueOnce(
+        buildDetail({ id: "srv-1", name: "Server 1", tool_count: 2 }),
+      );
+
+    vi.mocked(updateMcpServer).mockResolvedValueOnce(
+      buildDetail({ id: "srv-1", name: "Server 1", tool_count: 2 }),
+    );
+
+    const { result } = renderHook(() => {
+      const detail = useMcpServerDetail("srv-1");
+      const mutations = useMcpMutations({
+        onSuccess: async () => {
+          await detail.refetch();
+        },
+      });
+
+      return { detail, mutations };
+    });
+
+    await waitFor(() => {
+      expect(result.current.detail.data?.tool_count).toBe(0);
+    });
+
+    await act(async () => {
+      await result.current.mutations.updateServer("srv-1", {
+        name: "Server 1 Updated",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.detail.data?.tool_count).toBe(2);
+    });
+
+    expect(result.current.mutations.pending).toBe(false);
+    expect(result.current.mutations.error).toBeNull();
+    expect(updateMcpServer).toHaveBeenCalledTimes(1);
+    expect(getMcpServer).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps pending true while concurrent mutations are still running", async () => {
+    const first = deferred<McpServerDetail>();
+    const second = deferred<McpServerDetail>();
+
+    vi.mocked(createMcpServer)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+
+    const { result } = renderHook(() => useMcpMutations());
+
+    let firstPromise: Promise<McpServerDetail>;
+    let secondPromise: Promise<McpServerDetail>;
+
+    act(() => {
+      firstPromise = result.current.createServer({
+        command: "echo",
+        name: "Server 1",
+        transport: "stdio",
+      });
+      secondPromise = result.current.createServer({
+        command: "echo",
+        name: "Server 2",
+        transport: "stdio",
+      });
+    });
+
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => {
+      first.resolve(buildDetail({ id: "srv-1", name: "Server 1" }));
+      await firstPromise;
+    });
+
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => {
+      second.resolve(buildDetail({ id: "srv-2", name: "Server 2" }));
+      await secondPromise;
+    });
+
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("resolves mutation when onSuccess callback fails and exposes callback error", async () => {
+    const callbackError = new Error("refresh failed");
+    const apiResult = buildDetail({ id: "srv-1", name: "Server 1" });
+    const onSuccess = vi.fn(async () => {
+      throw callbackError;
+    });
+
+    vi.mocked(createMcpServer).mockResolvedValueOnce(apiResult);
+
+    const { result } = renderHook(() => useMcpMutations({ onSuccess }));
+
+    let resolved: McpServerDetail | null = null;
+
+    await act(async () => {
+      resolved = await result.current.createServer({
+        command: "echo",
+        name: "Server 1",
+        transport: "stdio",
+      });
+    });
+
+    expect(resolved).toEqual(apiResult);
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error?.message).toBe("refresh failed");
+  });
+});
+
+function buildSummary(overrides: Partial<McpServerSummary> = {}): McpServerSummary {
+  return {
+    args: [],
+    command: "echo",
+    desired_state: "running",
+    enabled: true,
+    env: {},
+    headers: {},
+    id: "srv-default",
+    last_checked_at: null,
+    last_error: null,
+    name: "Default Server",
+    runtime_status: "running",
+    tool_count: 0,
+    transport: "stdio",
+    url: null,
+    ...overrides,
+  };
+}
+
+function buildDetail(overrides: Partial<McpServerDetail> = {}): McpServerDetail {
+  return {
+    ...buildSummary(overrides),
+    tools: [],
+    ...overrides,
+  };
+}
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+};
+
+function deferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => {};
+  let reject: (reason?: unknown) => void = () => {};
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+
+  return { promise, reject, resolve };
+}
+
+function StrictModeWrapper({ children }: { children: ReactNode }) {
+  return <StrictMode>{children}</StrictMode>;
+}
