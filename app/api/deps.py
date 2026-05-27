@@ -51,7 +51,7 @@ def get_user_repository(session: SessionDep) -> UserRepository:
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
-def require_mcp_admin(request: Request) -> None:
+def require_admin_user(request: Request) -> None:
     if not settings.auth_enabled:
         return
 
@@ -59,8 +59,9 @@ def require_mcp_admin(request: Request) -> None:
     if current_user is None or not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="MCP admin access required.",
+            detail="Admin access required.",
         )
+
 
 @asynccontextmanager
 async def mcp_runtime_repository_context():

@@ -106,11 +106,11 @@ describe("App", () => {
     expect(sidebar.textContent?.indexOf("开发用户")).toBeLessThan(
       sidebar.textContent?.indexOf("发起新SOP质检"),
     );
-    expect(screen.getByRole("button", { name: "Common" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "普通" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "管理" })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -132,7 +132,7 @@ describe("App", () => {
       screen.queryByRole("button", { name: "MCP 管理" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+    fireEvent.click(screen.getByRole("button", { name: "管理" }));
 
     expect(devLogin).toHaveBeenCalledWith("admin");
     await waitFor(() => {
@@ -147,8 +147,8 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("button", { name: /common/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /admin/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "普通" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "管理" })).toBeInTheDocument();
   });
 
   it("submits common dev login and disables choices while pending", async () => {
@@ -160,11 +160,11 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Common" }));
+    fireEvent.click(await screen.findByRole("button", { name: "普通" }));
 
     expect(devLogin).toHaveBeenCalledWith("common");
     expect(screen.getByRole("button", { name: /signing in…/i })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Admin" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "管理" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveAttribute("aria-busy", "true");
 
     loginComplete.resolve(buildUser());
@@ -183,15 +183,15 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Admin" }));
+    fireEvent.click(await screen.findByRole("button", { name: "管理" }));
 
     expect(devLogin).toHaveBeenCalledWith("admin");
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Unable to switch to the requested account.",
     );
     expect(screen.getByRole("alert")).toHaveClass("break-words");
-    expect(screen.getByRole("button", { name: "Common" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Admin" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "普通" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "管理" })).toBeEnabled();
   });
 });
 

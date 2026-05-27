@@ -72,8 +72,8 @@ describe("ProtectedRoute", () => {
         name: "403 Forbidden",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/admin access is required/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to sop/i })).toHaveAttribute("href", "/sop");
+    expect(screen.getByText("需要管理权限才能访问该功能。")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "返回 SOP" })).toHaveAttribute("href", "/sop");
   });
 
   it("allows admin route access", () => {

@@ -1,4 +1,4 @@
 export const DEV_ACCOUNTS = [
-  { account: "common", label: "Common" },
-  { account: "admin", label: "Admin" },
+  { account: "common", label: "普通" },
+  { account: "admin", label: "管理" },
 ] as const;

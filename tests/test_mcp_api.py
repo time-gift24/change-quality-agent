@@ -154,7 +154,7 @@ def overrides():
 
 
 @pytest.mark.asyncio
-async def test_mcp_admin_routes_reject_non_admin_user(monkeypatch, overrides) -> None:
+async def test_mcp_routes_reject_normal_user(monkeypatch, overrides) -> None:
     async def resolve_common_user(_request):
         return SimpleNamespace(account="common", is_admin=False)
 
@@ -168,11 +168,11 @@ async def test_mcp_admin_routes_reject_non_admin_user(monkeypatch, overrides) ->
         response = await client.get("/api/mcp/servers")
 
     assert response.status_code == 403
-    assert response.json() == {"detail": "MCP admin access required."}
+    assert response.json() == {"detail": "Admin access required."}
 
 
 @pytest.mark.asyncio
-async def test_mcp_admin_routes_allow_admin_user_without_token(
+async def test_mcp_routes_allow_admin_user_without_token(
     monkeypatch,
     overrides,
 ) -> None:
