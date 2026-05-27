@@ -153,6 +153,65 @@ describe("RunObserverView", () => {
     const errorTurn = screen.getByLabelText("Assistant turn error");
     expect(within(errorTurn).getByText("graph aborted")).toBeInTheDocument();
   });
+
+  it("scrolls the output container to the bottom when run events change", async () => {
+    Object.defineProperty(window.HTMLElement.prototype, "scrollHeight", {
+      configurable: true,
+      get() {
+        return this.dataset.testid === "run-scroll-parent" ? 480 : 0;
+      },
+    });
+    Object.defineProperty(window.HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      get() {
+        return this.dataset.testid === "run-scroll-parent" ? 120 : 0;
+      },
+    });
+    const firstState = stateFromEvents([
+      event({
+        type: "messages",
+        node: "check_steps",
+        sequence: 1,
+        payload: { delta: "first" },
+      }),
+    ]);
+    const { rerender } = render(
+      <div data-testid="run-scroll-parent" style={{ overflowY: "auto" }}>
+        <RunObserverView
+          summary={summary()}
+          state={firstState}
+          registeredNodeIds={registeredNodeIds}
+        />
+      </div>,
+    );
+
+    rerender(
+      <div data-testid="run-scroll-parent" style={{ overflowY: "auto" }}>
+        <RunObserverView
+          summary={summary()}
+          state={stateFromEvents([
+            event({
+              type: "messages",
+              node: "check_steps",
+              sequence: 1,
+              payload: { delta: "first" },
+            }),
+            event({
+              type: "messages",
+              node: "check_steps",
+              sequence: 2,
+              payload: { delta: " second" },
+            }),
+          ])}
+          registeredNodeIds={registeredNodeIds}
+        />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("run-scroll-parent").scrollTop).toBe(480);
+    });
+  });
 });
 
 describe("RunObserver", () => {
