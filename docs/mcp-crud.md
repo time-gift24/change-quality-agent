@@ -71,7 +71,7 @@ MCP 管理模块负责把 MCP server 配置持久化到数据库，并由 FastAP
 
 ## API
 
-所有 MCP 管理 API 都需要 `X-MCP-Admin-Token`。未配置 token 返回 `503`，token 错误返回 `403`。
+所有 MCP 管理 API 都需要已认证用户 Cookie 和 `X-MCP-Admin-Token`。缺少或无效用户 session 返回 `401`；未配置 token 返回 `503`，token 错误返回 `403`。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -176,7 +176,7 @@ enabled=true AND desired_state='running'
 
 当前实现把 MCP 子进程管理作为高权限后台能力处理：
 
-- 管理 API 必须配置并携带 `X-MCP-Admin-Token`。
+- 管理 API 必须先通过用户 Cookie 鉴权，并配置、携带 `X-MCP-Admin-Token`。
 - stdio 启动使用 `command` 和 `args` 数组，不接受 shell 命令字符串。
 - `mcp_allowed_stdio_commands` 限制可执行命令。
 - `mcp_allowed_stdio_specs` 限制可启动的 `command:first_arg` 组合，例如 `uvx:mcp-server-filesystem`。
