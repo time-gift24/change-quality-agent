@@ -1,7 +1,7 @@
 """create llm providers
 
-Revision ID: 20260527_0004
-Revises: 20260526_0003
+Revision ID: 20260527_0005
+Revises: 20260527_0004
 Create Date: 2026-05-27
 
 """
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = "20260527_0004"
-down_revision: str | Sequence[str] | None = "20260526_0003"
+revision: str = "20260527_0005"
+down_revision: str | Sequence[str] | None = "20260527_0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
