@@ -7,12 +7,17 @@ from uuid import UUID
 from app.core.agent_runtime import AgentRuntime, to_jsonable
 from app.core.agent_streaming import consume_runtime_stream
 from app.core.database import async_session
+from app.core.llm_models import LlmProviderRuntimeConfig
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
     AgentDisabledError,
     AgentNotFoundError,
     AgentRepository,
     AgentVersionNotFoundError,
+)
+from app.repositories.llm_providers import (
+    LlmProviderNotFoundError,
+    LlmProviderRepository,
 )
 from app.repositories.runs import RunRepository
 from app.schemas.agents import AgentCreate, AgentDraftUpdate, AgentTestRunCreate
@@ -30,6 +35,27 @@ class AgentRunStartResult:
     events_url: str
     run_id: UUID
     status: RunStatus
+
+
+class DatabaseLlmProviderResolver:
+    def __init__(self, repository: LlmProviderRepository) -> None:
+        self._repository = repository
+
+    async def resolve(self, provider_key: str) -> LlmProviderRuntimeConfig:
+        provider = await self._repository.get_by_key(provider_key)
+        if provider is None:
+            raise LlmProviderNotFoundError(f"LLM provider not found: {provider_key}")
+        if not provider.enabled:
+            raise RuntimeError(f"LLM provider is disabled: {provider_key}")
+        return LlmProviderRuntimeConfig(
+            key=provider.key,
+            provider_type=provider.provider_type,
+            base_url=provider.base_url,
+            api_key=provider.api_key,
+            default_headers=dict(provider.default_headers or {}),
+            default_query=dict(provider.default_query or {}),
+            enabled=provider.enabled,
+        )
 
 
 class AgentService:
@@ -269,7 +295,11 @@ async def run_agent_test_with_new_session(run_id: UUID) -> dict[str, Any]:
     async with async_session() as session:
         run_repository = RunRepository(session)
         agent_repository = AgentRepository(session)
-        return await run_agent_test(run_id, run_repository, agent_repository)
+        provider_repository = LlmProviderRepository(session)
+        runtime = AgentRuntime(
+            provider_resolver=DatabaseLlmProviderResolver(provider_repository)
+        )
+        return await run_agent_test(run_id, run_repository, agent_repository, runtime)
 
 
 def _input_preview(messages: list[dict[str, str]]) -> str:

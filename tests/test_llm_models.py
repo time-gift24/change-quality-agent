@@ -3,6 +3,7 @@ import pytest
 
 from app.core import llm_models
 from app.core.config import settings
+from app.core.llm_models import LlmProviderRuntimeConfig
 
 
 def test_create_chat_model_builds_codeagent_with_internal_headers(
@@ -56,6 +57,83 @@ def test_create_chat_model_falls_back_to_langchain_init(
 
     assert model is configured_model
     assert calls == [("openai:gpt-5-mini", {"temperature": 0.2})]
+
+
+def test_create_provider_chat_model_passes_provider_config_to_init_chat_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+    configured_model = object()
+
+    def fake_init_chat_model(model: str, **model_config):
+        calls.append((model, dict(model_config)))
+        return configured_model
+
+    monkeypatch.setattr(llm_models, "init_chat_model", fake_init_chat_model)
+    provider = LlmProviderRuntimeConfig(
+        key="openai_main",
+        provider_type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        default_headers={"X-Tenant": "quality"},
+        default_query={"api-version": "2026-01-01"},
+        enabled=True,
+    )
+
+    model = llm_models.create_provider_chat_model(
+        "gpt-5-mini",
+        provider,
+        temperature=0,
+        model_kwargs={"stream_options": {"include_usage": True}},
+    )
+
+    assert model is configured_model
+    assert calls == [
+        (
+            "gpt-5-mini",
+            {
+                "model_provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "sk-test",
+                "default_headers": {"X-Tenant": "quality"},
+                "default_query": {"api-version": "2026-01-01"},
+                "temperature": 0,
+                "model_kwargs": {"stream_options": {"include_usage": True}},
+            },
+        )
+    ]
+
+
+def test_create_provider_chat_model_omits_empty_provider_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    def fake_init_chat_model(model: str, **model_config):
+        calls.append((model, dict(model_config)))
+        return object()
+
+    monkeypatch.setattr(llm_models, "init_chat_model", fake_init_chat_model)
+    provider = LlmProviderRuntimeConfig(
+        key="anthropic_main",
+        provider_type="anthropic",
+        base_url=None,
+        api_key=None,
+        default_headers={},
+        default_query={},
+        enabled=True,
+    )
+
+    llm_models.create_provider_chat_model("claude-sonnet-4-5", provider)
+
+    assert calls == [
+        (
+            "claude-sonnet-4-5",
+            {
+                "model_provider": "anthropic",
+            },
+        )
+    ]
 
 
 def test_create_chat_model_sets_codeagent_api_base_on_real_client(

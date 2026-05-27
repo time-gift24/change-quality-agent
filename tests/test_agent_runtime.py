@@ -6,6 +6,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.core.agent_runtime import AgentRuntime
+from app.core.llm_models import LlmProviderRuntimeConfig
 from app.core.llm_models import create_chat_model
 
 
@@ -13,6 +14,7 @@ class FakeVersion:
     def __init__(self) -> None:
         self.id = uuid4()
         self.model = "openai:gpt-5-mini"
+        self.provider_key = None
         self.model_config = {"temperature": 0.2}
         self.system_prompt = "Review risky changes carefully."
         self.tool_allowlist = ["search_sop"]
@@ -33,6 +35,24 @@ class AsyncFakeResolver(FakeResolver):
     async def resolve(self, tool_allowlist, mcp_server_ids):
         self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
         return self.tools
+
+
+class FakeProviderResolver:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.provider = LlmProviderRuntimeConfig(
+            key="openai_main",
+            provider_type="openai",
+            base_url="https://api.openai.com/v1",
+            api_key="sk-test",
+            default_headers={},
+            default_query={},
+            enabled=True,
+        )
+
+    async def resolve(self, provider_key: str) -> LlmProviderRuntimeConfig:
+        self.calls.append(provider_key)
+        return self.provider
 
 
 class FakeAgent:
@@ -126,6 +146,56 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
     ]
     assert created["model"] is configured_model
     assert created["tools"] == resolver.tools
+
+
+@pytest.mark.asyncio
+async def test_runtime_uses_provider_resolver_when_provider_key_is_set() -> None:
+    version = FakeVersion()
+    version.model = "gpt-5-mini"
+    version.provider_key = "openai_main"
+    provider_resolver = FakeProviderResolver()
+    provider_model = object()
+    default_factory_calls: list[str] = []
+    provider_factory_calls: list[tuple[str, LlmProviderRuntimeConfig, dict[str, object]]] = []
+    created: dict[str, object] = {}
+
+    def fake_provider_model_factory(model: str, provider, **model_config):
+        provider_factory_calls.append((model, provider, dict(model_config)))
+        return provider_model
+
+    def fake_create_agent(*, model, tools, system_prompt):
+        created["model"] = model
+        return FakeAgent({"messages": []})
+
+    runtime = AgentRuntime(
+        create_agent=fake_create_agent,
+        model_factory=lambda model, **_: default_factory_calls.append(model),
+        provider_resolver=provider_resolver,
+        provider_model_factory=fake_provider_model_factory,
+    )
+
+    await runtime.run(version=version, messages=[])
+
+    assert provider_resolver.calls == ["openai_main"]
+    assert provider_factory_calls == [
+        ("gpt-5-mini", provider_resolver.provider, {"temperature": 0.2})
+    ]
+    assert default_factory_calls == []
+    assert created["model"] is provider_model
+
+
+@pytest.mark.asyncio
+async def test_runtime_requires_provider_resolver_when_provider_key_is_set() -> None:
+    version = FakeVersion()
+    version.model = "gpt-5-mini"
+    version.provider_key = "openai_main"
+    runtime = AgentRuntime(
+        create_agent=lambda **_: FakeAgent({"messages": []}),
+        model_factory=lambda model, **_: model,
+    )
+
+    with pytest.raises(RuntimeError, match="LLM provider resolver is not configured"):
+        await runtime.run(version=version, messages=[])
 
 
 @pytest.mark.asyncio

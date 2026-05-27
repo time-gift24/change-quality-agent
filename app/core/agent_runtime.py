@@ -2,11 +2,15 @@ import inspect
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 from langchain.agents import create_agent as langchain_create_agent
 
-from app.core.llm_models import create_chat_model
+from app.core.llm_models import (
+    LlmProviderRuntimeConfig,
+    create_chat_model,
+    create_provider_chat_model,
+)
 from app.core.stream_events import runtime_stream_event
 
 
@@ -25,6 +29,11 @@ class StaticToolResolver:
         return []
 
 
+class LlmProviderResolver(Protocol):
+    async def resolve(self, provider_key: str) -> LlmProviderRuntimeConfig:
+        pass
+
+
 class AgentRuntime:
     def __init__(
         self,
@@ -32,10 +41,14 @@ class AgentRuntime:
         tool_resolver: StaticToolResolver | None = None,
         *,
         model_factory=create_chat_model,
+        provider_resolver: LlmProviderResolver | None = None,
+        provider_model_factory=create_provider_chat_model,
     ) -> None:
         self._create_agent = create_agent
         self._tool_resolver = tool_resolver or StaticToolResolver()
         self._model_factory = model_factory
+        self._provider_resolver = provider_resolver
+        self._provider_model_factory = provider_model_factory
 
     async def run(
         self,
@@ -92,7 +105,18 @@ class AgentRuntime:
         if inspect.isawaitable(tools):
             tools = await tools
         model_config = getattr(version, "model_config", {}) or {}
-        model = self._model_factory(version.model, **dict(model_config))
+        provider_key = getattr(version, "provider_key", None)
+        if provider_key:
+            if self._provider_resolver is None:
+                raise RuntimeError("LLM provider resolver is not configured.")
+            provider = await self._provider_resolver.resolve(str(provider_key))
+            model = self._provider_model_factory(
+                version.model,
+                provider,
+                **dict(model_config),
+            )
+        else:
+            model = self._model_factory(version.model, **dict(model_config))
         agent = self._create_agent(
             model=model,
             tools=tools,

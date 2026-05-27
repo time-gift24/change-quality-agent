@@ -1,4 +1,5 @@
 from typing import Any
+from dataclasses import dataclass
 
 import httpx
 from langchain.chat_models import init_chat_model
@@ -20,6 +21,17 @@ _CODEAGENT_PROVIDER_CONFIG_KEYS = frozenset(
         "http_async_client",
     }
 )
+
+
+@dataclass(frozen=True)
+class LlmProviderRuntimeConfig:
+    key: str
+    provider_type: str
+    base_url: str | None
+    api_key: str | None
+    default_headers: dict[str, str]
+    default_query: dict[str, str]
+    enabled: bool
 
 
 def create_chat_model(model: str, **model_config: Any) -> BaseChatModel:
@@ -48,6 +60,26 @@ def create_chat_model(model: str, **model_config: Any) -> BaseChatModel:
         http_async_client=http_async_client,
         **model_config,
     )
+
+
+def create_provider_chat_model(
+    model: str,
+    provider: LlmProviderRuntimeConfig,
+    **model_config: Any,
+) -> BaseChatModel:
+    provider_config: dict[str, Any] = {
+        "model_provider": provider.provider_type,
+    }
+    if provider.base_url:
+        provider_config["base_url"] = provider.base_url
+    if provider.api_key:
+        provider_config["api_key"] = provider.api_key
+    if provider.default_headers:
+        provider_config["default_headers"] = provider.default_headers
+    if provider.default_query:
+        provider_config["default_query"] = provider.default_query
+
+    return init_chat_model(model, **provider_config, **model_config)
 
 
 def _build_token_refreshing_http_clients(
