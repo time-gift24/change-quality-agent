@@ -26,6 +26,9 @@ Implementation notes:
   - `/mcp` renders the route-guarded MCP management page for server CRUD,
     lifecycle actions, and tool snapshots. Access requires an authenticated
     admin user.
+  - `/llm-providers` renders the route-guarded LLM provider CRUD pages for
+    ordinary LangChain `init_chat_model` providers. Access requires an
+    authenticated admin user.
 - In Vite dev mode, an unauthenticated browser session shows a `common` /
   `admin` user picker backed by `POST /api/auth/dev-login`. Choosing a user
   creates the `cqa_user` dev session cookie and reloads the auth bootstrap.
@@ -38,3 +41,5 @@ Implementation notes:
 - The SOP quality page is a thin wrapper over the generic `RunObserver`.
 - MCP management is isolated in `src/features/mcp` and calls only the
   `/api/mcp/servers` API family defined in `../api/openapi.yml`.
+- LLM provider management is isolated in `src/features/llmProviders` and calls
+  only the `/api/v1/llm-providers` API family defined in `../api/openapi.yml`.

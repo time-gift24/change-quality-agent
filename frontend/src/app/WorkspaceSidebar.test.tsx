@@ -33,16 +33,17 @@ afterEach(() => {
 });
 
 describe("WorkspaceSidebar", () => {
-  it("renders both 发起新SOP质检 and MCP 管理 entries when expanded", () => {
+  it("renders workspace navigation entries when expanded", () => {
     renderSidebar({ open: true });
 
     expect(
       screen.getByRole("button", { name: "发起新SOP质检" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "LLM Provider 管理" })).toBeInTheDocument();
   });
 
-  it("places MCP 管理 directly below 发起新SOP质检 inside the same nav", () => {
+  it("places management entries below 发起新SOP质检 inside the same nav", () => {
     renderSidebar({ open: true });
 
     const nav = screen.getByRole("navigation", { name: "工作台导航" });
@@ -50,18 +51,22 @@ describe("WorkspaceSidebar", () => {
 
     expect(buttons[0]).toHaveAccessibleName("发起新SOP质检");
     expect(buttons[1]).toHaveAccessibleName("MCP 管理");
+    expect(buttons[2]).toHaveAccessibleName("LLM Provider 管理");
   });
 
-  it("keeps both nav entries visible (with icons) when collapsed", () => {
+  it("keeps nav entries visible with icons when collapsed", () => {
     renderSidebar({ open: false });
 
     const newSopButton = screen.getByRole("button", { name: "发起新SOP质检" });
     const mcpButton = screen.getByRole("button", { name: "MCP 管理" });
+    const llmButton = screen.getByRole("button", { name: "LLM Provider 管理" });
 
     expect(newSopButton).toBeInTheDocument();
     expect(mcpButton).toBeInTheDocument();
+    expect(llmButton).toBeInTheDocument();
     expect(newSopButton.querySelector("svg")).not.toBeNull();
     expect(mcpButton.querySelector("svg")).not.toBeNull();
+    expect(llmButton.querySelector("svg")).not.toBeNull();
   });
 
   it("hides MCP 管理 when routing does not expose that nav route", () => {
@@ -109,6 +114,14 @@ describe("WorkspaceSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "MCP 管理" }));
 
     expect(props.onNavigate).toHaveBeenCalledWith("mcp");
+  });
+
+  it("invokes onNavigate when LLM Provider 管理 is clicked", () => {
+    const { props } = renderSidebar({ activeKey: "sop" });
+
+    fireEvent.click(screen.getByRole("button", { name: "LLM Provider 管理" }));
+
+    expect(props.onNavigate).toHaveBeenCalledWith("llm-providers");
   });
 
   it("invokes onNewConversation when on sop and 发起新SOP质检 is clicked", () => {
