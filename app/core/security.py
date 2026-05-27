@@ -21,10 +21,11 @@ AUTH_REQUIRED_DETAIL = "Authentication required."
 
 
 def is_auth_bypass_path(path: str) -> bool:
+    normalized_path = path.rstrip("/") or "/"
     return (
-        path == "/health"
-        or path in {"/docs", "/redoc", "/openapi.json"}
-        or path in {"/api/auth/dev-login", "/api/auth/logout"}
+        normalized_path == "/health"
+        or normalized_path in {"/docs", "/redoc", "/openapi.json"}
+        or normalized_path in {"/api/auth/dev-login", "/api/auth/logout"}
     )
 
 

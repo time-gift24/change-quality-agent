@@ -62,10 +62,13 @@ async def require_api_auth(request: Request, call_next):
 
     current_user = await resolve_current_user(request)
     if current_user is None:
-        return JSONResponse(
+        response = JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": AUTH_REQUIRED_DETAIL},
         )
+        if request.cookies.get(settings.auth_session_cookie_name) is not None:
+            response.delete_cookie(settings.auth_session_cookie_name)
+        return response
 
     request.state.current_user = current_user
     return await call_next(request)
