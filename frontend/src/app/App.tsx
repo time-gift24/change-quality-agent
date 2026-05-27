@@ -9,6 +9,8 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import { AuthProvider, useAuth } from "../features/auth/AuthContext";
+import { DevUserPicker } from "../features/auth/DevUserPicker";
 import { McpDetailPage } from "../features/mcp/pages/McpDetailPage";
 import { McpListPage } from "../features/mcp/pages/McpListPage";
 import { McpCreatePage, McpEditPage } from "../features/mcp/pages/McpServerFormPage";
@@ -20,21 +22,49 @@ import { ProtectedRoute } from "./routing/ProtectedRoute";
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<WorkspaceFrame />} path="/">
-          <Route element={<Navigate replace to="/sop" />} index />
-          <Route element={<ChatPage />} path="sop" />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<McpListPage />} path="mcp" />
-            <Route element={<McpCreatePage />} path="mcp/new" />
-            <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
-            <Route element={<McpDetailPage />} path="mcp/:serverId" />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<AuthenticatedWorkspace />} path="/">
+            <Route element={<Navigate replace to="/sop" />} index />
+            <Route element={<ChatPage />} path="sop" />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<McpListPage />} path="mcp" />
+              <Route element={<McpCreatePage />} path="mcp/new" />
+              <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
+              <Route element={<McpDetailPage />} path="mcp/:serverId" />
+            </Route>
+            <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>
-          <Route element={<Navigate replace to="/sop" />} path="*" />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+function AuthenticatedWorkspace() {
+  const { status } = useAuth();
+
+  if (status === "loading") {
+    return <AuthStatus message="Loading..." />;
+  }
+
+  if (status === "anonymous") {
+    if (import.meta.env.DEV) {
+      return <DevUserPicker />;
+    }
+
+    return <AuthStatus message="Authentication required." />;
+  }
+
+  return <WorkspaceFrame />;
+}
+
+function AuthStatus({ message }: { message: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-aurora px-4 text-sm text-body">
+      {message}
+    </main>
   );
 }
 
