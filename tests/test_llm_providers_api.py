@@ -224,6 +224,26 @@ async def test_update_provider_clears_api_key_when_null() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_provider_clears_headers_and_query_when_null() -> None:
+    repository = FakeRepository()
+    override_dependencies(repository, FakeSession())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            "/api/v1/llm-providers/openai_main",
+            json={"default_headers": None, "default_query": None},
+        )
+
+    assert response.status_code == 200
+    assert repository.updated_values == {"default_headers": {}, "default_query": {}}
+    assert response.json()["default_headers"] == {}
+    assert response.json()["default_query"] == {}
+
+
+@pytest.mark.asyncio
 async def test_delete_provider_soft_deletes() -> None:
     repository = FakeRepository()
     session = FakeSession()

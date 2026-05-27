@@ -57,7 +57,7 @@ async def update_llm_provider(
     session: SessionDep,
     repository: LlmProviderRepositoryDep,
 ) -> LlmProviderDetail:
-    values = payload.model_dump(exclude_unset=True, mode="json")
+    values = _normalize_update_values(payload.model_dump(exclude_unset=True, mode="json"))
     try:
         provider = await repository.update(provider_key, **values)
     except LlmProviderNotFoundError as exc:
@@ -92,3 +92,10 @@ def _conflict() -> HTTPException:
         status_code=status.HTTP_409_CONFLICT,
         detail="LLM provider key already exists.",
     )
+
+
+def _normalize_update_values(values: dict[str, object]) -> dict[str, object]:
+    for field in ("default_headers", "default_query"):
+        if field in values and values[field] is None:
+            values[field] = {}
+    return values

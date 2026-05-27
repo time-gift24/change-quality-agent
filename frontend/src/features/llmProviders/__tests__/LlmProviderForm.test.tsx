@@ -70,6 +70,10 @@ describe("LlmProviderForm", () => {
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
     expect(onUpdate).toHaveBeenCalledWith("openai_main", expect.not.objectContaining({ api_key: expect.anything() }));
+    expect(onUpdate).toHaveBeenCalledWith(
+      "openai_main",
+      expect.not.objectContaining({ default_headers: expect.anything() }),
+    );
 
     onUpdate.mockClear();
     fireEvent.click(screen.getByLabelText("清除现有 API Key"));
@@ -77,6 +81,25 @@ describe("LlmProviderForm", () => {
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
     expect(onUpdate).toHaveBeenCalledWith("openai_main", expect.objectContaining({ api_key: null }));
+  });
+
+  it("rejects changed redacted header placeholders on edit", async () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <LlmProviderForm
+        mode="edit"
+        onUpdate={onUpdate}
+        provider={buildProvider()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(/Default Headers/), {
+      target: { value: "Authorization=********\nX-Tenant=renamed" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Provider" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("脱敏值 ********");
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it("rejects malformed KEY=VALUE lines", async () => {

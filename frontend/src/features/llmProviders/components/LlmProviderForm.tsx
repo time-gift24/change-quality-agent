@@ -17,6 +17,8 @@ import type {
   LlmProviderUpdate,
 } from "../types";
 
+const REDACTED_VALUE = "********";
+
 type LlmProviderFormMode = "create" | "edit" | "view";
 
 type LlmProviderFormProps = {
@@ -137,13 +139,40 @@ export function LlmProviderForm({
     if (!provider) return;
     const payload: LlmProviderUpdate = {
       base_url: baseUrl.trim() || null,
-      default_headers: parsedHeaders.value,
-      default_query: parsedQuery.value,
       description: description.trim() || null,
       display_name: displayName.trim(),
       enabled,
       provider_type: providerType.trim(),
     };
+    const shouldOmitHeaders = shouldOmitRedactedField(
+      headersText,
+      provider.default_headers,
+    );
+    const shouldOmitQuery = shouldOmitRedactedField(
+      queryText,
+      provider.default_query,
+    );
+    if (
+      hasUnsafeRedactedPlaceholder(
+        headersText,
+        parsedHeaders.value,
+        provider.default_headers,
+      ) ||
+      hasUnsafeRedactedPlaceholder(
+        queryText,
+        parsedQuery.value,
+        provider.default_query,
+      )
+    ) {
+      setError("脱敏值 ******** 需要替换为新值，或保持该区域不变。");
+      return;
+    }
+    if (!shouldOmitHeaders) {
+      payload.default_headers = parsedHeaders.value;
+    }
+    if (!shouldOmitQuery) {
+      payload.default_query = parsedQuery.value;
+    }
     if (apiKey.trim()) {
       payload.api_key = apiKey.trim();
     } else if (clearApiKey) {
@@ -347,4 +376,25 @@ export function parseKeyValueText(label: string, text: string) {
     value[key] = item;
   }
   return { error: null, value };
+}
+
+function shouldOmitRedactedField(
+  text: string,
+  currentValue: Record<string, string>,
+): boolean {
+  return (
+    Object.values(currentValue).includes(REDACTED_VALUE) &&
+    text === keyValueMapToText(currentValue)
+  );
+}
+
+function hasUnsafeRedactedPlaceholder(
+  text: string,
+  parsedValue: Record<string, string>,
+  currentValue: Record<string, string>,
+): boolean {
+  return (
+    Object.values(parsedValue).includes(REDACTED_VALUE) &&
+    !shouldOmitRedactedField(text, currentValue)
+  );
 }

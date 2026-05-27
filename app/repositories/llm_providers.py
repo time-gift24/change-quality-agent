@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.llm_providers import LlmProvider
@@ -26,7 +27,13 @@ class LlmProviderRepository:
 
         provider = LlmProvider(**values)
         self._session.add(provider)
-        await self._session.flush()
+        try:
+            await self._session.flush()
+        except IntegrityError as exc:
+            await self._session.rollback()
+            raise LlmProviderAlreadyExistsError(
+                f"LLM provider already exists: {key}",
+            ) from exc
         return provider
 
     async def list(self) -> list[LlmProvider]:
