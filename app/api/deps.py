@@ -10,6 +10,7 @@ from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.runs import RunRepository
+from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
 
@@ -42,6 +43,13 @@ def get_mcp_repository(session: SessionDep) -> McpServerRepository:
 
 
 McpRepositoryDep = Annotated[McpServerRepository, Depends(get_mcp_repository)]
+
+
+def get_user_repository(session: SessionDep) -> UserRepository:
+    return UserRepository(session)
+
+
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def require_mcp_admin(

@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     )
     log_level: str = "INFO"
     access_log_enabled: bool = True
+    auth_enabled: bool = True
+    auth_dev_mode: bool = False
+    auth_session_cookie_name: str = "cqa_user"
     environments: list[EnvironmentConfig] = Field(
         default_factory=lambda: [
             EnvironmentConfig(
