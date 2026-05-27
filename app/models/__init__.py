@@ -1,9 +1,11 @@
 from app.models.mcp import McpServer, McpServerTool
 from app.models.runs import Run, RunEvent
+from app.models.users import User
 
 __all__ = [
     "McpServer",
     "McpServerTool",
     "Run",
     "RunEvent",
+    "User",
 ]

@@ -1,5 +1,6 @@
 from app.models.mcp import McpServer, McpServerTool
 from app.models.runs import Run, RunEvent
+from app.models.users import User
 
 
 def test_run_model_table_name() -> None:
@@ -34,3 +35,16 @@ def test_mcp_server_model_has_status_columns() -> None:
 
 def test_mcp_server_tool_model_table_name() -> None:
     assert McpServerTool.__tablename__ == "mcp_server_tools"
+
+
+def test_user_model_table_name() -> None:
+    assert User.__tablename__ == "users"
+
+
+def test_user_model_has_expected_columns() -> None:
+    columns = User.__table__.columns
+
+    assert "account" in columns
+    assert "refresh_token" in columns
+    assert "is_admin" in columns
+    assert "meta" in columns
