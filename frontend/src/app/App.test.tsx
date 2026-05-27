@@ -89,6 +89,52 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
   });
 
+  it("shows a dev user switcher after entering the workspace", async () => {
+    window.history.pushState({}, "", "/sop");
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      buildUser({ account: "common", is_admin: false }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
+    expect(
+      screen.getByRole("group", { name: "开发用户" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Common" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Admin" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
+  it("switches the workspace user in dev mode", async () => {
+    window.history.pushState({}, "", "/sop");
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      buildUser({ account: "common", is_admin: false }),
+    );
+    vi.mocked(devLogin).mockResolvedValue(
+      buildUser({ account: "admin", id: "user-admin", is_admin: true }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("SOP 质检")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "MCP 管理" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Admin" }));
+
+    expect(devLogin).toHaveBeenCalledWith("admin");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
+    });
+  });
+
   it("shows dev user picker when auth bootstrap is anonymous", async () => {
     vi.mocked(getCurrentUser).mockRejectedValue(
       new ApiError(401, "Unauthorized", "Authentication required."),

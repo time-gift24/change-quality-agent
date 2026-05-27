@@ -1,12 +1,8 @@
 import { useState } from "react";
 
-import { ApiError } from "../../lib/apiClient";
 import { useAuth } from "./AuthContext";
-
-const DEV_ACCOUNTS = [
-  { account: "common", label: "Common" },
-  { account: "admin", label: "Admin" },
-] as const;
+import { DEV_ACCOUNTS } from "./devAccounts";
+import { getLoginErrorMessage } from "./loginErrors";
 
 export function DevUserPicker() {
   const { loginAs } = useAuth();
@@ -77,16 +73,4 @@ export function DevUserPicker() {
       </section>
     </main>
   );
-}
-
-function getLoginErrorMessage(error: unknown): string {
-  if (error instanceof ApiError && error.detail) {
-    return error.detail;
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "Login failed.";
 }

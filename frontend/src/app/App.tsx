@@ -11,6 +11,7 @@ import {
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import { DevUserPicker } from "../features/auth/DevUserPicker";
+import { DevUserSwitcher } from "../features/auth/DevUserSwitcher";
 import { McpDetailPage } from "../features/mcp/pages/McpDetailPage";
 import { McpListPage } from "../features/mcp/pages/McpListPage";
 import { McpCreatePage, McpEditPage } from "../features/mcp/pages/McpServerFormPage";
@@ -127,7 +128,9 @@ function WorkspaceFrame() {
           onToggle={() => setSidebarOpen((value) => !value)}
           open={sidebarOpen}
         >
-          {sidebarContent ?? <RecentSopSidebarPanel refreshKey={recentRefreshKey} />}
+          {sidebarContent ?? (
+            <DefaultSidebarContent refreshKey={recentRefreshKey} />
+          )}
         </WorkspaceSidebar>
 
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
@@ -135,5 +138,16 @@ function WorkspaceFrame() {
         </div>
       </div>
     </WorkspaceLayoutProvider>
+  );
+}
+
+function DefaultSidebarContent({ refreshKey }: { refreshKey: number }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {import.meta.env.DEV ? <DevUserSwitcher /> : null}
+      <div className="min-h-0 flex-1">
+        <RecentSopSidebarPanel refreshKey={refreshKey} />
+      </div>
+    </div>
   );
 }
