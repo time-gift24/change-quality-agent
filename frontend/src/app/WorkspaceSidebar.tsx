@@ -18,6 +18,7 @@ type WorkspaceSidebarProps = {
   navRoutes: WorkspaceRouteDefinition[];
   onNavigate: (routeKey: WorkspaceRouteKey) => void;
   onNewConversation?: () => void;
+  topContent?: ReactNode;
   children?: ReactNode;
 };
 
@@ -28,6 +29,7 @@ export function WorkspaceSidebar({
   navRoutes,
   onNavigate,
   onNewConversation,
+  topContent,
   children,
 }: WorkspaceSidebarProps) {
   function handleNewConversation() {
@@ -71,6 +73,8 @@ export function WorkspaceSidebar({
           </span>
         ) : null}
       </SidebarHeader>
+
+      {open && topContent ? topContent : null}
 
       <SidebarMenu aria-label="工作台导航">
         {navRoutes.map((route) => (

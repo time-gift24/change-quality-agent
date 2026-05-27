@@ -31,9 +31,20 @@ export function DevUserSwitcher() {
   }
 
   return (
-    <section className="px-3 pt-3" aria-label="开发用户切换">
+    <section className="px-3 pb-2" aria-label="开发用户切换">
+      <div className="mb-2 min-w-0">
+        <p
+          className="truncate text-xs font-semibold text-ink"
+          id="dev-user-switcher-label"
+        >
+          开发用户
+        </p>
+        <p className="mt-0.5 truncate text-2xs text-mute">
+          Dev 模式权限视角
+        </p>
+      </div>
       <div
-        aria-label="开发用户"
+        aria-labelledby="dev-user-switcher-label"
         className="grid grid-cols-2 gap-1 rounded-full border border-hairline-soft bg-canvas-soft p-1"
         role="group"
       >

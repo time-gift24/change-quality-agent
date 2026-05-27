@@ -101,6 +101,11 @@ describe("App", () => {
     expect(
       screen.getByRole("group", { name: "开发用户" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Dev 模式权限视角")).toBeInTheDocument();
+    const sidebar = screen.getByRole("complementary", { name: "工作台侧边栏" });
+    expect(sidebar.textContent?.indexOf("开发用户")).toBeLessThan(
+      sidebar.textContent?.indexOf("发起新SOP质检"),
+    );
     expect(screen.getByRole("button", { name: "Common" })).toHaveAttribute(
       "aria-pressed",
       "true",

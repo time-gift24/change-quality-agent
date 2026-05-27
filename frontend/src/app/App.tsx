@@ -127,9 +127,10 @@ function WorkspaceFrame() {
           onNewConversation={handleNewConversation}
           onToggle={() => setSidebarOpen((value) => !value)}
           open={sidebarOpen}
+          topContent={import.meta.env.DEV ? <DevUserSwitcher /> : null}
         >
           {sidebarContent ?? (
-            <DefaultSidebarContent refreshKey={recentRefreshKey} />
+            <RecentSopSidebarPanel refreshKey={recentRefreshKey} />
           )}
         </WorkspaceSidebar>
 
@@ -138,16 +139,5 @@ function WorkspaceFrame() {
         </div>
       </div>
     </WorkspaceLayoutProvider>
-  );
-}
-
-function DefaultSidebarContent({ refreshKey }: { refreshKey: number }) {
-  return (
-    <div className="flex h-full min-h-0 flex-col">
-      {import.meta.env.DEV ? <DevUserSwitcher /> : null}
-      <div className="min-h-0 flex-1">
-        <RecentSopSidebarPanel refreshKey={refreshKey} />
-      </div>
-    </div>
   );
 }
