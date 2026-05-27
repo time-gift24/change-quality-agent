@@ -87,15 +87,29 @@ def test_dump_draft_config_rejects_invalid_raw_draft() -> None:
         )
 
 
+def test_dump_draft_config_preserves_provider_key() -> None:
+    agents = repository_types()
+
+    payload = agents.dump_draft_config(
+        "release-reviewer",
+        draft_config(model="gpt-5-mini", provider_key="openai_main"),
+    )
+
+    assert payload["provider_key"] == "openai_main"
+    assert payload["model"] == "gpt-5-mini"
+
+
 def draft_config(
     *,
     system_prompt: str = "You are careful.",
     model: str = "openai:gpt-5-mini",
+    provider_key: str | None = None,
     temperature: float = 0,
 ) -> AgentDraftConfig:
     return AgentDraftConfig(
         system_prompt=system_prompt,
         model=model,
+        provider_key=provider_key,
         model_config={"temperature": temperature},
         tool_allowlist=["search_sop"],
         mcp_server_ids=["change-docs"],
@@ -334,6 +348,25 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     listed_agents = await repository.list_agents()
     assert "latest_version" not in inspect(listed_agents[0]).unloaded
     assert listed_agents[0].latest_version.version_number == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.db
+@requires_test_database
+async def test_publish_agent_copies_provider_key_to_version(session) -> None:
+    agents = repository_types()
+    repository = agents.AgentRepository(session)
+    await repository.create_agent(
+        key="release-reviewer",
+        display_name="Release Reviewer",
+        description=None,
+        draft=draft_config(model="gpt-5-mini", provider_key="openai_main"),
+    )
+
+    version = await repository.publish_agent("release-reviewer")
+
+    assert version.model == "gpt-5-mini"
+    assert version.provider_key == "openai_main"
 
 
 @pytest.mark.asyncio

@@ -52,6 +52,39 @@ def test_agent_draft_config_dumps_external_model_config_key() -> None:
     assert "model_parameters" not in payload
 
 
+def test_agent_draft_config_accepts_provider_key_with_bare_model() -> None:
+    draft = AgentDraftConfig(
+        system_prompt="You are careful.",
+        model="gpt-5-mini",
+        provider_key="openai_main",
+        model_config={"temperature": 0},
+    )
+
+    payload = draft.model_dump(mode="json")
+
+    assert draft.provider_key == "openai_main"
+    assert payload["provider_key"] == "openai_main"
+
+
+def test_agent_draft_config_rejects_provider_key_with_prefixed_model() -> None:
+    with pytest.raises(ValidationError, match="provider_key requires bare model name"):
+        AgentDraftConfig(
+            system_prompt="You are careful.",
+            model="openai:gpt-5-mini",
+            provider_key="openai_main",
+        )
+
+
+def test_agent_draft_config_allows_codeagent_without_provider_key() -> None:
+    draft = AgentDraftConfig(
+        system_prompt="You are careful.",
+        model="codeagent:deepseek-v4-pro",
+    )
+
+    assert draft.model == "codeagent:deepseek-v4-pro"
+    assert draft.provider_key is None
+
+
 def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key() -> None:
     class AgentVersionRecord:
         id = uuid4()
@@ -59,6 +92,7 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
         version_number = 3
         system_prompt = "You are careful."
         model = "openai:gpt-5-mini"
+        provider_key = "openai_main"
         model_config = {"temperature": 0}
         tool_allowlist = ["search_sop"]
         mcp_server_ids = ["change-docs"]
@@ -69,6 +103,7 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
     payload = detail.model_dump(mode="json")
 
     assert detail.model_parameters == {"temperature": 0}
+    assert detail.provider_key == "openai_main"
     assert payload["model_config"] == {"temperature": 0}
     assert "model_parameters" not in payload
 

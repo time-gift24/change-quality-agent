@@ -39,6 +39,7 @@ class FakeVersion:
         self.version_number = version_number
         self.system_prompt = "You are careful."
         self.model = "openai:gpt-5-mini"
+        self.provider_key = None
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -176,6 +177,7 @@ def draft_payload() -> dict[str, object]:
     return {
         "system_prompt": "You are careful.",
         "model": "openai:gpt-5-mini",
+        "provider_key": None,
         "model_config": {"temperature": 0},
         "tool_allowlist": ["search_sop"],
         "mcp_server_ids": ["change-docs"],
@@ -345,6 +347,58 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
 
 
 @pytest.mark.asyncio
+async def test_patch_draft_accepts_provider_key_with_bare_model() -> None:
+    repository = FakeAgentRepository(agents=[FakeAgent()])
+    session = FakeSession()
+    override_dependencies(repository, session)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            "/api/agents/release-reviewer/draft",
+            json={
+                "draft": {
+                    **draft_payload(),
+                    "model": "gpt-5-mini",
+                    "provider_key": "openai_main",
+                },
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["draft"]["provider_key"] == "openai_main"
+    assert repository.updated_kwargs is not None
+    draft = repository.updated_kwargs["draft"]
+    assert isinstance(draft, AgentDraftConfig)
+    assert draft.provider_key == "openai_main"
+
+
+@pytest.mark.asyncio
+async def test_patch_draft_rejects_provider_key_with_prefixed_model() -> None:
+    repository = FakeAgentRepository(agents=[FakeAgent()])
+    override_dependencies(repository, FakeSession())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.patch(
+            "/api/agents/release-reviewer/draft",
+            json={
+                "draft": {
+                    **draft_payload(),
+                    "model": "openai:gpt-5-mini",
+                    "provider_key": "openai_main",
+                },
+            },
+        )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_publish_agent_returns_created_version_detail() -> None:
     repository = FakeAgentRepository(agents=[FakeAgent()])
     session = FakeSession()
@@ -360,6 +414,7 @@ async def test_publish_agent_returns_created_version_detail() -> None:
     body = response.json()
     assert body["version_number"] == 1
     assert body["model_config"] == {"temperature": 0}
+    assert body["provider_key"] is None
     assert "model_parameters" not in body
     assert session.commits == 1
 
@@ -422,6 +477,7 @@ async def test_get_version_returns_detail_or_404() -> None:
     assert found.status_code == 200
     assert found.json()["version_number"] == 3
     assert found.json()["model_config"] == {"temperature": 0}
+    assert found.json()["provider_key"] is None
     assert missing.status_code == 404
 
 

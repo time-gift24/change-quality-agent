@@ -91,6 +91,7 @@ class AgentVersion(Base):
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_key: Mapped[str | None] = mapped_column(Text)
     model_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
