@@ -10,9 +10,9 @@ publishing, and test-running ReAct agents. It builds on the existing generic
 same run APIs already used by SOP quality runs.
 
 The feature is intentionally limited to agent definition and test execution.
-Tool management, MCP server management, and LLM provider configuration remain
-separate modules. This feature stores references to those future resources
-instead of owning them directly.
+Tool management, MCP server management, and ordinary LLM provider configuration
+remain separate modules. Agent versions may reference stored provider keys, but
+they do not own provider credentials.
 
 ## Core Capabilities
 
@@ -56,7 +56,8 @@ An agent draft stores the editable runtime configuration:
 ```json
 {
   "system_prompt": "You are a careful release reviewer.",
-  "model": "codeagent:codeagent-v4-pro",
+  "model": "gpt-5-mini",
+  "provider_key": "openai_main",
   "model_config": {
     "temperature": 0,
     "reasoning_effort": "high",
@@ -73,6 +74,7 @@ Published versions copy the draft into immutable fields:
 
 - `system_prompt`
 - `model`
+- `provider_key`
 - `model_config`
 - `tool_allowlist`
 - `mcp_server_ids`
@@ -87,6 +89,28 @@ and `CODEAGENT_TOKEN_PROVIDER=codeagent`; agent drafts do not store provider
 credentials. Token headers are resolved before each model HTTP request so
 long-running agent executions do not reuse headers captured at model construction
 time.
+
+Ordinary LangChain providers use stored provider configuration instead. When
+`provider_key` is set, `model` must be a bare model name such as
+`gpt-5-mini`; it must not include a prefix such as `openai:` and must not use
+`codeagent:`. At runtime the selected provider supplies `model_provider`,
+optional `base_url`, optional API key, default headers, and default query
+parameters to `langchain.chat_models.init_chat_model`.
+
+Provider configuration is managed through `/api/v1/llm-providers`:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/llm-providers` | Create a stored LangChain provider. |
+| `GET` | `/api/v1/llm-providers` | List non-deleted providers. |
+| `GET` | `/api/v1/llm-providers/{provider_key}` | Fetch provider detail. |
+| `PATCH` | `/api/v1/llm-providers/{provider_key}` | Update provider metadata, connection settings, or enabled state. |
+| `DELETE` | `/api/v1/llm-providers/{provider_key}` | Soft-delete the provider while keeping the key reserved. |
+
+Provider API keys are write-only through the HTTP API. Responses expose
+`api_key_configured` and mask secret-like header/query keys; they never return
+plaintext API keys. Omitted `api_key` in an update preserves the current value,
+while explicit `null` clears it.
 
 ## Persistence Model
 
@@ -112,6 +136,7 @@ time.
 - `version_number`
 - `system_prompt`
 - `model`
+- `provider_key`
 - `model_config`
 - `tool_allowlist`
 - `mcp_server_ids`
@@ -171,7 +196,9 @@ The test-run flow is:
 6. The run is marked `running`.
 7. A start event is appended.
 8. `AgentRuntime` resolves tools through the configured resolver.
-9. `AgentRuntime` builds a model with `langchain.chat_models.init_chat_model`.
+9. `AgentRuntime` builds a model. `provider_key` versions resolve stored
+   provider configuration and then call `langchain.chat_models.init_chat_model`;
+   `codeagent:` versions use the internal CodeAgent factory.
 10. `AgentRuntime` calls `langchain.agents.create_agent`.
 11. The runtime invokes the agent with the request messages.
 12. Success appends message and done events, stores normalized output, and marks
@@ -223,7 +250,7 @@ This feature deliberately does not include:
 - Tool CRUD or real tool registry validation.
 - MCP server CRUD or real MCP server validation.
 - LLM provider configuration UI or provider-specific policy beyond the v1
-  CodeAgent runtime factory.
+- stored provider CRUD and CodeAgent runtime factory.
 - Dynamic LangGraph node composition.
 - Auth, workspace scoping, sharing, or per-agent permissions.
 - Token-level streaming.

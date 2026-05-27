@@ -19,6 +19,8 @@ tags:
   description: MCP server configuration and runtime management APIs.
 - name: agents
   description: ReAct agent definitions, versions, and test runs.
+- name: llm-providers
+  description: Stored LangChain chat model provider configuration.
 security:
 - CookieAuth: []
 paths:
@@ -548,6 +550,116 @@ paths:
           $ref: '#/components/responses/ServiceUnavailable'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers:
+    get:
+      tags:
+      - llm-providers
+      summary: List LLM providers
+      operationId: listLlmProviders
+      responses:
+        '200':
+          description: LLM provider summaries with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmProviderSummary'
+    post:
+      tags:
+      - llm-providers
+      summary: Create an LLM provider
+      operationId: createLlmProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderCreate'
+      responses:
+        '201':
+          description: Created LLM provider with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '409':
+          description: LLM provider key already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers/{provider_key}:
+    get:
+      tags:
+      - llm-providers
+      summary: Get an LLM provider
+      operationId: getLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderKey'
+      responses:
+        '200':
+          description: LLM provider detail with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    patch:
+      tags:
+      - llm-providers
+      summary: Update an LLM provider
+      operationId: updateLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderUpdate'
+      responses:
+        '200':
+          description: Updated LLM provider with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - llm-providers
+      summary: Delete an LLM provider
+      operationId: deleteLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderKey'
+      responses:
+        '204':
+          description: LLM provider deleted.
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/agents:
     get:
       tags:
@@ -849,6 +961,14 @@ components:
         type: integer
         minimum: 1
       example: 1
+    LlmProviderKey:
+      name: provider_key
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9][a-z0-9_-]*$
+      example: openai_main
   responses:
     Unauthorized:
       description: Authentication is required or the session cookie is invalid.
@@ -1342,6 +1462,136 @@ components:
           items:
             type: object
             additionalProperties: true
+    LlmProviderCreate:
+      type: object
+      required:
+      - key
+      - display_name
+      - provider_type
+      properties:
+        key:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]*$
+          example: openai_main
+        display_name:
+          type: string
+          example: OpenAI Main
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          example: openai
+        base_url:
+          type: string
+          nullable: true
+          example: https://api.openai.com/v1
+        api_key:
+          type: string
+          nullable: true
+          writeOnly: true
+        default_headers:
+          type: object
+          additionalProperties:
+            type: string
+        default_query:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+          default: true
+    LlmProviderUpdate:
+      type: object
+      properties:
+        display_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          nullable: true
+        base_url:
+          type: string
+          nullable: true
+        api_key:
+          type: string
+          nullable: true
+          writeOnly: true
+          description: Omit to preserve the current API key. Send null to clear it.
+        default_headers:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        default_query:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+          nullable: true
+    LlmProviderSummary:
+      type: object
+      required:
+      - id
+      - key
+      - display_name
+      - provider_type
+      - default_headers
+      - default_query
+      - enabled
+      - created_at
+      - updated_at
+      - api_key_configured
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+          example: openai_main
+        display_name:
+          type: string
+          example: OpenAI Main
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          example: openai
+        base_url:
+          type: string
+          nullable: true
+          example: https://api.openai.com/v1
+        default_headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Secret-like keys are masked in responses.
+        default_query:
+          type: object
+          additionalProperties:
+            type: string
+          description: Secret-like keys are masked in responses.
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        api_key_configured:
+          type: boolean
+    LlmProviderDetail:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/LlmProviderSummary'
+      properties: {}
     AgentDraftConfig:
       type: object
       required:
@@ -1354,6 +1604,11 @@ components:
         model:
           type: string
           minLength: 1
+        provider_key:
+          type: string
+          nullable: true
+          pattern: ^[a-z0-9][a-z0-9_-]*$
+          description: Stored provider key. When set, model must be a bare model name without a provider prefix.
         model_config:
           type: object
           additionalProperties: true
@@ -1421,6 +1676,10 @@ components:
         model:
           type: string
           example: codeagent:codeagent-v4-pro
+        provider_key:
+          type: string
+          nullable: true
+          example: openai_main
         published_at:
           type: string
           format: date-time
@@ -1521,6 +1780,10 @@ components:
         model:
           type: string
           example: codeagent:codeagent-v4-pro
+        provider_key:
+          type: string
+          nullable: true
+          example: openai_main
         published_at:
           type: string
           format: date-time

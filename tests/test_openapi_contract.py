@@ -128,6 +128,29 @@ def test_agents_tag_and_paths_are_documented() -> None:
         assert statuses <= set(operation["responses"])
 
 
+def test_llm_provider_tag_and_paths_are_documented() -> None:
+    contract = load_contract()
+
+    tag_descriptions = {tag["name"]: tag["description"] for tag in contract["tags"]}
+    assert tag_descriptions["llm-providers"] == (
+        "Stored LangChain chat model provider configuration."
+    )
+
+    paths = contract["paths"]
+    expected_operations = {
+        ("/api/v1/llm-providers", "get"): {"200"},
+        ("/api/v1/llm-providers", "post"): {"201", "409", "422"},
+        ("/api/v1/llm-providers/{provider_key}", "get"): {"200", "404", "422"},
+        ("/api/v1/llm-providers/{provider_key}", "patch"): {"200", "404", "422"},
+        ("/api/v1/llm-providers/{provider_key}", "delete"): {"204", "404", "422"},
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["tags"] == ["llm-providers"]
+        assert statuses <= set(operation["responses"])
+
+
 def test_agents_parameters_are_reusable_and_referenced() -> None:
     contract = load_contract()
     parameters = contract["components"]["parameters"]
@@ -146,6 +169,13 @@ def test_agents_parameters_are_reusable_and_referenced() -> None:
         "schema": {"type": "integer", "minimum": 1},
         "example": 1,
     }
+    assert parameters["LlmProviderKey"] == {
+        "name": "provider_key",
+        "in": "path",
+        "required": True,
+        "schema": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "example": "openai_main",
+    }
 
     paths = contract["paths"]
     agent_key_ref = {"$ref": "#/components/parameters/AgentKey"}
@@ -157,6 +187,10 @@ def test_agents_parameters_are_reusable_and_referenced() -> None:
     assert version_ref in paths["/api/agents/{agent_key}/versions/{version_number}"][
         "get"
     ]["parameters"]
+    provider_ref = {"$ref": "#/components/parameters/LlmProviderKey"}
+    assert provider_ref in paths["/api/v1/llm-providers/{provider_key}"]["get"][
+        "parameters"
+    ]
 
 
 def test_agent_schemas_use_api_json_field_names() -> None:
@@ -178,6 +212,12 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     draft_properties = schemas["AgentDraftConfig"]["properties"]
     assert "model_config" in draft_properties
     assert "model_parameters" not in draft_properties
+    assert draft_properties["provider_key"] == {
+        "type": "string",
+        "nullable": True,
+        "pattern": "^[a-z0-9][a-z0-9_-]*$",
+        "description": "Stored provider key. When set, model must be a bare model name without a provider prefix.",
+    }
     assert schemas["AgentCreate"]["properties"]["draft"] == {
         "$ref": "#/components/schemas/AgentDraftConfig"
     }
@@ -188,6 +228,25 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     version_properties = schemas["AgentVersionDetail"]["properties"]
     assert "model_config" in version_properties
     assert "model_parameters" not in version_properties
+    assert "provider_key" in version_properties
+
+
+def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None:
+    schemas = load_contract()["components"]["schemas"]
+
+    for schema_name in (
+        "LlmProviderCreate",
+        "LlmProviderUpdate",
+        "LlmProviderSummary",
+        "LlmProviderDetail",
+    ):
+        assert schema_name in schemas
+
+    assert "api_key" in schemas["LlmProviderCreate"]["properties"]
+    assert "api_key" in schemas["LlmProviderUpdate"]["properties"]
+    assert "api_key" not in schemas["LlmProviderSummary"]["properties"]
+    assert "api_key" not in schemas["LlmProviderDetail"]["properties"]
+    assert "api_key_configured" in schemas["LlmProviderSummary"]["properties"]
 
 
 def test_agent_test_runs_response_reuses_run_start_response() -> None:
