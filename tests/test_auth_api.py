@@ -33,10 +33,11 @@ class FakeUserRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
-    app.dependency_overrides.clear()
+def restore_overrides():
+    previous_overrides = dict(app.dependency_overrides)
     yield
     app.dependency_overrides.clear()
+    app.dependency_overrides.update(previous_overrides)
 
 
 def override_user_repository(repository: FakeUserRepository) -> None:

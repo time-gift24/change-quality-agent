@@ -2,11 +2,12 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.api.deps import UserRepositoryDep
 from app.core.config import settings
+from app.repositories.users import DEV_USERS
 from app.schemas.users import DevLoginRequest, UserPublic
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-DEV_LOGIN_ACCOUNTS = frozenset({"common", "admin"})
+DEV_LOGIN_ACCOUNTS = frozenset(user["account"] for user in DEV_USERS)
 
 
 @router.get("/me")
