@@ -1,20 +1,18 @@
 import inspect
-import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from agent.react_runtime import AgentRuntime
+from app.agent.sop_quality import SOP_QUALITY_AGENT_KEY, stream_sop_quality_agent
+from app.core.agent_runtime import AgentRuntime
+from app.core.agent_streaming import consume_runtime_stream
 from app.core.config import Settings
 from app.core.database import async_session
 from app.repositories.agents import AgentRepository
 from app.repositories.runs import ActiveRunExistsError, RunRepository
 from app.schemas.runs import RunStatus
-from app.services.agents import _consume_runtime_stream
 from app.services.sop_client import SopClient
-
-SOP_QUALITY_AGENT_KEY = "sop-quality-v1"
 
 
 @dataclass(frozen=True)
@@ -140,12 +138,10 @@ async def run_sop_quality_graph(
         stream = getattr(runtime, "stream", None)
         if stream is None:
             raise RuntimeError("SOP quality agent runtime does not support streaming.")
-        stream_result = await _consume_runtime_stream(
+        stream_result = await consume_runtime_stream(
             repository,
             run,
-            stream,
-            version=version,
-            messages=[_sop_quality_user_message(run)],
+            stream_sop_quality_agent(runtime=runtime, version=version, run=run),
         )
         if stream_result.error is not None:
             await repository.mark_terminal(
@@ -210,19 +206,3 @@ async def _commit_if_available(repository: RunRepository) -> None:
     commit = getattr(repository, "commit", None)
     if commit is not None:
         await commit()
-
-
-def _sop_quality_user_message(run: Any) -> dict[str, str]:
-    sop_snapshot = json.dumps(
-        run.subject_snapshot,
-        ensure_ascii=False,
-        sort_keys=True,
-    )
-    return {
-        "role": "user",
-        "content": (
-            "请对以下 SOP 快照执行质量检查，指出步骤完整性、发布风险和需要补充的验证项。\n\n"
-            f"SOP ID: {run.subject_id}\n"
-            f"SOP Snapshot JSON:\n{sop_snapshot}"
-        ),
-    }

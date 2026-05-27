@@ -1,4 +1,4 @@
-from app.services.run_events import normalize_langgraph_chunk
+from app.core.stream_events import normalize_langgraph_chunk
 
 
 def test_message_event_extracts_node_from_metadata() -> None:

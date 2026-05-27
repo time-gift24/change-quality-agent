@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
-from agent.react_runtime import AgentRuntime
+from app.core.agent_runtime import AgentRuntime
 
 
 class FakeVersion:

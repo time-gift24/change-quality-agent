@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 from langchain_core.messages import AIMessage
 
-from agent.react_runtime import AgentRunResult
+from app.core.agent_runtime import AgentRunResult
 from app.schemas.runs import RunStatus
 from app.services.agents import run_agent_test
 

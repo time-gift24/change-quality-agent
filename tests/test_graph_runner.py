@@ -3,6 +3,7 @@ from uuid import uuid4
 import pytest
 
 from app.models.agents import Agent
+from app.agent.sop_quality import stream_sop_quality_agent
 from app.schemas.runs import RunStatus
 from app.services.sop_quality import run_sop_quality_graph
 
@@ -102,6 +103,29 @@ class FakeStreamingRuntime:
         self.calls.append({"version": version, "messages": messages})
         for event in self.events:
             yield event
+
+
+@pytest.mark.asyncio
+async def test_sop_quality_agent_facade_builds_review_message() -> None:
+    run = FakeRun()
+    version = FakeVersion()
+    runtime = FakeStreamingRuntime()
+
+    events = [
+        event
+        async for event in stream_sop_quality_agent(
+            runtime=runtime,
+            version=version,
+            run=run,
+        )
+    ]
+
+    assert events == runtime.events
+    assert runtime.calls[0]["version"] is version
+    message = runtime.calls[0]["messages"][0]
+    assert message["role"] == "user"
+    assert "release-checklist" in message["content"]
+    assert "SOP Snapshot JSON" in message["content"]
 
 
 @pytest.mark.asyncio
