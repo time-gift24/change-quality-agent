@@ -7,6 +7,7 @@ export async function requestJson<T>(
 
   const response = await fetch(url, {
     ...init,
+    credentials: "same-origin",
     headers,
   });
 

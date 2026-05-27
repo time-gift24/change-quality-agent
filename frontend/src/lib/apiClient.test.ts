@@ -7,6 +7,23 @@ afterEach(() => {
 });
 
 describe("requestJson", () => {
+  it("uses same-origin credentials for cookie-backed API calls", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(requestJson("/api/auth/me")).resolves.toEqual({ ok: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/me",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
+
   it("includes FastAPI error details in ApiError", async () => {
     vi.stubGlobal(
       "fetch",
