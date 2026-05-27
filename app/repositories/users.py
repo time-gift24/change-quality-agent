@@ -1,6 +1,8 @@
+from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.users import User
@@ -37,21 +39,28 @@ class UserRepository:
         is_admin: bool,
         meta: dict[str, Any],
     ) -> User:
-        user = await self.get_by_account(account)
-        if user is None:
-            user = User(
-                account=account,
-                refresh_token=refresh_token,
-                is_admin=is_admin,
-                meta=meta,
+        statement = insert(User).values(
+            account=account,
+            refresh_token=refresh_token,
+            is_admin=is_admin,
+            meta=deepcopy(meta),
+        )
+        upsert_statement = (
+            statement.on_conflict_do_update(
+                index_elements=[User.account],
+                set_={
+                    "refresh_token": statement.excluded.refresh_token,
+                    "is_admin": statement.excluded.is_admin,
+                    "meta": statement.excluded.meta,
+                    "updated_at": func.now(),
+                },
             )
-            self._session.add(user)
-        else:
-            user.refresh_token = refresh_token
-            user.is_admin = is_admin
-            user.meta = meta
+            .returning(User)
+            .execution_options(populate_existing=True)
+        )
+        result = await self._session.execute(upsert_statement)
         await self._session.flush()
-        return user
+        return result.scalar_one()
 
 
 async def seed_dev_users(repository: UserRepository) -> None:
