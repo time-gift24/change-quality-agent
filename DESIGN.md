@@ -1,451 +1,685 @@
 ---
 version: alpha
-name: Cohere-design-analysis
-description: Cohere's 2026 web system is a controlled enterprise AI interface built from stark white editorial space, deep green-black product bands, soft mineral surfaces, rounded media cards, and a distinctive type split between monospaced-feeling display headlines and precise Unica77 UI text.
+name: Meta-design-analysis
+description: Meta's design system spans hardware commerce (Quest VR, Ray-Ban Meta AI glasses) and brand surfaces with a confident product-merchandising voice. The system pairs a stark white canvas with full-bleed photographic product cards, a confident Optimistic VF wordmark/headline face, dual-CTA hero patterns (black primary + outlined secondary), and a saturated cobalt blue (#0064E0) for in-product purchase actions. Pill-shaped 100px-radius buttons, generous 24-32px card rounding, and tight three-tier text hierarchy carry across homepage, product detail (PDP), buy-now configurator, and accessory subpages.
 
 colors:
-  primary: "#17171c"
-  cohere-black: "#000000"
-  ink: "#212121"
-  deep-green: "#003c33"
-  dark-navy: "#071829"
-  canvas: "#ffffff"
-  soft-stone: "#eeece7"
-  pale-green: "#edfce9"
-  pale-blue: "#f1f5ff"
-  hairline: "#d9d9dd"
-  border-light: "#e5e7eb"
-  card-border: "#f2f2f2"
-  muted: "#93939f"
-  slate: "#75758a"
-  body-muted: "#616161"
-  action-blue: "#1863dc"
-  focus-blue: "#4c6ee6"
-  coral: "#ff7759"
-  coral-soft: "#ffad9b"
-  form-focus: "#9b60aa"
+  primary: "#0064e0"
+  primary-deep: "#0457cb"
+  primary-soft: "#e7f3ff"
+  primary-bright: "#0091ff"
   on-primary: "#ffffff"
-  on-dark: "#ffffff"
-  error: "#b30000"
+  ink-button: "#000000"
+  on-ink-button: "#ffffff"
+  fb-blue: "#1876f2"
+  meta-link: "#385898"
+  oculus-purple: "#a121ce"
+  success: "#31a24c"
+  success-bg: "#24e400"
+  attention: "#f2a918"
+  warning: "#f7b928"
+  warning-bg: "#ffe200"
+  critical: "#e41e3f"
+  critical-strong: "#f0284a"
+  canvas: "#ffffff"
+  surface-soft: "#f1f4f7"
+  ink-deep: "#0a1317"
+  ink: "#1c1e21"
+  charcoal: "#444950"
+  slate: "#4b4c4f"
+  steel: "#5d6c7b"
+  stone: "#8595a4"
+  hairline: "#ced0d4"
+  hairline-soft: "#dee3e9"
+  disabled-text: "#bcc0c4"
 
 typography:
   hero-display:
-    fontFamily: CohereText
-    fontSize: 96px
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: -1.92px
-  product-display:
-    fontFamily: CohereText
-    fontSize: 72px
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: -1.44px
-  section-display:
-    fontFamily: Unica77 Cohere Web
-    fontSize: 60px
-    fontWeight: 400
-    lineHeight: 1
-    letterSpacing: -1.2px
-  section-heading:
-    fontFamily: Unica77 Cohere Web
+    fontFamily: Optimistic VF
+    fontSize: 64px
+    fontWeight: 500
+    lineHeight: 1.16
+    fontFeature: "ss01, ss02"
+  display-lg:
+    fontFamily: Optimistic VF
     fontSize: 48px
-    fontWeight: 400
-    lineHeight: 1.2
-    letterSpacing: -0.48px
-  card-heading:
-    fontFamily: Unica77 Cohere Web
-    fontSize: 32px
-    fontWeight: 400
-    lineHeight: 1.2
-    letterSpacing: -0.32px
-  feature-heading:
-    fontFamily: Unica77 Cohere Web
+    fontWeight: 500
+    lineHeight: 1.17
+    fontFeature: "ss01, ss02"
+  heading-lg:
+    fontFamily: Optimistic VF
+    fontSize: 36px
+    fontWeight: 500
+    lineHeight: 1.28
+    fontFeature: "ss01, ss02"
+  heading-md:
+    fontFamily: Optimistic VF
+    fontSize: 28px
+    fontWeight: 300
+    lineHeight: 1.21
+    fontFeature: "ss01, ss02"
+  heading-sm:
+    fontFamily: Optimistic VF
     fontSize: 24px
-    fontWeight: 400
-    lineHeight: 1.3
-    letterSpacing: 0
-  body-large:
-    fontFamily: Unica77 Cohere Web
+    fontWeight: 500
+    lineHeight: 1.25
+    fontFeature: "ss01, ss02"
+  subtitle-lg:
+    fontFamily: Optimistic VF
+    fontSize: 18px
+    fontWeight: 700
+    lineHeight: 1.44
+  subtitle-md:
+    fontFamily: Optimistic VF
     fontSize: 18px
     fontWeight: 400
-    lineHeight: 1.4
-    letterSpacing: 0
-  body:
-    fontFamily: Unica77 Cohere Web
+    lineHeight: 1.44
+  body-md-bold:
+    fontFamily: Optimistic VF
+    fontSize: 16px
+    fontWeight: 700
+    lineHeight: 1.50
+    letterSpacing: -0.16px
+  body-md:
+    fontFamily: Optimistic VF
     fontSize: 16px
     fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: 0
-  button:
-    fontFamily: Unica77 Cohere Web
+    lineHeight: 1.50
+    letterSpacing: -0.16px
+  body-sm-bold:
+    fontFamily: Optimistic VF
     fontSize: 14px
-    fontWeight: 500
-    lineHeight: 1.71
-    letterSpacing: 0
+    fontWeight: 700
+    lineHeight: 1.43
+    letterSpacing: -0.14px
+  body-sm:
+    fontFamily: Optimistic VF
+    fontSize: 14px
+    fontWeight: 400
+    lineHeight: 1.43
+    letterSpacing: -0.14px
+  caption-bold:
+    fontFamily: Optimistic VF
+    fontSize: 12px
+    fontWeight: 700
+    lineHeight: 1.33
   caption:
-    fontFamily: Unica77 Cohere Web
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.4
-    letterSpacing: 0
-  mono-label:
-    fontFamily: CohereMono
-    fontSize: 14px
-    fontWeight: 400
-    lineHeight: 1.4
-    letterSpacing: 0.28px
-  micro:
-    fontFamily: Unica77 Cohere Web
+    fontFamily: Optimistic VF
     fontSize: 12px
     fontWeight: 400
-    lineHeight: 1.4
-    letterSpacing: 0
+    lineHeight: 1.33
+  button-md:
+    fontFamily: Optimistic VF
+    fontSize: 14px
+    fontWeight: 700
+    lineHeight: 1.43
+    letterSpacing: -0.14px
+  link-md:
+    fontFamily: Optimistic VF
+    fontSize: 16px
+    fontWeight: 700
+    lineHeight: 1.50
+    letterSpacing: -0.16px
 
 rounded:
-  xs: 4px
-  sm: 8px
-  md: 16px
-  lg: 22px
-  xl: 30px
-  pill: 32px
-  full: 9999px
+  xs: 2px
+  sm: 4px
+  md: 6px
+  lg: 8px
+  xl: 16px
+  xxl: 24px
+  xxxl: 32px
+  feature: 40px
+  full: 100px
+  circle: 9999px
 
 spacing:
-  xxs: 2px
-  xs: 6px
-  sm: 8px
+  xxs: 4px
+  xs: 8px
+  sm: 10px
   md: 12px
-  lg: 16px
+  base: 16px
+  lg: 20px
   xl: 24px
   xxl: 32px
-  section: 80px
+  xxxl: 40px
+  section-sm: 48px
+  section: 64px
+  section-lg: 80px
+  hero: 120px
 
 components:
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    typography: "{typography.button}"
-    rounded: "{rounded.pill}"
-    padding: 12px 24px
+    typography: "{typography.button-md}"
+    rounded: "{rounded.full}"
+    padding: "14px 30px"
+    treatment: "Tech CTA gradient may layer primary -> primary-bright -> primary-deep for launch/quality-run actions."
+  button-primary-pressed:
+    backgroundColor: "{colors.primary-deep}"
+    textColor: "{colors.on-primary}"
+  button-primary-disabled:
+    backgroundColor: "{colors.disabled-text}"
+    textColor: "{colors.canvas}"
+  button-buy-cta:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.full}"
+    padding: "14px 30px"
+  button-buy-cta-pressed:
+    backgroundColor: "{colors.primary-deep}"
+    textColor: "{colors.on-primary}"
   button-secondary:
-    backgroundColor: transparent
+    backgroundColor: "transparent"
+    textColor: "{colors.ink-deep}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.full}"
+    padding: "12px 28px"
+    border: "2px solid {colors.ink-deep}"
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink-deep}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.full}"
+    padding: "10px 22px"
+    border: "2px solid rgba(10, 19, 23, 0.12)"
+  button-pill-tab:
+    backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.xs}"
-    padding: 8px 0
-  button-pill-outline:
-    backgroundColor: transparent
-    textColor: "{colors.primary}"
-    typography: "{typography.button}"
+    typography: "{typography.body-sm-bold}"
+    rounded: "{rounded.full}"
+    padding: "8px 16px"
+    border: "1px solid {colors.hairline}"
+  button-pill-tab-active:
+    backgroundColor: "{colors.ink-deep}"
+    textColor: "{colors.canvas}"
+  button-icon-circular:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.circle}"
+    size: 40px
+  card-product-feature:
+    backgroundColor: "{colors.canvas}"
+    rounded: "{rounded.xxxl}"
+    padding: "{spacing.xxl}"
+    border: "1px solid {colors.hairline-soft}"
+  card-feature-photo:
+    backgroundColor: "{colors.canvas}"
+    rounded: "{rounded.xxxl}"
+    padding: "0"
+    border: "none"
+  card-promo-strip:
+    backgroundColor: "{colors.ink-deep}"
+    textColor: "{colors.canvas}"
+    rounded: "{rounded.xxxl}"
+    padding: "{spacing.section}"
+  card-icon-feature:
+    backgroundColor: "{colors.canvas}"
     rounded: "{rounded.xl}"
-    padding: 6px 12px
-  announcement-bar:
-    backgroundColor: "{colors.cohere-black}"
-    textColor: "{colors.on-dark}"
-    typography: "{typography.micro}"
-    height: 36px
-  hero-photo-card:
+    padding: "{spacing.xl}"
+  card-checkout-summary:
+    backgroundColor: "{colors.canvas}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xl}"
+    border: "1px solid {colors.hairline-soft}"
+    shadow: "rgba(20, 22, 26, 0.3) 0px 1px 4px 0px"
+  product-thumbnail:
+    backgroundColor: "{colors.surface-soft}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.base}"
+    aspect-ratio: "1 / 1"
+  text-input:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.md}"
+    border: "1px solid {colors.hairline}"
+    height: 44px
+  text-input-focused:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    border: "2px solid {colors.fb-blue}"
+  text-input-error:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    border: "1px solid {colors.critical-strong}"
+  search-pill:
+    backgroundColor: "{colors.surface-soft}"
+    textColor: "{colors.steel}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.full}"
+    padding: "{spacing.md} {spacing.lg}"
+    height: 40px
+  radio-option:
     backgroundColor: "{colors.canvas}"
     rounded: "{rounded.lg}"
-  agent-console-card:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-dark}"
-    rounded: "{rounded.sm}"
-    padding: 24px
-  trust-logo-strip:
+    padding: "{spacing.lg}"
+    border: "1px solid rgba(10, 19, 23, 0.12)"
+  radio-option-selected:
     backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.caption}"
-  capability-card:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.xs}"
-    padding: 24px
-  dark-feature-band:
-    backgroundColor: "{colors.deep-green}"
-    textColor: "{colors.on-dark}"
     rounded: "{rounded.lg}"
-    padding: 80px
-  product-card:
-    backgroundColor: "{colors.soft-stone}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.sm}"
-    padding: 32px
-  blog-filter-chip:
-    backgroundColor: transparent
-    textColor: "{colors.coral}"
-    typography: "{typography.card-heading}"
-    rounded: "{rounded.sm}"
-    padding: 8px 14px
-  research-table:
+    border: "2px solid #0143b5"
+  color-swatch-circle:
+    rounded: "{rounded.circle}"
+    size: 32px
+    border: "2px solid {colors.canvas}"
+  badge-promo-yellow:
+    backgroundColor: "{colors.warning}"
+    textColor: "{colors.ink-deep}"
+    typography: "{typography.caption-bold}"
+    rounded: "{rounded.full}"
+    padding: "4px 10px"
+  badge-attention:
+    backgroundColor: "{colors.attention}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.caption-bold}"
+    rounded: "{rounded.full}"
+    padding: "4px 10px"
+  badge-success:
+    backgroundColor: "{colors.success}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.caption-bold}"
+    rounded: "{rounded.full}"
+    padding: "4px 10px"
+  badge-critical:
+    backgroundColor: "{colors.critical}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.caption-bold}"
+    rounded: "{rounded.full}"
+    padding: "4px 10px"
+  promo-banner:
+    backgroundColor: "{colors.ink-deep}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.body-sm-bold}"
+    padding: "{spacing.md} {spacing.xl}"
+  faq-accordion-item:
     backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-large}"
-  contact-form-card:
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xl}"
+    border: "1px solid {colors.hairline-soft}"
+  why-buy-tile:
     backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xxl} {spacing.xl}"
+    border: "1px solid {colors.hairline-soft}"
+  warranty-card:
+    backgroundColor: "{colors.surface-soft}"
+    rounded: "{rounded.xxl}"
+    padding: "{spacing.xxl}"
+  footer-region:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.steel}"
+    typography: "{typography.body-sm}"
+    padding: "{spacing.section} {spacing.xxl}"
+    border: "1px solid {colors.hairline-soft}"
+  hero-band-marketing:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.canvas}"
+    typography: "{typography.hero-display}"
+    rounded: "{rounded.xxxl}"
+    padding: "{spacing.section-lg}"
+  product-gallery-pdp:
+    backgroundColor: "{colors.canvas}"
+    rounded: "{rounded.xxxl}"
+    padding: "{spacing.base}"
+  color-sku-picker-row:
+    backgroundColor: "{colors.surface-soft}"
     rounded: "{rounded.lg}"
-    padding: 32px
-  footer-newsletter:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-dark}"
-    typography: "{typography.micro}"
+    padding: "{spacing.base}"
+  feature-icon-row:
+    backgroundColor: "{colors.canvas}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xl}"
+    border: "1px solid {colors.hairline-soft}"
+  tech-specs-table:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+    border: "1px solid {colors.hairline-soft}"
+  testimonial-customer-card:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.xl}"
+    padding: "{spacing.xxl}"
+    border: "1px solid {colors.hairline-soft}"
 ---
 
 ## Overview
 
-Cohere's current web presence feels like a sober enterprise AI command center with editorial restraint. The home page opens on a huge typographic declaration over a white canvas, then uses photography, dark product mockups, trust logos, and generous empty space to make AI infrastructure feel controlled rather than speculative. Product pages invert the tone into deep green-black or dark navy bands, while blog and research pages move toward publishing-system clarity: large filters, thin rules, dense lists, and pale technical backgrounds.
+Meta's commerce surfaces (homepage, Quest configurator, Ray-Ban product detail, prescription page) read as a confident hardware merchandiser. The brand voice is photography-first: large, full-bleed product imagery dominates above-the-fold real estate, with white space and tight typographic hierarchy carrying the rest. The system has a recognizable dual-CTA pattern — a black pill-shaped primary on marketing surfaces shifting to a saturated cobalt blue ({colors.primary}) inside the buy-now flows, paired with an outlined ghost button for secondary navigation.
 
-What makes the system distinctive is the mix of austere black-and-white UI with bursts of tactile brand imagery. The site avoids decorative chrome in the normal interface; color arrives through photography, abstract 3D media, coral blog taxonomy chips, blue research links, and dark product environments. Cards are rounded but not cute. Type is large, tight, and almost monospaced in spirit, creating a research-lab cadence across marketing, product, and editorial surfaces.
+Optimistic VF — Meta's variable display face — anchors the entire system, ranging from a 64px hero display down to a 12px caption. The face's `ss01` and `ss02` stylistic sets are switched on across every heading role, contributing to the brand's slightly humanist, friendly geometric character. Below 768px the system collapses cleanly: hero stacks, pill nav becomes a hamburger, three-up feature grids flatten to a single column, and product configurators drop their right-rail summary into a sticky bottom bar.
 
 **Key Characteristics:**
-- Monumental display headlines with very tight line height and negative tracking.
-- White editorial canvases interrupted by deep green, dark navy, and image-led CTA bands.
-- Rounded media cards and product cards, usually 8px to 22px.
-- Pill CTAs in near-black or white, with most secondary actions rendered as underlined text links.
-- Trust-logo strips with monochrome partner marks and very wide vertical spacing.
-- Agent-console mockups using dark panels, small status chips, and product integration badges.
-- Blog and research surfaces with prominent taxonomy chips, long rule-separated lists, and search fields.
+- Stark white canvas ({colors.canvas}) carrying full-bleed product photography with `{rounded.xxxl}` (32px) corner softening on showcase tiles
+- Two-tier primary button system: marketing CTAs use {colors.ink-button} pills; commerce CTAs use {colors.primary} cobalt pills inside buy-now panels
+- Optimistic VF as the universal display + body face with consistent `ss01, ss02` OpenType features
+- Pill-shaped buttons ({rounded.full}) and `{rounded.xxxl}`/`{rounded.feature}` cards as the dominant geometric signature
+- Saturated promotional banners (yellow {colors.warning}, dark {colors.ink-deep}) used sparingly above the nav for time-bound offers
+- Photographic feature cards with no card chrome (no border, no shadow) — the product imagery IS the surface treatment
 
 ## Colors
 
+> Source pages: meta.com/ (homepage), /ai-glasses/ray-ban-meta-skyler-gen-2/ (PDP), /quest/quest-3s/buy-now/ (configurator), /ai-glasses/prescription/ (lens upsell). Token coverage was identical across all four pages — the design system is genuinely unified.
+
 ### Brand & Accent
+- **Cobalt Primary** ({colors.primary}): The buy-now CTA color. Used on every "Add to cart", "Configure", "Pre-order" button inside the commerce flow and the right-rail purchase panel.
+- **Deep Cobalt** ({colors.primary-deep}): Pressed-state and dark-surface variant of the cobalt primary; also the active link color.
+- **Soft Cobalt** ({colors.primary-soft}): Translucent background tint for informational callouts (`{colors.primary-soft}` at 15% alpha).
+- **Facebook Blue** ({colors.fb-blue}): Selected radio/checkbox state and inline form-control activation color.
+- **Meta Link Blue** ({colors.meta-link}): Reserved for legacy navigation and footer link affordances.
+- **Oculus Purple** ({colors.oculus-purple}): VR product accent — used inside Quest-branded surfaces for category emphasis.
 
-- **Cohere Black** (`#000000`): Announcement bar, highest-contrast text, and the global brand anchor.
-- **Near-Black Primary** (`#17171c`): Primary CTA buttons, dark footer, and deep UI cards.
-- **Deep Enterprise Green** (`#003c33`): Product hero bands for North and Command-style dark sections.
-- **Dark Navy** (`#071829`): Financial-services and security-oriented solution bands.
-- **Action Blue** (`#1863dc`): Editorial links, pagination, and secondary action emphasis.
-- **Coral** (`#ff7759`): Blog category chips, taxonomy outlines, and warm product markers.
-- **Soft Coral** (`#ffad9b`): Pale chip borders and segmented article-label details.
+### Surface
+- **Canvas White** ({colors.canvas}): Page background and primary card surface.
+- **Soft Cloud** ({colors.surface-soft}): Subtle product-thumbnail and warranty-card background; also the search-pill rest state.
+- **Hairline Gray** ({colors.hairline}): 1px input border and form-control divider.
+- **Hairline Soft** ({colors.hairline-soft}): Quieter divider used on cards, footer separators, and section breaks.
 
-### Surface & Background
-
-- **Canvas White** (`#ffffff`): Dominant page background and form/card surface.
-- **Soft Stone** (`#eeece7`): Product cards, testimonial placeholders, and warm neutral surface blocks.
-- **Pale Green Wash** (`#edfce9`): North page section backdrop behind stacked dark capability panels.
-- **Pale Blue Wash** (`#f1f5ff`): Blog CTA surface behind abstract 3D imagery.
-- **Card Border** (`#f2f2f2`): Softest card containment line.
-
-### Text & Rules
-
-- **Ink** (`#212121`): Default body text and most link text on light backgrounds.
-- **Muted Slate** (`#93939f`): Footer links, dates, metadata, and de-emphasized labels.
-- **Slate** (`#75758a`): Research separators and tertiary text.
-- **Hairline** (`#d9d9dd`): Standard list rules and section dividers.
-- **Border Light** (`#e5e7eb`): Secondary divider and utility rule.
+### Text
+- **Deep Ink** ({colors.ink-deep}): Primary headline and body text on light surfaces.
+- **Ink** ({colors.ink}): Standard body and secondary headline text.
+- **Charcoal** ({colors.charcoal}): Tertiary body text and form-button labels.
+- **Slate** ({colors.slate}): Section-header copy and supporting microcopy.
+- **Steel** ({colors.steel}): Quieter caption text and footer link hierarchy.
+- **Stone** ({colors.stone}): Disabled or de-emphasized labels.
 
 ### Semantic
-
-- **Focus Blue** (`#4c6ee6`): Keyboard focus and ring color.
-- **Form Focus Violet** (`#9b60aa`): Focus border for text inputs.
-- **Error Red** (`#b30000`): Extracted ring/shadow color associated with validation-like states.
-
-### Gradient System
-
-Cohere does not use gradients as a generic UI fill. Gradients and color fields are media-led: abstract 3D hero imagery, deep blue open-science particle fields, red-orange product video posters, and dark green-to-black product environments. Keep UI surfaces flat; reserve gradient richness for large media panels and CTA image bands.
+- **Success** ({colors.success}): "In stock", "Free returns" affirmations.
+- **Attention** ({colors.attention}): Mid-priority alerts and timed callouts.
+- **Warning** ({colors.warning}): Promotional banners ("Get 25% off…") and limited-time tags.
+- **Critical** ({colors.critical}): Validation errors, destructive feedback.
+- **Critical Strong** ({colors.critical-strong}): Form-input error border and inline error labels.
 
 ## Typography
 
 ### Font Family
+**Optimistic VF** is Meta's proprietary variable display face. Fallbacks: Montserrat, Helvetica, Arial, Noto Sans. The variable axes carry from 300 (light heading-md, used for editorial intro headlines like "Look forward") through 500 (display, hero, heading-sm) up to 700 (subtitle, body emphasis, button labels). Stylistic sets `ss01` and `ss02` are switched on across every heading role — they soften the geometry and give the type a slightly humanist breathing.
 
-- **Display**: `CohereText`, falling back to `Space Grotesk`, `Inter`, `ui-sans-serif`, and `system-ui`.
-- **Body/UI**: `Unica77 Cohere Web`, falling back to `Inter`, `Arial`, `ui-sans-serif`, and `system-ui`.
-- **Technical labels**: `CohereMono`, falling back to `Arial`, `ui-sans-serif`, and `system-ui`.
-- **Icons**: Cohere uses custom icon fonts and thin-line geometric illustrations.
+A secondary Helvetica fallback chain is used for technical microcopy (12px) inside spec sheets and footer fine print.
 
 ### Hierarchy
 
-| Role | Font | Size | Weight | Line Height | Letter Spacing | Notes |
-|---|---|---:|---:|---:|---:|---|
-| Hero Display | CohereText | 96px | 400 | 1.00 | -1.92px | Home page declaration scale. |
-| Product Display | CohereText | 72px | 400 | 1.00 | -1.44px | Product and research hero headlines. |
-| Section Display | Unica77 | 60px | 400 | 1.00 | -1.2px | Large product-page headings. |
-| Section Heading | Unica77 | 48px | 400 | 1.20 | -0.48px | Split hero and CTA headings. |
-| Card Heading | Unica77 | 32px | 400 | 1.20 | -0.32px | Feature card and list section titles. |
-| Feature Heading | Unica77 | 24px | 400 | 1.30 | 0 | Cards, filters, and article titles. |
-| Body Large | Unica77 | 18px | 400 | 1.40 | 0 | Lead text and larger paragraphs. |
-| Body | Unica77 | 16px | 400 | 1.50 | 0 | Default copy and link text. |
-| Button | Unica77 | 14px | 500 | 1.71 | 0 | Compact CTA labels. |
-| Caption | Unica77 | 14px | 400 | 1.40 | 0 | Metadata and small explanatory text. |
-| Mono Label | CohereMono | 14px | 400 | 1.40 | 0.28px | Uppercase technical labels. |
-| Micro | Unica77 | 12px | 400 | 1.40 | 0 | Footer, nav microcopy, and small links. |
+| Token | Size | Weight | Line Height | Letter Spacing | OpenType | Use |
+|---|---|---|---|---|---|---|
+| `{typography.hero-display}` | 64px | 500 | 1.16 | 0 | ss01, ss02 | Homepage hero ("Get 25% off…", category opener) |
+| `{typography.display-lg}` | 48px | 500 | 1.17 | 0 | ss01, ss02 | Section-opener display ("Made for prescriptions. Built for comfort.") |
+| `{typography.heading-lg}` | 36px | 500 | 1.28 | 0 | ss01, ss02 | Subsection headlines ("Why buy from Meta", "Tech specs") |
+| `{typography.heading-md}` | 28px | 300 | 1.21 | 0 | ss01, ss02 | Editorial subheads in lighter weight ("Look forward", "Built for prescriptions") |
+| `{typography.heading-sm}` | 24px | 500 | 1.25 | 0 | ss01, ss02 | Card titles, feature-tile headers |
+| `{typography.subtitle-lg}` | 18px | 700 | 1.44 | 0 | — | Bold callouts, FAQ question titles |
+| `{typography.subtitle-md}` | 18px | 400 | 1.44 | 0 | — | Body lead and longer-line subtitles |
+| `{typography.body-md}` | 16px | 400 | 1.50 | -0.16px | — | Primary body text |
+| `{typography.body-md-bold}` | 16px | 700 | 1.50 | -0.16px | — | Body emphasis and link-md |
+| `{typography.body-sm}` | 14px | 400 | 1.43 | -0.14px | — | Secondary body, helper text |
+| `{typography.body-sm-bold}` | 14px | 700 | 1.43 | -0.14px | — | Pill tab labels, footer headings |
+| `{typography.caption-bold}` | 12px | 700 | 1.33 | 0 | — | Badge labels, timestamps |
+| `{typography.caption}` | 12px | 400 | 1.33 | 0 | — | Footer fine print, legal microcopy |
+| `{typography.button-md}` | 14px | 700 | 1.43 | -0.14px | — | Pill button labels |
+| `{typography.link-md}` | 16px | 700 | 1.50 | -0.16px | — | Inline navigation links |
 
 ### Principles
-
-- Use massive type sparingly; Cohere pages often have one oversized headline and then settle into restrained 16px-24px UI copy.
-- Keep display type tight. Hero copy should feel compact and carved, not airy.
-- Avoid heavy bold weights. Size, spacing, and surface contrast do most of the hierarchy work.
-- Use uppercase mono labels for category and system markers, especially on product and research pages.
-- Editorial pages can use coral chips and blue links, but the base typography remains black and measured.
+- Negative letter-spacing on body roles (`-0.14px` to `-0.16px`) tightens the type fractionally — Optimistic VF was designed for this snug-but-not-condensed setting.
+- Editorial subheads use the 300 weight to introduce visual rest between the 500-weight display headlines and the 400-weight body, creating a three-tier visual rhythm.
+- All headings carry `ss01, ss02` stylistic sets together — the design treats them as a paired alternates package, never one without the other.
+- Buttons, pill tabs, and footer headings share `{typography.body-sm-bold}` (14px / 700 / -0.14px), creating a tight visual relationship between interactive elements.
 
 ## Layout
 
 ### Spacing System
-
-The system uses an 8px base with many one-off alignment values: `2px`, `6px`, `8px`, `10px`, `12px`, `16px`, `20px`, `22px`, `24px`, `28px`, `32px`, `36px`, `40px`, `56px`, `60px`, `64px`, and `80px`.
-
-Large sections rely on dramatic vertical breathing room. The home page places a trust-logo strip far below the hero media. Product pages often hold dark panels inside fields of empty white space, then transition to dense forms or footers only near the end.
+- **Base unit**: 4px increment with 8px as the dominant primary step.
+- **Tokens**: `{spacing.xxs}` (4px) · `{spacing.xs}` (8px) · `{spacing.sm}` (10px) · `{spacing.md}` (12px) · `{spacing.base}` (16px) · `{spacing.lg}` (20px) · `{spacing.xl}` (24px) · `{spacing.xxl}` (32px) · `{spacing.xxxl}` (40px) · `{spacing.section-sm}` (48px) · `{spacing.section}` (64px) · `{spacing.section-lg}` (80px) · `{spacing.hero}` (120px).
+- **Section rhythm**: Marketing sections separate at `{spacing.section-lg}` (80px); product detail sections compress to `{spacing.section}` (64px); FAQ stacks tighten further to `{spacing.xxl}` (32px).
+- **Card internal padding**: Standard `{spacing.xxl}` (32px); icon-feature tiles compress to `{spacing.xl}` (24px); promo-strip cards expand to `{spacing.section}` (64px) for hero presence.
 
 ### Grid & Container
-
-- Global nav uses a three-zone layout: logo left, menu centered, sign-in/CTA right.
-- Home hero is centered text above a two-card media composition: a wide product mockup card beside a narrower photography card.
-- Feature sections commonly use 3-column cards on desktop.
-- Product pages alternate centered hero blocks, trust-logo strips, large single-feature bands, and 2- or 3-column card grids.
-- Research pages use full-width lists with date and chip columns instead of decorative cards.
-- Forms use two-column input rows inside a rounded white card on dark or stone section backgrounds.
+- Marketing page max-width sits around 1280px with 32–48px gutters.
+- The PDP layout uses a 2-column split: hero gallery (~58% width) + sticky purchase rail (~42%, with `max-width: 380px` on the rail).
+- Three-up feature grids ("Why buy from Meta") use a 24px column gap; six-up product thumbnail rows (color/SKU pickers) use a 12px gap.
 
 ### Whitespace Philosophy
-
-Cohere uses whitespace as a trust signal. Large empty intervals separate the brand claim, customer proof, product proof, and CTA. Dense content appears only where it serves the information architecture: research paper rows, blog card grids, and contact form fields.
+Whitespace is product-photography-first. Hero sections give product imagery 50–70% of the viewport height; copy is given oxygen to breathe in `{spacing.xxl}` to `{spacing.xxxl}` blocks above and below. Inside the configurator, whitespace tightens — the buy-now panel is information-dense, with `{spacing.base}` to `{spacing.lg}` rhythm between option groups.
 
 ## Elevation & Depth
 
-Cohere is mostly flat. Depth comes from surface alternation, media contrast, rounded corners, and thin borders rather than drop shadows.
+The system runs predominantly flat. Elevation is reserved for two interaction layers:
 
 | Level | Treatment | Use |
 |---|---|---|
-| Flat | No shadow, white or dark field | Hero copy, research lists, editorial surfaces |
-| Bordered | 1px `#d9d9dd`, `#e5e7eb`, or dark translucent rules | Research rows, forms, pale cards, footer inputs |
-| Media Lift | Rounded image or video over contrasting section color | Hero photo cards, product videos, CTA imagery |
-| Dark Product Field | Deep green or navy full-width band | Command, North, financial services, security sections |
+| 0 (flat) | No shadow; `{rounded.xxxl}` rounding + `{colors.hairline-soft}` border | Default product cards, why-buy tiles |
+| 1 (subtle) | `rgba(0, 0, 0, 0.2) 1px 1px 0px 0px` | Pill-tab activation indicator |
+| 2 (sticky panel) | `rgba(20, 22, 26, 0.3) 0px 1px 4px 0px` | PDP right-rail purchase summary, sticky mobile checkout bar |
+
+### Decorative Depth
+- Photography-as-depth: full-bleed product imagery on `{rounded.xxxl}` cards creates atmospheric layering without shadows.
+- Translucent overlays (`rgba(255, 255, 255, 0.1)` to `rgba(10, 19, 23, 0.12)`) cover dark hero photography to lift legibility of overlaid text.
+- Decorative pastel tints inside accessory cards — soft pink, ice-blue, mint — appear briefly behind product cutouts but are NOT formalized as system tokens (treated as photographic content).
 
 ## Shapes
 
-### Radius Scale
+### Border Radius Scale
 
-| Token | Value | Role |
-|---|---:|---|
-| `xs` | 4px | Small images, search fields, article thumbnails, utility elements |
-| `sm` | 8px | Blog chips, cards, small media, dialogs |
-| `md` | 16px | Medium product cards and grouped blocks |
-| `lg` | 22px | Signature media-card and soft placeholder radius |
-| `xl` | 30px | Research/topic filter pills |
-| `pill` | 32px | Primary CTA buttons |
-| `full` | 9999px | Round status elements and fully pill-shaped controls |
+| Token | Value | Use |
+|---|---|---|
+| `{rounded.xs}` | 2px | Inline checkbox marks, fine UI corners |
+| `{rounded.sm}` | 4px | Tags, micro-controls |
+| `{rounded.md}` | 6px | Square thumbnail rounding |
+| `{rounded.lg}` | 8px | Form inputs, radio-option containers |
+| `{rounded.xl}` | 16px | Standard feature cards, FAQ accordion items |
+| `{rounded.xxl}` | 24px | Warranty / accessory tiles, ghost-style action cards |
+| `{rounded.xxxl}` | 32px | Photographic feature cards, big promo strips |
+| `{rounded.feature}` | 40px | Accessory hero panels, "Built for prescriptions" cards |
+| `{rounded.full}` | 100px | Pill buttons, tab chips, badges |
+| `{rounded.circle}` | 50% | Color swatches, circular icon buttons |
 
-### Image Treatment
-
-Images are not decorative backdrops for text except in CTA bands. Most imagery sits as rounded cards with visible corners: product videos, enterprise photography, article thumbnails, and abstract 3D renders. The dominant radii are 8px and 22px.
+### Photography Geometry
+- Product hero photography sits in `{rounded.xxxl}` (32px) frames more often than rectangles.
+- Color/material swatches are perfect circles (`{rounded.circle}`, 32px diameter, 2px white border ring when selected).
+- Square product thumbnails (`aspect-ratio: 1/1`) use `{rounded.xl}` rounding.
+- Six-up "color & SKU" picker rows use 1:1 aspect tiles with `{rounded.lg}` (8px) corners — tighter than the hero photography frames to differentiate selection-grid context from showcase context.
 
 ## Components
 
-### **`button-primary`**
+> Per the no-hover policy, hover states are NOT documented for any component below. Default and pressed/active states only.
 
-Near-black or white pill CTA, depending on surface contrast. Uses 14px-16px Unica77, 12px 24px padding, and a 32px pill radius. This is the primary action style for "Request a demo", "Submit", and hero CTAs.
+### Buttons
 
-### **`button-secondary`**
+**`button-primary`** — Black pill primary CTA for marketing surfaces ("Shop", "Pre-order").
+- Background `{colors.ink-button}`, text `{colors.on-ink-button}`, typography `{typography.button-md}`, padding `14px 30px`, rounded `{rounded.full}`.
+- Pressed state `button-primary-pressed` flips background to `{colors.charcoal}`.
+- Disabled state `button-primary-disabled` uses `{colors.disabled-text}` background.
 
-Text-only action link, usually underlined or rule-aligned, with no filled background. Used for "Explore products", "Try the Playground", newsletter signup, and secondary hero actions.
+**`button-buy-cta`** — Cobalt pill primary CTA for commerce flows ("Add to cart", "Configure", "Continue").
+- Background `{colors.primary}`, text `{colors.on-primary}`, typography `{typography.button-md}`, padding `14px 30px`, rounded `{rounded.full}`.
+- Pressed state `button-buy-cta-pressed` deepens background to `{colors.primary-deep}`.
+- This variant ONLY appears inside the buy-now configurator and PDP purchase rail. Marketing surfaces use `button-primary` instead.
 
-### **`button-pill-outline`**
+**`button-secondary`** — Outlined ghost CTA, often paired with primary in dual-CTA hero patterns.
+- Background transparent, text `{colors.ink-deep}`, border `2px solid {colors.ink-deep}`, typography `{typography.button-md}`, padding `12px 28px`, rounded `{rounded.full}`.
 
-Outlined pill control with transparent fill, 1px dark border, and 30px radius. Used for research filters, topic tags, and lightweight taxonomy controls.
+**`button-ghost`** — Quieter outlined variant used for tertiary CTAs.
+- Background transparent, text `{colors.ink-deep}`, border `2px solid rgba(10, 19, 23, 0.12)`, typography `{typography.button-md}`, padding `10px 22px`, rounded `{rounded.full}`.
 
-### **`announcement-bar`**
+**`button-pill-tab`** + **`button-pill-tab-active`** — Top-of-page category navigation pills ("Glasses / Quest / Apps").
+- Inactive: background `{colors.canvas}`, text `{colors.ink}`, border `1px solid {colors.hairline}`, padding `8px 16px`, rounded `{rounded.full}`.
+- Active: background `{colors.ink-deep}`, text `{colors.canvas}`. No border in active state — the dark fill replaces it.
 
-Full-width black strip above the nav, 36px tall, centered microcopy with an underlined "Learn more" link and a close control at the far right.
+**`button-icon-circular`** — 40×40px circular utility buttons (carousel arrows, share, favorite).
+- Background `{colors.canvas}`, icon color `{colors.ink}`, rounded `{rounded.circle}`.
 
-### **`hero-photo-card`**
+### Cards & Containers
 
-Rounded media card used in the home hero and solution pages. It combines photography or abstract imagery with an overlaid dark agent-console module. Radius is usually 22px on large cards and 8px on smaller thumbnails.
+**`card-product-feature`** — White feature card with product photography and copy (homepage "Designed for sport", "Advanced. Inside and out.").
+- Background `{colors.canvas}`, rounded `{rounded.xxxl}`, padding `{spacing.xxl}`, border `1px solid {colors.hairline-soft}`.
 
-### **`agent-console-card`**
+**`card-feature-photo`** — Edge-to-edge photographic showcase tile with NO chrome (homepage "Built for prescriptions" full-bleed glasses card).
+- Background `{colors.canvas}` (visible only at the corners), rounded `{rounded.xxxl}`, no padding, no border. The image fills the card; copy is overlaid bottom-left in white.
 
-Dark product mockup panel showing agent names, status chips, integration badges, prompt fields, and generated response cards. Background is near-black, text is white or muted, and small accent chips use product colors.
+**`card-promo-strip`** — Dark full-width promo card with embedded copy + CTAs (homepage "Meta Quest brings the magic of virtual reality" wide strip).
+- Background `{colors.ink-deep}`, text `{colors.canvas}`, rounded `{rounded.xxxl}`, padding `{spacing.section}`.
 
-### **`trust-logo-strip`**
+**`card-icon-feature`** — Three-up feature tile with line icon, headline, and short copy ("Free 2-day delivery", "Free 30-day returns", "Worry-free warranty", "Buy now, pay later").
+- Background `{colors.canvas}`, rounded `{rounded.xl}`, padding `{spacing.xl}`, border `1px solid {colors.hairline-soft}`.
 
-Centered copy above a row of monochrome customer logos. It is intentionally quiet: no cards, no borders, just large horizontal spacing and black or white logos depending on the background.
+**`card-checkout-summary`** — PDP right-rail sticky summary with title, price, color picker, "Add to cart" button.
+- Background `{colors.canvas}`, rounded `{rounded.xl}`, padding `{spacing.xl}`, border `1px solid {colors.hairline-soft}`, shadow `rgba(20, 22, 26, 0.3) 0px 1px 4px 0px`.
 
-### **`capability-card`**
+**`product-thumbnail`** — Square product image cell used in color/SKU pickers and "People also bought" rows.
+- Background `{colors.surface-soft}`, rounded `{rounded.xl}`, padding `{spacing.base}`, aspect-ratio `1 / 1`.
 
-Content block with thin-line geometric illustration, 24px heading, body copy, and a text link. On light backgrounds, cards often have only a top rule or a subtle image/card relationship rather than full boxing.
+**`warranty-card`** — Promo callout for warranty + finance offers ("1y Warranty", "Meta Horizon+").
+- Background `{colors.surface-soft}`, rounded `{rounded.xxl}`, padding `{spacing.xxl}`. Uses pastel-tinted variants for additional perks.
 
-### **`dark-feature-band`**
+**`why-buy-tile`** — 4-up reassurance tile row in the lower marketing zone.
+- Background `{colors.canvas}`, rounded `{rounded.xl}`, padding `{spacing.xxl} {spacing.xl}`, border `1px solid {colors.hairline-soft}`. Heading in `{typography.subtitle-lg}`, body in `{typography.body-sm}`.
 
-Deep green or navy full-width section used for product capabilities, security claims, and feature breakdowns. Text turns white; cards use darker translucent surfaces, pale borders, and abstract line illustrations.
+### Inputs & Forms
 
-### **`product-card`**
+**`text-input`** — Standard form field (footer email subscribe, support form).
+- Background `{colors.canvas}`, text `{colors.ink}`, border `1px solid {colors.hairline}`, rounded `{rounded.lg}`, padding `{spacing.md}`, height 44px.
 
-Warm stone card used for product/model summaries. Typically 3-column on desktop, with 8px radius, generous padding, a small pill button, a divider line, and checkmark bullet rows.
+**`text-input-focused`** — Activated state.
+- Border switches to `2px solid {colors.fb-blue}`.
 
-### **`blog-filter-chip`**
+**`text-input-error`** — Validation error state.
+- Border switches to `1px solid {colors.critical-strong}`; error label below in `{colors.critical-strong}` `{typography.body-sm}`.
 
-Large coral taxonomy chip used on the blog index. Active chips invert to coral fill with dark text; inactive chips use coral outline and pale fill. Typography is oversized relative to typical filters, making the taxonomy a hero-level control.
+**`search-pill`** — Top-nav search field.
+- Background `{colors.surface-soft}`, text `{colors.steel}`, typography `{typography.body-sm}`, rounded `{rounded.full}`, height 40px.
 
-### **`research-table`**
+**`radio-option`** + **`radio-option-selected`** — Configurator option cards (storage, color variant, shipping option).
+- Inactive: background `{colors.canvas}`, rounded `{rounded.lg}`, padding `{spacing.lg}`, border `1px solid rgba(10, 19, 23, 0.12)`.
+- Selected: border switches to `2px solid #0143b5` (deep cobalt) — the cobalt theme persists into form-control selection signaling.
 
-Rule-separated publication list with title left, topic pills centered, and date right. Rows are tall, white, and border-driven; filters above use many compact outlined pills.
+**`color-swatch-circle`** — Round color/material picker (Ray-Ban frame finishes, glass colors).
+- 32px diameter, `{rounded.circle}`, `2px solid {colors.canvas}` ring on selection over the swatch's own fill color.
 
-### **`contact-form-card`**
+### Badges & Status
 
-Rounded white form panel set against dark green or warm stone sections. Inputs are rectangular with thin gray borders, 12px-16px padding, and compact labels/placeholders. Submit uses the same near-black pill style as primary CTAs.
+**`badge-promo-yellow`** — Limited-time offer chip ("Limited time", "Sale").
+- Background `{colors.warning}`, text `{colors.ink-deep}`, typography `{typography.caption-bold}`, rounded `{rounded.full}`, padding `4px 10px`.
 
-### **`footer-newsletter`**
+**`badge-attention`** — Mid-priority status indicator ("Almost gone", "Selling fast").
+- Background `{colors.attention}`, text `{colors.canvas}`, typography `{typography.caption-bold}`, rounded `{rounded.full}`, padding `4px 10px`.
 
-Dark footer subscription block with coral "AI moves fast" label, white headline, muted legal microcopy, a single-line email field, and arrow submit marker. Footer columns use white section labels and muted links.
+**`badge-success`** — Affirmative status ("In stock", "Verified", "Free shipping").
+- Background `{colors.success}`, text `{colors.canvas}`, typography `{typography.caption-bold}`, rounded `{rounded.full}`, padding `4px 10px`.
+
+**`badge-critical`** — Urgent/destructive label ("Out of stock", "Discontinued", error chips).
+- Background `{colors.critical}`, text `{colors.canvas}`, typography `{typography.caption-bold}`, rounded `{rounded.full}`, padding `4px 10px`.
+
+**`promo-banner`** — Sticky full-width promotional strip ABOVE the top nav ("Get 25% off the #1 selling AI glasses").
+- Background `{colors.ink-deep}` (or `{colors.warning}` for yellow promo variants), text `{colors.canvas}` (or `{colors.ink-deep}` on yellow), typography `{typography.body-sm-bold}`, padding `{spacing.md} {spacing.xl}`. Carries one-line offer copy plus an inline CTA link.
+
+### Navigation
+
+**Top Navigation (Desktop)** — Sticky white bar with category pill tabs, search, account, cart.
+- Background `{colors.canvas}`, height ~64px with bottom `1px solid {colors.hairline-soft}`.
+- Left: Meta wordmark logo (61×14px). Center: pill-tab category nav. Right: search-pill + circular icon buttons (account, cart).
+
+**Top Navigation (Mobile)** — Compressed to logo + hamburger + cart icon. Pill-tab nav slides into a full-screen drawer below 768px.
+
+**Promo Banner** — Full-width strip ABOVE the nav for time-bound offers.
+- Background `{colors.ink-deep}` or `{colors.warning}` (yellow), text `{colors.canvas}` or `{colors.ink-deep}`, typography `{typography.body-sm-bold}`, padding `{spacing.md} {spacing.xl}`. Carries one-line offer copy + inline link.
+
+**Breadcrumb (PDP)** — Inline path above the product hero ("Glasses › Ray-Ban Meta › Skyler (Gen 2)").
+- Typography `{typography.body-sm}`, separator dot in `{colors.stone}`, active leaf in `{colors.ink}`, parent links in `{colors.steel}`.
+
+### Signature Components
+
+**`hero-band-marketing`** — Full-bleed photographic hero with overlaid copy + dual-CTA pair.
+- Edge-to-edge product photography on a dark or photographic background. Overlay copy in `{typography.hero-display}` white. Below the title: 1-line subtitle in `{typography.subtitle-md}` then `button-primary` + `button-secondary` pair.
+
+**`product-gallery-pdp`** — Product detail page main hero: 4-up vertical thumbnail strip on the left, large product image center, sticky purchase rail right.
+- Thumbnails: 80×80px, `{rounded.lg}`, `{colors.surface-soft}` background, 1px `{colors.hairline-soft}` border (active border switches to `{colors.ink-deep}`).
+- Main image area: ~720×720px on desktop, `{rounded.xxxl}` rounding, photographic surface.
+- Sticky rail uses `card-checkout-summary`.
+
+**`color-sku-picker-row`** — Six-up grid of square product variants with name + price below each.
+- Tile background `{colors.surface-soft}`, rounded `{rounded.lg}`, image padded `{spacing.base}`. Active tile border switches to `2px solid {colors.ink-deep}`. Below the tile: variant name in `{typography.body-sm-bold}` and price in `{typography.body-sm}`.
+
+**`feature-icon-row`** — Four reassurance benefits ("Free 2-day delivery", "Free 30-day returns", "Worry-free warranty", "Buy now, pay later").
+- 4-column grid, each cell uses `card-icon-feature` chrome with a 32px line icon at top, headline `{typography.subtitle-lg}`, body `{typography.body-sm}`.
+
+**`faq-accordion`** — Vertical stack of expandable Q&A items.
+- Each item uses `faq-accordion-item` chrome. Question in `{typography.subtitle-lg}` left, chevron icon (`{colors.steel}`, 20px) right. Expanded answer drops in `{typography.body-md}` text below with `{spacing.base}` top padding.
+
+**`tech-specs-table`** — Two-column key/value table for product specifications.
+- Row layout: spec label (`{typography.body-sm-bold}` `{colors.ink}`) left, spec value (`{typography.body-sm}` `{colors.charcoal}`) right. Row separator `1px solid {colors.hairline-soft}`. Section headers in `{typography.heading-sm}` above each spec group.
+
+**`testimonial-customer-card`** — Small editorial card with author + quote + photo.
+- Background `{colors.canvas}`, rounded `{rounded.xl}`, padding `{spacing.xxl}`, border `1px solid {colors.hairline-soft}`. Avatar circle 40px, byline in `{typography.body-sm-bold}`, quote in `{typography.body-md}`.
+
+**`footer-region`** — Dense multi-column site footer.
+- Background `{colors.canvas}`, top border `1px solid {colors.hairline-soft}`, padding `{spacing.section} {spacing.xxl}`. Six column groups with section headings in `{typography.body-sm-bold}` `{colors.ink}` and link lists in `{typography.body-sm}` `{colors.steel}`. Bottom row contains language picker, region selector, legal links in `{typography.caption}` `{colors.stone}`.
 
 ## Do's and Don'ts
 
 ### Do
-
-- Use white canvas as the default surface; introduce dark green or navy as full-width product bands.
-- Keep primary CTAs pill-shaped and near-black on light surfaces.
-- Use 22px radius on major media cards and placeholders.
-- Use coral for editorial taxonomy and small warm accents, not as the main CTA system.
-- Use monochrome trust logos with wide spacing.
-- Use thin-line geometric illustrations for research and capability icons.
-- Let photography and product mockups carry color, while the UI shell stays restrained.
+- Reserve `{colors.primary}` (cobalt) for buy-now CTAs only — its visual weight is meaningful precisely because it doesn't appear on marketing pages.
+- Use `{colors.ink-button}` (black) for marketing-surface primary CTAs. Pair with `{colors.button-secondary}` ghost outline for the secondary action.
+- Apply `{rounded.full}` to every button, every category pill, every badge, every chip — buttons are NEVER squared in Meta's system.
+- Apply `{rounded.xxxl}` to photographic product cards and `{rounded.xl}` to icon-feature tiles to maintain the visible card-hierarchy contrast.
+- Switch on `ss01, ss02` together for any Optimistic VF heading. Never one stylistic set without the other.
+- Use the 300-weight `{typography.heading-md}` for editorial subheads — it creates the brand's signature visual rhythm against the 500-weight displays.
 
 ### Don't
-
-- Do not turn coral or blue into broad decorative surface colors.
-- Do not add heavy drop shadows to cards.
-- Do not make every section card-based; Cohere often uses unframed rows, rules, and open space.
-- Do not use rounded cards below 8px for major media.
-- Do not replace the display/body type split with one generic sans-serif voice.
-- Do not render undocumented interaction variants in documentation or previews.
-- Do not use saturated gradients as normal UI backgrounds; keep gradients media-led.
+- Don't use `{colors.primary}` (cobalt) for marketing-surface primary buttons — it conflicts with Meta's brand-history positioning of black-CTA-on-white-canvas marketing.
+- Don't introduce additional accent colors beyond cobalt + Oculus purple. The hardware brand is deliberately monochromatic outside its product photography.
+- Don't soften the corners of pill buttons below `{rounded.full}`. The pill is a brand signature.
+- Don't run feature cards without rounding — `{rounded.xxxl}` is the minimum for any photographic surface.
+- Don't reduce `{typography.body-md}` line-height below 1.50 — the negative letter-spacing already tightens the metric and any further compression breaks legibility.
+- Don't apply heavy shadows to marketing cards. Elevation is a commerce-flow signal, not a marketing flourish.
 
 ## Responsive Behavior
 
 ### Breakpoints
-
 | Name | Width | Key Changes |
-|---|---:|---|
-| Small Mobile | <425px | Single-column cards, compact nav, reduced hero headline scale |
-| Mobile | 425-640px | Hero media stacks, card grids become one column, form rows stack |
-| Large Mobile | 640-768px | Wider one-column layouts with larger media cards |
-| Tablet | 768-1024px | Two-column cards begin, nav spacing tightens |
-| Desktop | 1024-1440px | Full nav, 3-column card grids, split hero compositions |
-| Large Desktop | 1440-2560px | Wide containers and large empty vertical intervals |
+|---|---|---|
+| Mobile (small) | < 480px | Single column. Hero text drops to `{typography.display-lg}` or smaller. Pill tabs collapse into hamburger drawer. PDP gallery stacks above purchase rail; rail becomes sticky bottom bar. |
+| Mobile (large) | 480 – 767px | Same as small but feature tiles render two-up. |
+| Tablet | 768 – 1023px | Two-column feature grids. Pill-tab nav returns. PDP gallery + purchase rail render side-by-side at compressed proportions (~60/40). |
+| Desktop | 1024 – 1359px | Full three- and four-up feature grids; full pill-tab category nav; PDP at standard 58/42 split. |
+| Wide Desktop | ≥ 1360px | Same as desktop with wider hero gutters and larger product photography. |
 
 ### Touch Targets
-
-Primary CTAs and pills meet comfortable touch sizing through 12px-24px padding and pill radii. Research filter chips and blog category chips are larger than standard tags, making dense taxonomy surfaces usable on touch devices.
+- Pill buttons render at 40–44px effective height (with the 14px button text + `14px 30px` padding). Above the WCAG AAA 44px floor.
+- Circular icon buttons are 40×40px — at the AA floor; bumps to 44×44px on mobile via override.
+- Color swatch circles are 32×32px. To hit AAA, the swatch carries a 12px clear hit zone around it (effective hit target ~56px).
+- Form inputs render at 44px height to align with primary button height.
 
 ### Collapsing Strategy
+- **Promo banner** stays full-width on all breakpoints; truncates with ellipsis on small mobile, retains the inline link affordance.
+- **Pill-tab nav** below 768px collapses into a hamburger drawer; the active tab is rendered as a label inside the closed nav.
+- **PDP layout**: gallery stacks above the purchase summary at < 1024px; the summary becomes a sticky bottom bar with price + "Add to cart" button at < 768px. The full summary remains scrollable above the sticky bar.
+- **Feature grids** (3-up, 4-up) collapse to 2-up at 768–1023px and 1-up at < 768px. Card padding compresses from `{spacing.xxl}` to `{spacing.xl}` at the 1-up breakpoint.
+- **Hero typography**: `{typography.hero-display}` (64px) drops to `{typography.heading-lg}` (36px) at < 768px and `{typography.heading-sm}` (24px) at < 480px.
+- **Footer**: 6-column desktop layout reflows to 2-column at tablet and accordion-collapsed groups at mobile.
 
-- Nav collapses from full horizontal links to a compact mobile menu.
-- Hero media moves from split cards to stacked cards.
-- Product and capability grids collapse from 3 columns to 2 and then 1.
-- Form fields collapse from paired rows to a single column.
-- Research rows preserve their rule-separated structure but stack metadata below titles on smaller widths.
+### Image Behavior
+- Product photography uses 1:1 (thumbnails, color pickers), 4:3 (PDP gallery), and 16:9 (homepage promo strips) ratios.
+- Hero photography is full-bleed with `{rounded.xxxl}` corners; lazy-loaded below the fold.
+- Product variant images preserve their `{rounded.lg}` thumbnails across all breakpoints — they never go full-width on mobile.
 
 ## Iteration Guide
 
-1. Start from a white canvas or a full-width dark green/navy band; avoid mid-tone page backgrounds unless the screenshot shows a specific CTA/form section.
-2. Use `button-primary` for the single highest-priority action and `button-secondary` for the companion action.
-3. Use `hero-photo-card` or `agent-console-card` when a page needs visual energy; avoid invented dashboard data.
-4. For editorial pages, combine `blog-filter-chip`, `button-pill-outline`, and `research-table` instead of generic marketing cards.
-5. Keep component examples structurally honest: placeholder product frames are better than invented product content.
+1. Focus on ONE component at a time. The system has high internal consistency — small precision wins compound.
+2. Reference component names and tokens directly (`{colors.primary}`, `{component-name}-pressed`, `{rounded.full}`) — do not paraphrase.
+3. Run `npx @google/design.md lint DESIGN.md` after edits to catch broken refs, contrast issues, orphaned tokens.
+4. Add new variants as separate `components:` entries (`-pressed`, `-disabled`, `-focused`) — do not bury them inside prose.
+5. Default to `{typography.body-md}` for body and `{typography.subtitle-lg}` for emphasis. Headlines step down through `hero-display → display-lg → heading-lg → heading-md → heading-sm`.
+6. Keep `{colors.primary}` (cobalt) scarce. If it appears outside the buy-now flow on a viewport, ask whether the surface really needs to look like a checkout panel.
+7. Pill-shaped buttons (`{rounded.full}`) always; squared buttons signal "third-party widget" in this design language and should be filtered out of any work surface.
 
 ## Known Gaps
 
-- Exact proprietary font files are not bundled; use the documented fallbacks when implementing externally.
-- Mobile screenshots were not regenerated in this public update, so mobile behavior is documented from the desktop system and existing responsive patterns.
-- Some live pages lazy-load content blocks late; blank testimonial placeholders are documented as placeholder skeleton surfaces rather than filled testimonial cards.
+- Selected/checked states for non-button form controls (toggle, multi-select) were not visible on the captured surfaces — implement following the cobalt-on-white pattern from `radio-option-selected`.
+- Animation/transition timings are not extracted; recommend 150–250ms ease-out for primary surface transitions and 300ms ease-in-out for accordion expand/collapse.
+- Specific dark-mode token values for canvas, surface, ink, and hairline are not defined; the brand has not surfaced a published dark-mode token set on these commerce pages.
+- Pastel decorative tints inside accessory cards (soft pink, ice blue, mint) appear visually but are not formalized — treat them as photographic content, not as system colors.

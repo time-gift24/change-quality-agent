@@ -37,7 +37,9 @@ export function McpCreatePage() {
           onCancel={() => navigate("/mcp")}
           onCreate={async (payload) => {
             const created = await mutations.createServer(payload);
-            navigate(`/mcp/${created.id}`);
+            navigate(`/mcp/${created.id}`, {
+              state: { mcpNotice: "MCP Server 已创建。" },
+            });
           }}
           pending={mutations.pending}
           server={null}
@@ -78,7 +80,9 @@ export function McpEditPage() {
             onUpdate={async (srvId, payload) => {
               await mutations.updateServer(srvId, payload);
               await detailState.refetch();
-              navigate(`/mcp/${targetServerId}`);
+              navigate(`/mcp/${targetServerId}`, {
+                state: { mcpNotice: "MCP Server 配置已保存。" },
+              });
             }}
             pending={mutations.pending}
             server={server}
@@ -91,44 +95,80 @@ export function McpEditPage() {
 
 function FormGrid({ children, aside }: { children: ReactNode; aside: ReactNode }) {
   return (
-    <div className="grid max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="min-w-0 space-y-3">{children}</div>
-      <aside className="space-y-3">{aside}</aside>
+    <div className="grid max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-4">{children}</div>
+      <aside
+        aria-label="配置摘要"
+        className="space-y-3 xl:sticky xl:top-4 xl:self-start"
+      >
+        {aside}
+      </aside>
     </div>
   );
 }
 
 function FormSideNote({ title, lines }: { title: string; lines: string[] }) {
   return (
-    <div className="rounded-xl border border-hairline bg-canvas px-4 py-3">
-      <h2 className="text-xs font-semibold text-ink">{title}</h2>
-      <ul className="mt-2 space-y-2 text-2xs leading-relaxed text-mute">
-        {lines.map((line) => (
-          <li key={line}>{line}</li>
+    <div className="overflow-hidden rounded-3xl border border-primary/10 bg-canvas/90 shadow-[0_18px_45px_rgba(0,100,224,0.07)]">
+      <div className="border-b border-primary/10 bg-primary-soft/60 px-4 py-3">
+        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-primary-deep">
+          Config Summary
+        </p>
+        <h2 className="mt-1 text-sm font-semibold text-ink">配置摘要</h2>
+        <p className="mt-1 text-xs leading-relaxed text-body">{title}</p>
+      </div>
+      <ol className="space-y-3 p-4">
+        {lines.map((line, index) => (
+          <li className="flex gap-3" key={line}>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-semibold text-on-primary">
+              {index + 1}
+            </span>
+            <p className="pt-0.5 text-xs leading-relaxed text-body">{line}</p>
+          </li>
         ))}
-      </ul>
+      </ol>
     </div>
   );
 }
 
 function ServerSideNote({ server }: { server: McpServerDetail }) {
+  const endpointLabel = server.transport === "stdio" ? "command" : "url";
+  const endpointValue = server.transport === "stdio" ? server.command : server.url;
+
   return (
-    <div className="rounded-xl border border-hairline bg-canvas px-4 py-3">
-      <h2 className="text-xs font-semibold text-ink">当前状态</h2>
-      <dl className="mt-3 space-y-2 text-2xs">
+    <div className="overflow-hidden rounded-3xl border border-primary/10 bg-canvas/90 shadow-[0_18px_45px_rgba(0,100,224,0.07)]">
+      <div className="border-b border-primary/10 bg-primary-soft/60 px-4 py-3">
+        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-primary-deep">
+          Live Config
+        </p>
+        <h2 className="mt-1 text-sm font-semibold text-ink">配置摘要</h2>
+        <p className="mt-1 truncate text-xs text-body">{server.name}</p>
+      </div>
+
+      <dl className="space-y-3 p-4 text-xs">
         <SideRow label="运行状态" value={<McpStatusBadge status={server.runtime_status} />} />
-        <SideRow label="工具数量" value={server.tool_count} />
+        <SideRow label="传输方式" value={server.transport} />
+        <SideRow label={endpointLabel} value={endpointValue ?? "-"} />
+        <SideRow label="目标状态" value={server.desired_state} />
+        <SideRow label="启用状态" value={server.enabled ? "enabled" : "disabled"} />
+        <SideRow label="工具数量" value={`${server.tool_count} tools`} />
         <SideRow label="最近检查" value={server.last_checked_at ?? "-"} />
       </dl>
+
+      {server.last_error ? (
+        <p className="mx-4 mb-4 rounded-2xl border border-error-soft bg-error-soft/45 px-3 py-2 text-xs leading-relaxed text-error-deep">
+          {server.last_error}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function SideRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex items-start justify-between gap-3">
       <dt className="text-mute">{label}</dt>
-      <dd className="text-right font-mono text-ink">{value}</dd>
+      <dd className="min-w-0 break-all text-right font-mono text-2xs text-ink">{value}</dd>
     </div>
   );
 }

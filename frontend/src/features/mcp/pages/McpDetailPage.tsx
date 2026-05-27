@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, type ReactNode } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "../../../components/ui/button";
 import { McpRowActionsMenu } from "../components/McpRowActionsMenu";
@@ -13,6 +13,7 @@ import { McpPageLayout } from "./McpPageLayout";
 
 export function McpDetailPage() {
   const { serverId } = useParams<{ serverId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const detailState = useMcpServerDetail(serverId ?? null);
   const serversState = useMcpServers();
@@ -23,6 +24,7 @@ export function McpDetailPage() {
   const isLoading = detailState.loading && !server;
   const targetServerId = server?.id ?? serverId ?? "";
   const mutationErrorMessage = getMcpErrorMessage(mutations.error);
+  const notice = getNavigationNotice(location.state);
 
   const runMutation = useCallback(
     async (action: () => Promise<unknown>) => {
@@ -89,11 +91,31 @@ export function McpDetailPage() {
       ]}
       title={server?.name ?? serverId ?? "MCP Server"}
     >
+      {notice ? <SuccessNotice message={notice} /> : null}
       {mutationErrorMessage ? <ErrorAlert message={mutationErrorMessage} /> : null}
       {isLoading ? <p className="text-xs text-mute">加载详情中…</p> : null}
       {is404 && !isLoading ? <NotFoundState onBack={() => navigate("/mcp", { replace: true })} /> : null}
       {server ? <DetailContent server={server} /> : null}
     </McpPageLayout>
+  );
+}
+
+function getNavigationNotice(state: unknown): string | null {
+  if (!state || typeof state !== "object") return null;
+  const maybeNotice = (state as { mcpNotice?: unknown }).mcpNotice;
+  return typeof maybeNotice === "string" && maybeNotice.trim()
+    ? maybeNotice
+    : null;
+}
+
+function SuccessNotice({ message }: { message: string }) {
+  return (
+    <p
+      className="mb-3 rounded-xl border border-success/20 bg-success/10 px-3 py-2 text-xs text-success"
+      role="status"
+    >
+      {message}
+    </p>
   );
 }
 
@@ -111,7 +133,7 @@ function DetailDescription({ server }: { server: McpServerDetail }) {
 
 function DetailContent({ server }: { server: McpServerDetail }) {
   return (
-    <div className="grid max-w-6xl gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="grid max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0 space-y-4">
         {server.last_error ? <ErrorAlert message={server.last_error} /> : null}
         <McpServerForm mode="view" server={server} />
@@ -125,25 +147,74 @@ function DetailContent({ server }: { server: McpServerDetail }) {
         </section>
       </div>
 
-      <aside className="space-y-3">
-        <div className="rounded-xl border border-hairline bg-canvas px-4 py-3">
-          <h2 className="text-xs font-semibold text-ink">运行信息</h2>
-          <dl className="mt-3 space-y-2 text-2xs">
-            <InfoRow label="服务 ID" value={server.id} />
-            <InfoRow label="最近检查" value={server.last_checked_at ?? "-"} />
-            <InfoRow label="启用状态" value={server.enabled ? "enabled" : "disabled"} />
-          </dl>
-        </div>
+      <aside
+        aria-label="配置总览"
+        className="space-y-3 xl:sticky xl:top-4 xl:self-start"
+      >
+        <DetailSummaryCard server={server} />
       </aside>
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function DetailSummaryCard({ server }: { server: McpServerDetail }) {
+  const endpointLabel = server.transport === "stdio" ? "command" : "url";
+  const endpointValue = server.transport === "stdio" ? server.command : server.url;
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-primary/10 bg-canvas/90 shadow-[0_18px_45px_rgba(0,100,224,0.07)]">
+      <div className="border-b border-primary/10 bg-primary-soft/60 px-4 py-3">
+        <p className="font-mono text-2xs uppercase tracking-[0.18em] text-primary-deep">
+          Server Overview
+        </p>
+        <h2 className="mt-1 text-sm font-semibold text-ink">配置总览</h2>
+        <p className="mt-1 truncate text-xs text-body">{server.name}</p>
+      </div>
+
+      <div className="p-4">
+        <div className="rounded-2xl border border-hairline bg-canvas-soft/70 px-3 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-mute">运行状态</span>
+            <McpStatusBadge status={server.runtime_status} />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <MetricTile label="Tools" value={String(server.tool_count)} />
+            <MetricTile label="Desired" value={server.desired_state} />
+          </div>
+        </div>
+
+        <dl className="mt-4 space-y-3 text-xs">
+          <InfoRow label="服务 ID" value={server.id} />
+          <InfoRow label="传输方式" value={server.transport} />
+          <InfoRow label={endpointLabel} value={endpointValue ?? "-"} />
+          <InfoRow label="启用状态" value={server.enabled ? "enabled" : "disabled"} />
+          <InfoRow label="最近检查" value={server.last_checked_at ?? "-"} />
+        </dl>
+
+        {server.last_error ? (
+          <p className="mt-4 rounded-2xl border border-error-soft bg-error-soft/45 px-3 py-2 text-xs leading-relaxed text-error-deep">
+            {server.last_error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-canvas px-3 py-2 ring-1 ring-primary/10">
+      <p className="font-mono text-2xs uppercase tracking-[0.14em] text-mute">{label}</p>
+      <p className="mt-1 truncate font-mono text-xs font-semibold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <dt className="text-mute">{label}</dt>
-      <dd className="break-all text-right font-mono text-ink">{value}</dd>
+      <dd className="min-w-0 break-all text-right font-mono text-2xs text-ink">{value}</dd>
     </div>
   );
 }

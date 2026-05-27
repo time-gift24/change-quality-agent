@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import type { McpServerRuntimeStatus } from "../types";
 
@@ -17,6 +18,14 @@ const canStart = (s: McpServerRuntimeStatus) =>
   s === "stopped" || s === "error" || s === "unknown";
 const canStop = (s: McpServerRuntimeStatus) =>
   s === "running" || s === "starting";
+const MENU_WIDTH = 176;
+const MENU_GAP = 6;
+const VIEWPORT_PADDING = 8;
+
+type MenuPosition = {
+  left: number;
+  top: number;
+};
 
 export function McpRowActionsMenu({
   runtimeStatus,
@@ -29,6 +38,7 @@ export function McpRowActionsMenu({
   onDelete,
 }: McpRowActionsMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -63,6 +73,38 @@ export function McpRowActionsMenu({
     triggerRef.current?.focus();
   }, []);
 
+  const calculateMenuPosition = useCallback((): MenuPosition | null => {
+    const trigger = triggerRef.current;
+    if (!trigger) return null;
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuHeight = menuRef.current?.offsetHeight ?? 0;
+    const maxLeft = window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING;
+    const left = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(triggerRect.right - MENU_WIDTH, maxLeft),
+    );
+    const hasBottomSpace =
+      !menuHeight || triggerRect.bottom + MENU_GAP + menuHeight <= window.innerHeight - VIEWPORT_PADDING;
+    const top = hasBottomSpace
+      ? triggerRect.bottom + MENU_GAP
+      : Math.max(VIEWPORT_PADDING, triggerRect.top - menuHeight - MENU_GAP);
+
+    return { left, top };
+  }, []);
+
+  const updateMenuPosition = useCallback(() => {
+    const nextPosition = calculateMenuPosition();
+    if (nextPosition) setMenuPosition(nextPosition);
+  }, [calculateMenuPosition]);
+
+  const openMenu = useCallback((initialFocus: "first" | "last") => {
+    initialFocusRef.current = initialFocus;
+    const nextPosition = calculateMenuPosition();
+    if (nextPosition) setMenuPosition(nextPosition);
+    setOpen(true);
+  }, [calculateMenuPosition]);
+
   const focusItem = useCallback((index: number) => {
     const visible = items.filter((i) => !i.separator);
     const clamped = Math.max(0, Math.min(index, visible.length - 1));
@@ -79,6 +121,24 @@ export function McpRowActionsMenu({
     const idx = initialFocusRef.current === "last" ? visible.length - 1 : 0;
     focusItem(idx);
   }, [open, items, focusItem]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+
+    updateMenuPosition();
+  }, [open, updateMenuPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,14 +162,12 @@ export function McpRowActionsMenu({
     }
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
       e.preventDefault();
-      initialFocusRef.current = "first";
-      setOpen(true);
+      openMenu("first");
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      initialFocusRef.current = "last";
-      setOpen(true);
+      openMenu("last");
     }
   }
 
@@ -150,6 +208,49 @@ export function McpRowActionsMenu({
     close();
   }
 
+  const menu = open && menuPosition ? (
+    <div
+      ref={menuRef}
+      aria-labelledby={triggerId}
+      className="fixed z-50 w-44 rounded-2xl border border-hairline-soft bg-canvas p-1 shadow-lg shadow-primary/10"
+      onKeyDown={handleMenuKeyDown}
+      role="menu"
+      style={{ left: menuPosition.left, top: menuPosition.top }}
+    >
+      {items.map((item) =>
+        item.separator ? (
+          <div key={item.id} className="my-1 border-t border-hairline" role="separator" />
+        ) : item.linkTo ? (
+          <Link
+            key={item.id}
+            className="flex items-center rounded-xl px-3 py-2 text-xs text-body transition-colors hover:bg-canvas-soft focus:bg-canvas-soft focus:outline-none"
+            data-menuitem-id={item.id}
+            onClick={close}
+            ref={(el) => { if (el) itemRefs.current.set(item.id, el); }}
+            role="menuitem"
+            to={item.linkTo}
+          >
+            {item.label}
+          </Link>
+        ) : (
+          <button
+            key={item.id}
+            className={`flex w-full items-center rounded-xl px-3 py-2 text-xs transition-colors hover:bg-canvas-soft focus:bg-canvas-soft focus:outline-none ${
+              item.variant === "destructive" ? "text-error-deep" : "text-body"
+            }`}
+            data-menuitem-id={item.id}
+            onClick={() => handleItemClick(item.action)}
+            ref={(el) => { if (el) itemRefs.current.set(item.id, el); }}
+            role="menuitem"
+            type="button"
+          >
+            {item.label}
+          </button>
+        ),
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="relative inline-block">
       <button
@@ -159,7 +260,7 @@ export function McpRowActionsMenu({
         aria-label="更多操作"
         className="flex h-8 w-8 items-center justify-center rounded-lg text-mute transition-colors hover:bg-canvas-soft hover:text-ink"
         id={triggerId}
-        onClick={() => { initialFocusRef.current = "first"; setOpen(true); }}
+        onClick={() => openMenu("first")}
         onKeyDown={handleTriggerKeyDown}
         type="button"
       >
@@ -175,47 +276,7 @@ export function McpRowActionsMenu({
         </svg>
       </button>
 
-      {open ? (
-        <div
-          ref={menuRef}
-          aria-labelledby={triggerId}
-          className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-hairline bg-canvas p-1 shadow-md"
-          onKeyDown={handleMenuKeyDown}
-          role="menu"
-        >
-          {items.map((item) =>
-            item.separator ? (
-              <div key={item.id} className="my-1 border-t border-hairline" role="separator" />
-            ) : item.linkTo ? (
-              <Link
-                key={item.id}
-                className="flex items-center rounded-md px-2.5 py-1.5 text-xs text-body transition-colors hover:bg-canvas-soft focus:bg-canvas-soft focus:outline-none"
-                data-menuitem-id={item.id}
-                onClick={close}
-                ref={(el) => { if (el) itemRefs.current.set(item.id, el); }}
-                role="menuitem"
-                to={item.linkTo}
-              >
-                {item.label}
-              </Link>
-            ) : (
-              <button
-                key={item.id}
-                className={`flex w-full items-center rounded-md px-2.5 py-1.5 text-xs transition-colors hover:bg-canvas-soft focus:bg-canvas-soft focus:outline-none ${
-                  item.variant === "destructive" ? "text-error-deep" : "text-body"
-                }`}
-                data-menuitem-id={item.id}
-                onClick={() => handleItemClick(item.action)}
-                ref={(el) => { if (el) itemRefs.current.set(item.id, el); }}
-                role="menuitem"
-                type="button"
-              >
-                {item.label}
-              </button>
-            ),
-          )}
-        </div>
-      ) : null}
+      {menu && typeof document !== "undefined" ? createPortal(menu, document.body) : null}
     </div>
   );
 }

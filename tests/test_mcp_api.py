@@ -55,6 +55,9 @@ class FakeRepository:
     async def get_server(self, server_id):
         return self.server if server_id == self.server.id else None
 
+    async def reload_server(self, server_id):
+        return self.server if server_id == self.server.id else None
+
     async def create_server(self, **values):
         if self.raise_integrity_on_create:
             raise IntegrityError("insert", {}, Exception("duplicate"))
@@ -79,7 +82,8 @@ class FakeRepository:
 
 
 class FakeRuntimeManager:
-    def __init__(self) -> None:
+    def __init__(self, repository: FakeRepository) -> None:
+        self.repository = repository
         self.started = []
         self.stopped = []
         self.running_ids = set()
@@ -92,6 +96,10 @@ class FakeRuntimeManager:
             raise self.start_error
         self.started.append(server_id)
         self.running_ids.add(server_id)
+        self.repository.server.runtime_status = "running"
+        self.repository.server.last_checked_at = datetime.now(UTC)
+        self.repository.server.last_error = None
+        self.repository.server.tools = [FakeTool()]
         return _lifecycle_response(server_id)
 
     async def stop(self, server_id):
@@ -139,7 +147,7 @@ def overrides():
     settings.mcp_admin_token = "test-token"
     server = FakeServer()
     repository = FakeRepository(server)
-    runtime = FakeRuntimeManager()
+    runtime = FakeRuntimeManager(repository)
     app.dependency_overrides[get_mcp_repository] = lambda: repository
     app.dependency_overrides[get_mcp_runtime_manager] = lambda: runtime
     yield server, repository, runtime
@@ -193,7 +201,7 @@ async def test_get_mcp_server_returns_tools(overrides) -> None:
 
 @pytest.mark.asyncio
 async def test_create_mcp_server_persists_and_redacts_response(overrides) -> None:
-    _, repository, _ = overrides
+    _, repository, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
@@ -218,6 +226,37 @@ async def test_create_mcp_server_persists_and_redacts_response(overrides) -> Non
     assert body["name"] == "github"
     assert body["env"] == {"TOKEN": "********"}
     assert repository.committed is True
+    assert runtime.started == []
+
+
+@pytest.mark.asyncio
+async def test_create_running_mcp_server_starts_and_returns_tools(overrides) -> None:
+    server, _, runtime = overrides
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/mcp/servers",
+            headers=ADMIN_HEADERS,
+            json={
+                "name": "github",
+                "transport": "stdio",
+                "command": "uvx",
+                "args": ["mcp-server-github"],
+                "env": {"TOKEN": "secret"},
+                "headers": {},
+                "enabled": True,
+                "desired_state": "running",
+            },
+        )
+
+    assert response.status_code == 201
+    assert runtime.started == [server.id]
+    body = response.json()
+    assert body["runtime_status"] == "running"
+    assert body["tool_count"] == 1
+    assert body["tools"][0]["name"] == "search"
 
 
 @pytest.mark.asyncio
@@ -296,7 +335,7 @@ async def test_update_stopped_mcp_server_validates_merged_config(overrides) -> N
 
 @pytest.mark.asyncio
 async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
-    server, repository, _ = overrides
+    server, repository, runtime = overrides
     server.runtime_status = "stopped"
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -312,6 +351,7 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
     assert response.json()["command"] == "node"
     assert server.command == "node"
     assert repository.committed is True
+    assert runtime.started == [server.id]
 
 
 @pytest.mark.asyncio
@@ -395,6 +435,7 @@ async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
         )
 
     assert response.status_code == 502
+    assert response.json()["detail"] == "MCP lifecycle operation failed: token=[redacted]"
     assert "secret" not in response.text
 
 

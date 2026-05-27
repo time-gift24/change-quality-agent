@@ -21,6 +21,7 @@ from app.services.mcp_runtime import (
     McpCommandNotAllowedError,
     McpRuntimeNotEnabledError,
     UnsupportedMcpTransportError,
+    sanitize_mcp_error,
 )
 
 router = APIRouter(
@@ -44,12 +45,20 @@ async def list_mcp_servers(repository: McpRepositoryDep) -> list[McpServerSummar
 async def create_mcp_server(
     payload: McpServerCreate,
     repository: McpRepositoryDep,
+    runtime: McpRuntimeManagerDep,
 ) -> McpServerDetail:
     try:
         server = await repository.create_server(**payload.model_dump(mode="json"))
         await repository.commit()
     except IntegrityError as exc:
         raise _name_conflict() from exc
+
+    if _should_start_after_save(server):
+        await _run_lifecycle(runtime.start, server.id)
+        reloaded = await repository.reload_server(server.id)
+        if reloaded is not None:
+            server = reloaded
+
     return _server_detail(server)
 
 
@@ -90,6 +99,13 @@ async def update_mcp_server(
             await repository.commit()
         except IntegrityError as exc:
             raise _name_conflict() from exc
+
+        if _should_start_after_save(server):
+            await _run_lifecycle(runtime.start, server_id)
+            reloaded = await repository.reload_server(server_id)
+            if reloaded is not None:
+                server = reloaded
+
         return _server_detail(server)
 
 
@@ -175,6 +191,10 @@ def _validated_update_values(server, values: dict[str, object]) -> dict[str, obj
     return {key: validated[key] for key in values}
 
 
+def _should_start_after_save(server) -> bool:
+    return bool(server.enabled) and server.desired_state == "running"
+
+
 async def _run_lifecycle(
     operation: Callable[[UUID], Awaitable[McpLifecycleResponse]],
     server_id: UUID,
@@ -199,9 +219,10 @@ async def _run_lifecycle(
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        sanitized_error = sanitize_mcp_error(exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="MCP lifecycle operation failed.",
+            detail=f"MCP lifecycle operation failed: {sanitized_error}",
         ) from exc
 
 

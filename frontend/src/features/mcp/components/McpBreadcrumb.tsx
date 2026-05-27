@@ -17,7 +17,7 @@ export function McpBreadcrumb({ items, serverName }: McpBreadcrumbProps) {
   ];
 
   return (
-    <nav aria-label="面包屑" className="text-2xs font-mono">
+    <nav aria-label="面包屑" className="text-xs">
       <ol className="flex items-center gap-1.5">
         {resolvedItems.map((item, index) => {
           const isCurrent = index === resolvedItems.length - 1;

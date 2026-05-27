@@ -226,14 +226,19 @@ export function McpServerForm({
   const hasHeadersError = !!fieldErrors.headers;
   const hasGlobalError = !!fieldErrors._global;
   const inputClass =
-    "h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20";
+    "h-9 w-full rounded-xl border border-hairline bg-canvas px-3 text-xs text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft/70 read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20";
   const textAreaClass =
-    "min-h-[72px] w-full rounded-lg border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20 resize-y";
+    "min-h-[92px] w-full rounded-xl border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft/70 read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20 resize-y";
+  const argsTextAreaClass =
+    "min-h-[132px] w-full rounded-xl border border-hairline bg-canvas px-3 py-2 font-mono text-2xs leading-relaxed text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 read-only:bg-canvas-soft/70 read-only:text-body disabled:bg-canvas-soft disabled:text-body aria-invalid:border-error aria-invalid:ring-error/20 resize-y";
 
   return (
-    <section className="rounded-xl border border-hairline bg-canvas">
+    <section
+      aria-label="配置工作区"
+      className="overflow-hidden rounded-3xl border border-primary/10 bg-canvas/95 shadow-[0_18px_50px_rgba(0,100,224,0.08)]"
+    >
       <form
-        className="px-4 py-4"
+        className="space-y-4 p-4 sm:p-5"
         id={formId}
         noValidate
         onSubmit={(event) => { void handleSubmit(event); }}
@@ -248,197 +253,213 @@ export function McpServerForm({
           </p>
         ) : null}
 
-        <SectionHeader>基本信息</SectionHeader>
-
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-name">
-              服务名称 {canSubmit ? <span className="text-error">*</span> : null}
-            </label>
-            <input
-              aria-describedby={hasNameError ? nameErrorId : undefined}
-              aria-invalid={hasNameError}
-              className={inputClass}
-              id="mcp-form-name"
-              onChange={(e) => { setName(e.target.value); clearFieldError("name"); }}
-              readOnly={readOnly}
-              ref={nameInputRef}
-              required={canSubmit}
-              value={name}
-            />
-            {hasNameError ? (
-              <p className="text-2xs text-error-deep" id={nameErrorId} role="alert">
-                {fieldErrors.name}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-transport">
-              传输方式
-            </label>
-            <Select
-              aria-label="传输方式"
-              className="w-full"
-              disabled={mode !== "create"}
-              id="mcp-form-transport"
-              onChange={(e) => setTransport(e.target.value as McpTransport)}
-              value={transport}
-            >
-              <option value="stdio">stdio</option>
-              <option value="http">http</option>
-            </Select>
-          </div>
-        </div>
-
-        <SectionHeader>连接</SectionHeader>
-
-        {transport === "stdio" ? (
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px]">
+        <ConfigSection
+          description="命名和 transport 是 server 的识别层；transport 创建后不可切换。"
+          eyebrow="Identity"
+          title="基本信息"
+        >
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-command">
-                command {canSubmit ? <span className="text-error">*</span> : null}
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-name">
+                服务名称 {canSubmit ? <span className="text-error">*</span> : null}
               </label>
               <input
-                aria-describedby={hasCommandError ? commandErrorId : undefined}
-                aria-invalid={hasCommandError}
+                aria-describedby={hasNameError ? nameErrorId : undefined}
+                aria-invalid={hasNameError}
                 className={inputClass}
-                id="mcp-form-command"
-                onChange={(e) => { setCommand(e.target.value); clearFieldError("command"); }}
+                id="mcp-form-name"
+                onChange={(e) => { setName(e.target.value); clearFieldError("name"); }}
                 readOnly={readOnly}
-                ref={commandInputRef}
-                value={command}
+                ref={nameInputRef}
+                required={canSubmit}
+                value={name}
               />
-              {hasCommandError ? (
-                <p className="text-2xs text-error-deep" id={commandErrorId} role="alert">
-                  {fieldErrors.command}
+              {hasNameError ? (
+                <p className="text-2xs text-error-deep" id={nameErrorId} role="alert">
+                  {fieldErrors.name}
                 </p>
               ) : null}
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-args">
-                args
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-transport">
+                传输方式
               </label>
-              <textarea
-                className={textAreaClass}
-                id="mcp-form-args"
-                onChange={(e) => setArgsText(e.target.value)}
-                placeholder="每行一个参数"
-                readOnly={readOnly}
-                value={argsText}
-              />
+              <Select
+                aria-label="传输方式"
+                className="w-full"
+                disabled={mode !== "create"}
+                id="mcp-form-transport"
+                onChange={(e) => setTransport(e.target.value as McpTransport)}
+                value={transport}
+              >
+                <option value="stdio">stdio</option>
+                <option value="http">http</option>
+              </Select>
             </div>
           </div>
-        ) : (
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-url">
-              url {canSubmit ? <span className="text-error">*</span> : null}
-            </label>
-            <input
-              aria-describedby={hasUrlError ? urlErrorId : undefined}
-              aria-invalid={hasUrlError}
-              className={inputClass}
-              id="mcp-form-url"
-              onChange={(e) => { setUrl(e.target.value); clearFieldError("url"); }}
-              readOnly={readOnly}
-              ref={urlInputRef}
-              type="url"
-              value={url}
-            />
-            {hasUrlError ? (
-              <p className="text-2xs text-error-deep" id={urlErrorId} role="alert">
-                {fieldErrors.url}
-              </p>
-            ) : null}
+        </ConfigSection>
+
+        <ConfigSection
+          description={transport === "stdio" ? "stdio server 由本地 command 启动，args 每行一个。" : "http server 使用远端 URL 建立连接。"}
+          eyebrow="Connection"
+          title="连接"
+        >
+          {transport === "stdio" ? (
+            <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[260px_minmax(0,1fr)]">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-ink" htmlFor="mcp-form-command">
+                  command {canSubmit ? <span className="text-error">*</span> : null}
+                </label>
+                <input
+                  aria-describedby={hasCommandError ? commandErrorId : undefined}
+                  aria-invalid={hasCommandError}
+                  className={inputClass}
+                  id="mcp-form-command"
+                  onChange={(e) => { setCommand(e.target.value); clearFieldError("command"); }}
+                  readOnly={readOnly}
+                  ref={commandInputRef}
+                  value={command}
+                />
+                {hasCommandError ? (
+                  <p className="text-2xs text-error-deep" id={commandErrorId} role="alert">
+                    {fieldErrors.command}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-ink" htmlFor="mcp-form-args">
+                  args
+                </label>
+                <textarea
+                  className={argsTextAreaClass}
+                  id="mcp-form-args"
+                  onChange={(e) => setArgsText(e.target.value)}
+                  placeholder="每行一个参数"
+                  readOnly={readOnly}
+                  value={argsText}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-url">
+                url {canSubmit ? <span className="text-error">*</span> : null}
+              </label>
+              <input
+                aria-describedby={hasUrlError ? urlErrorId : undefined}
+                aria-invalid={hasUrlError}
+                className={inputClass}
+                id="mcp-form-url"
+                onChange={(e) => { setUrl(e.target.value); clearFieldError("url"); }}
+                readOnly={readOnly}
+                ref={urlInputRef}
+                type="url"
+                value={url}
+              />
+              {hasUrlError ? (
+                <p className="text-2xs text-error-deep" id={urlErrorId} role="alert">
+                  {fieldErrors.url}
+                </p>
+              ) : null}
+            </div>
+          )}
+        </ConfigSection>
+
+        <ConfigSection
+          description="密钥与请求头使用 KEY=VALUE。编辑时保留脱敏值不会覆盖原值。"
+          eyebrow="Secrets"
+          title="环境与请求头"
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-env">
+                env
+              </label>
+              <textarea
+                aria-describedby={hasEnvError ? envErrorId : undefined}
+                aria-invalid={hasEnvError}
+                className={textAreaClass}
+                id="mcp-form-env"
+                onChange={(e) => { setEnvText(e.target.value); clearFieldError("env"); }}
+                placeholder="KEY=VALUE"
+                readOnly={readOnly}
+                value={envText}
+              />
+              {hasEnvError ? (
+                <p className="text-2xs text-error-deep" id={envErrorId} role="alert">
+                  {fieldErrors.env}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-ink" htmlFor="mcp-form-headers">
+                headers
+              </label>
+              <textarea
+                aria-describedby={hasHeadersError ? headersErrorId : undefined}
+                aria-invalid={hasHeadersError}
+                className={textAreaClass}
+                id="mcp-form-headers"
+                onChange={(e) => { setHeadersText(e.target.value); clearFieldError("headers"); }}
+                placeholder="KEY=VALUE"
+                readOnly={readOnly}
+                value={headersText}
+              />
+              {hasHeadersError ? (
+                <p className="text-2xs text-error-deep" id={headersErrorId} role="alert">
+                  {fieldErrors.headers}
+                </p>
+              ) : null}
+            </div>
           </div>
-        )}
+        </ConfigSection>
 
-        <SectionHeader>环境与请求头</SectionHeader>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-env">
-              env
-            </label>
-            <textarea
-              aria-describedby={hasEnvError ? envErrorId : undefined}
-              aria-invalid={hasEnvError}
-              className={textAreaClass}
-              id="mcp-form-env"
-              onChange={(e) => { setEnvText(e.target.value); clearFieldError("env"); }}
-              placeholder="KEY=VALUE"
-              readOnly={readOnly}
-              value={envText}
-            />
-            {hasEnvError ? (
-              <p className="text-2xs text-error-deep" id={envErrorId} role="alert">
-                {fieldErrors.env}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink" htmlFor="mcp-form-headers">
-              headers
-            </label>
-            <textarea
-              aria-describedby={hasHeadersError ? headersErrorId : undefined}
-              aria-invalid={hasHeadersError}
-              className={textAreaClass}
-              id="mcp-form-headers"
-              onChange={(e) => { setHeadersText(e.target.value); clearFieldError("headers"); }}
-              placeholder="KEY=VALUE"
-              readOnly={readOnly}
-              value={headersText}
-            />
-            {hasHeadersError ? (
-              <p className="text-2xs text-error-deep" id={headersErrorId} role="alert">
-                {fieldErrors.headers}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <SectionHeader>启动行为</SectionHeader>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-hairline bg-canvas-soft px-3 py-2">
-            <input
-              checked={desiredState === "running"}
-              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
-              disabled={readOnly}
-              onChange={(e) => setDesiredState(e.target.checked ? "running" : "stopped")}
-              type="checkbox"
-            />
-            <span>
-              <span className="text-xs text-ink">创建后立即启动</span>
-              <span className="block text-2xs text-mute">
-                desired_state={desiredState}
+        <ConfigSection
+          description="保存配置和是否对 agent 暴露是两件事，默认先安全落盘。"
+          eyebrow="Lifecycle"
+          title="启动行为"
+        >
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-hairline bg-canvas-soft/70 px-3 py-3 transition-colors hover:border-primary/30">
+              <input
+                checked={desiredState === "running"}
+                className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
+                disabled={readOnly}
+                onChange={(e) => setDesiredState(e.target.checked ? "running" : "stopped")}
+                type="checkbox"
+              />
+              <span>
+                <span className="text-xs font-medium text-ink">创建后立即启动</span>
+                <span className="block font-mono text-2xs text-mute">
+                  desired_state={desiredState}
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
 
-          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-hairline bg-canvas-soft px-3 py-2">
-            <input
-              checked={enabled}
-              className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
-              disabled={readOnly}
-              onChange={(e) => setEnabled(e.target.checked)}
-              type="checkbox"
-            />
-            <span>
-              <span className="text-xs text-ink">启用</span>
-              <span className="block text-2xs text-mute">
-                {enabled ? "可供 agent 使用" : "暂不供 agent 使用"}
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-hairline bg-canvas-soft/70 px-3 py-3 transition-colors hover:border-primary/30">
+              <input
+                checked={enabled}
+                className="mt-0.5 h-4 w-4 rounded border-hairline bg-canvas accent-primary disabled:opacity-60"
+                disabled={readOnly}
+                onChange={(e) => setEnabled(e.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <span className="text-xs font-medium text-ink">启用</span>
+                <span className="block text-2xs text-mute">
+                  {enabled ? "可供 agent 使用" : "暂不供 agent 使用"}
+                </span>
               </span>
-            </span>
-          </label>
-        </div>
+            </label>
+          </div>
+        </ConfigSection>
       </form>
 
       {canSubmit ? (
-        <div className="flex items-center justify-end gap-2 border-t border-hairline px-4 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-primary/10 bg-canvas/90 px-4 py-3">
           {onCancel ? (
             <Button
               onClick={onCancel}
@@ -461,11 +482,28 @@ export function McpServerForm({
   );
 }
 
-function SectionHeader({ children }: { children: ReactNode }) {
+function ConfigSection({
+  children,
+  description,
+  eyebrow,
+  title,
+}: {
+  children: ReactNode;
+  description: string;
+  eyebrow: string;
+  title: string;
+}) {
   return (
-    <h3 className="mb-2 mt-4 border-b border-hairline pb-1.5 font-mono text-2xs uppercase tracking-wide text-mute first:mt-0">
+    <section className="rounded-2xl border border-hairline bg-canvas px-4 py-4">
+      <div className="mb-3 flex flex-col gap-1">
+        <p className="font-mono text-2xs uppercase tracking-[0.16em] text-primary-deep">
+          {eyebrow}
+        </p>
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <p className="max-w-2xl text-xs leading-relaxed text-body">{description}</p>
+      </div>
       {children}
-    </h3>
+    </section>
   );
 }
 

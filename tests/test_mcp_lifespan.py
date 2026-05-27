@@ -97,19 +97,22 @@ async def test_runtime_start_enabled_servers_starts_startup_servers() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_start_enabled_servers_records_early_start_failures() -> None:
+async def test_runtime_start_enabled_servers_starts_http_servers() -> None:
     repository = FakeStartupRepository()
     repository.servers = [FakeStartupServer("http-server")]
     repository.servers[0].transport = "http"
+    repository.servers[0].url = "https://example.com/mcp"
+    probe = FakeProbe()
     manager = McpRuntimeManager(
         repository_factory=lambda: repository,
-        probe=FakeProbe(),
+        probe=probe,
     )
 
     await manager.start_enabled_servers()
 
-    assert repository.servers[0].runtime_status == McpServerRuntimeStatus.error.value
-    assert repository.servers[0].last_error == "http"
+    assert probe.started == [repository.servers[0].id]
+    assert repository.servers[0].runtime_status == McpServerRuntimeStatus.running.value
+    assert repository.servers[0].last_error is None
     assert repository.commits == 1
 
 

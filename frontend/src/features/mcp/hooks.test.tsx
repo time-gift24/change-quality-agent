@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { StrictMode, type ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +52,23 @@ describe("mcp hooks", () => {
     expect(result.current.data).toHaveLength(1);
     expect(result.current.data[0]?.id).toBe("srv-1");
     expect(listMcpServers).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads server list under React StrictMode", async () => {
+    vi.mocked(listMcpServers).mockResolvedValue([
+      buildSummary({ id: "srv-1", name: "Server 1" }),
+    ]);
+
+    const { result } = renderHook(() => useMcpServers(), {
+      wrapper: StrictModeWrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.data[0]?.id).toBe("srv-1");
   });
 
   it("refreshes list after mutation success", async () => {
@@ -257,4 +275,8 @@ function deferred<T>(): Deferred<T> {
   });
 
   return { promise, reject, resolve };
+}
+
+function StrictModeWrapper({ children }: { children: ReactNode }) {
+  return <StrictMode>{children}</StrictMode>;
 }

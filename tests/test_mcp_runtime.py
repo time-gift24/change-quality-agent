@@ -11,7 +11,8 @@ from app.services.mcp_runtime import (
     McpRuntimeNotEnabledError,
     McpRuntimeManager,
     StdioMcpProbe,
-    UnsupportedMcpTransportError,
+    StreamableHttpMcpProbe,
+    TransportMcpProbe,
 )
 
 
@@ -147,6 +148,28 @@ class FailingStopProbe(FakeProbe):
     async def stop(self, handle):
         self.stopped += 1
         raise RuntimeError("stop failed")
+
+
+class TaskAffineProbe(FakeProbe):
+    async def start(self, server):
+        self.started += 1
+        return (
+            {"owner_task": asyncio.current_task()},
+            [{"name": "search", "description": "Search", "input_schema": {}}],
+        )
+
+    async def list_tools(self, handle):
+        self.listed += 1
+        if handle["owner_task"] is not asyncio.current_task():
+            raise RuntimeError("different task")
+        return [
+            {"name": "search", "description": "Search", "input_schema": {}}
+        ]
+
+    async def stop(self, handle):
+        self.stopped += 1
+        if handle["owner_task"] is not asyncio.current_task():
+            raise RuntimeError("different task")
 
 
 class SecretFailingStopProbe(FakeProbe):
@@ -285,15 +308,35 @@ async def test_stop_failure_keeps_handle_for_retry() -> None:
 
 
 @pytest.mark.asyncio
-async def test_http_start_is_unsupported_in_v1() -> None:
+async def test_stop_runs_in_task_that_owns_probe_handle_across_requests() -> None:
+    server = FakeServer()
+    repository = FakeRepository(server)
+    probe = TaskAffineProbe()
+    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=probe)
+
+    await asyncio.create_task(manager.start(server.id))
+    status = await manager.stop(server.id)
+
+    assert status.runtime_status == McpServerRuntimeStatus.stopped
+    assert manager.is_running(server.id) is False
+    assert probe.stopped == 1
+
+
+@pytest.mark.asyncio
+async def test_http_start_uses_http_probe() -> None:
     server = FakeServer(transport="http")
     repository = FakeRepository(server)
-    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=FakeProbe())
+    http_probe = FakeProbe()
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository,
+        probe=TransportMcpProbe(stdio_probe=FailingProbe(), http_probe=http_probe),
+    )
 
-    with pytest.raises(UnsupportedMcpTransportError):
-        await manager.start(server.id)
+    status = await manager.start(server.id)
 
-    assert server.desired_state == McpDesiredState.stopped.value
+    assert http_probe.started == 1
+    assert status.runtime_status == McpServerRuntimeStatus.running
+    assert server.desired_state == McpDesiredState.running.value
 
 
 @pytest.mark.asyncio
@@ -426,6 +469,43 @@ async def test_stdio_probe_cleans_exit_stack_on_cancellation(monkeypatch) -> Non
         "session-exit",
         "stdio-exit",
     ]
+
+
+@pytest.mark.asyncio
+async def test_http_probe_preserves_start_error_when_cleanup_is_cancelled(
+    monkeypatch,
+) -> None:
+    server = FakeServer(transport="http")
+
+    class FakeHttpContext:
+        async def __aenter__(self):
+            return object(), object(), lambda: None
+
+        async def __aexit__(self, exc_type, exc, tb):
+            raise asyncio.CancelledError()
+
+    class FakeClientSession:
+        def __init__(self, read_stream, write_stream) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+        async def initialize(self):
+            raise RuntimeError("init failed")
+
+    monkeypatch.setattr(
+        mcp_runtime_module,
+        "streamablehttp_client",
+        lambda url, headers: FakeHttpContext(),
+    )
+    monkeypatch.setattr(mcp_runtime_module, "ClientSession", FakeClientSession)
+
+    with pytest.raises(RuntimeError, match="init failed"):
+        await StreamableHttpMcpProbe().start(server)
 
 
 @pytest.mark.asyncio

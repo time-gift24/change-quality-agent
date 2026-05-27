@@ -3,7 +3,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { useMcpMutations, useMcpServerDetail } from "../hooks";
 import type { McpServerDetail } from "../types";
@@ -41,7 +41,7 @@ function renderCreatePage() {
     <MemoryRouter initialEntries={["/mcp/new"]}>
       <Routes>
         <Route element={<McpCreatePage />} path="/mcp/new" />
-        <Route element={<div>创建后详情页</div>} path="/mcp/:serverId" />
+        <Route element={<NavigationStateProbe label="创建后详情页" />} path="/mcp/:serverId" />
       </Routes>
     </MemoryRouter>,
   );
@@ -52,9 +52,21 @@ function renderEditPage() {
     <MemoryRouter initialEntries={["/mcp/srv-1/edit"]}>
       <Routes>
         <Route element={<McpEditPage />} path="/mcp/:serverId/edit" />
-        <Route element={<div>编辑后详情页</div>} path="/mcp/:serverId" />
+        <Route element={<NavigationStateProbe label="编辑后详情页" />} path="/mcp/:serverId" />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function NavigationStateProbe({ label }: { label: string }) {
+  const location = useLocation();
+  const state = location.state as { mcpNotice?: string } | null;
+
+  return (
+    <div>
+      <p>{label}</p>
+      {state?.mcpNotice ? <p>{state.mcpNotice}</p> : null}
+    </div>
   );
 }
 
@@ -99,6 +111,8 @@ describe("McpServerFormPage", () => {
     expect(within(nav).getByRole("link", { name: "MCP 管理" })).toHaveAttribute("href", "/mcp");
     expect(within(nav).getByText("新增 Server")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "新增 MCP Server" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "配置工作区" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "配置摘要" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -120,6 +134,7 @@ describe("McpServerFormPage", () => {
       transport: "stdio",
     }));
     expect(await screen.findByText("创建后详情页")).toBeInTheDocument();
+    expect(screen.getByText("MCP Server 已创建。")).toBeInTheDocument();
   });
 
   it("renders edit page with breadcrumb and populated editable form", () => {
@@ -130,8 +145,21 @@ describe("McpServerFormPage", () => {
     expect(within(nav).getByRole("link", { name: "Alpha Server" })).toHaveAttribute("href", "/mcp/srv-1");
     expect(within(nav).getByText("编辑")).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("heading", { name: "编辑 MCP Server" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "配置工作区" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "配置摘要" })).toBeInTheDocument();
+    expect(screen.queryByText("EDIT CONFIG")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: /服务名称/ })).toHaveValue("Alpha Server");
     expect(screen.getByRole("textbox", { name: /服务名称/ })).not.toHaveAttribute("readonly");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("updates a server and carries a success notice to detail page", async () => {
+    renderEditPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(updateServer).toHaveBeenCalled());
+    expect(await screen.findByText("编辑后详情页")).toBeInTheDocument();
+    expect(screen.getByText("MCP Server 配置已保存。")).toBeInTheDocument();
   });
 });

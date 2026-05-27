@@ -10,7 +10,7 @@ from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.runs import RunRepository
-from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe
+from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -78,9 +78,11 @@ def get_mcp_runtime_manager() -> McpRuntimeManager:
             repository_factory=mcp_runtime_repository_context,
             operation_timeout_seconds=settings.mcp_operation_timeout_seconds,
             single_instance_confirmed=settings.mcp_runtime_single_instance,
-            probe=StdioMcpProbe(
-                allowed_commands=set(settings.mcp_allowed_stdio_commands),
-                allowed_stdio_specs=set(settings.mcp_allowed_stdio_specs),
+            probe=TransportMcpProbe(
+                stdio_probe=StdioMcpProbe(
+                    allowed_commands=set(settings.mcp_allowed_stdio_commands),
+                    allowed_stdio_specs=set(settings.mcp_allowed_stdio_specs),
+                ),
             ),
         )
     return _mcp_runtime_manager

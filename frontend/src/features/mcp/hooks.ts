@@ -85,6 +85,8 @@ export function useMcpServers(): AsyncStateWithRefetch<McpServerSummary[]> {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
     };
@@ -135,6 +137,8 @@ export function useMcpServerDetail(
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     return () => {
       mountedRef.current = false;
     };

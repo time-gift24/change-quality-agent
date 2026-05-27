@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { McpServerRuntimeStatus } from "../types";
 
 import { AdminTokenControl } from "../components/AdminTokenControl";
+import { McpBreadcrumb } from "../components/McpBreadcrumb";
 import { McpServerTable } from "../components/McpServerTable";
 import { useMcpMutations, useMcpServers } from "../hooks";
 import { getMcpAdminToken, setMcpAdminToken } from "../adminToken";
@@ -62,21 +63,25 @@ export function McpListPage() {
 
   return (
     <main aria-label="MCP 管理主内容" className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex shrink-0 flex-col gap-3 border-b border-hairline bg-canvas/60 px-4 py-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold tracking-tight text-ink">
-            MCP 管理
-          </h1>
-          <p className="mt-0.5 text-xs text-mute">
-            管理 MCP server 生命周期与工具快照
-          </p>
+      <header className="flex shrink-0 flex-col gap-3 bg-transparent px-4 py-3">
+        <McpBreadcrumb items={[{ label: "MCP 管理" }]} />
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold tracking-tight text-ink">
+              MCP 管理
+            </h1>
+            <p className="mt-0.5 text-xs text-mute">
+              管理 MCP server 生命周期与工具快照
+            </p>
+          </div>
+          <AdminTokenControl
+            onChange={(next) => { setAdminTokenInput(next); setAdminTokenSaved(false); }}
+            onSave={() => { void handleSaveAdminToken(); }}
+            saved={adminTokenSaved}
+            value={adminTokenInput}
+          />
         </div>
-        <AdminTokenControl
-          onChange={(next) => { setAdminTokenInput(next); setAdminTokenSaved(false); }}
-          onSave={() => { void handleSaveAdminToken(); }}
-          saved={adminTokenSaved}
-          value={adminTokenInput}
-        />
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-3">

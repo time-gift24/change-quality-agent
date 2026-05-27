@@ -7,6 +7,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -92,6 +93,13 @@ describe("McpListPage", () => {
     expect(screen.queryByRole("complementary", { name: "工作台侧边栏" })).not.toBeInTheDocument();
   });
 
+  it("renders breadcrumb on the MCP list page", () => {
+    renderListPage();
+
+    const nav = screen.getByRole("navigation", { name: "面包屑" });
+    expect(within(nav).getByText("MCP 管理")).toHaveAttribute("aria-current", "page");
+  });
+
   it("keeps the table visible in the page scroll area", () => {
     renderListPage();
 
@@ -105,6 +113,69 @@ describe("McpListPage", () => {
     expect(link).toHaveAttribute("href", "/mcp/srv-1");
 
     expect(screen.getByRole("link", { name: /Beta Server/ })).toHaveAttribute("href", "/mcp/srv-2");
+  });
+
+  it("renders the MCP operations table with meaningful server fields", () => {
+    renderListPage();
+
+    expect(screen.getByRole("columnheader", { name: "MCP 服务" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "启用策略" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "连接配置" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "工具" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "运行状态" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "最近检查" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "操作" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Health Score" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/10/)).not.toBeInTheDocument();
+
+    expect(screen.getAllByText("已启用")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("目标 running")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("stdio")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("echo")[0]).toBeInTheDocument();
+    expect(screen.getByLabelText("Alpha Server 工具数 1")).toBeInTheDocument();
+    expect(screen.getAllByText("未检查")[0]).toBeInTheDocument();
+  });
+
+  it("shows disabled MCP server policy without synthetic scores", () => {
+    vi.mocked(useMcpServers).mockReturnValue({
+      data: [
+        buildSummary({
+          enabled: false,
+          id: "srv-disabled",
+          name: "Disabled Server",
+          runtime_status: "running",
+        }),
+      ],
+      error: null,
+      loading: false,
+      refetch: refetchServers,
+    });
+
+    renderListPage();
+
+    expect(screen.getByText("已停用")).toBeInTheDocument();
+    expect(screen.queryByText(/\/10/)).not.toBeInTheDocument();
+  });
+
+  it("surfaces errored MCP servers without calculating a health score", () => {
+    vi.mocked(useMcpServers).mockReturnValue({
+      data: [
+        buildSummary({
+          id: "srv-error",
+          last_error: "connection refused",
+          name: "Broken Server",
+          runtime_status: "error",
+        }),
+      ],
+      error: null,
+      loading: false,
+      refetch: refetchServers,
+    });
+
+    renderListPage();
+
+    expect(screen.getByText("最近错误")).toBeInTheDocument();
+    expect(screen.queryByText(/\/10/)).not.toBeInTheDocument();
   });
 
   it("renders server list in the table", () => {
@@ -145,6 +216,8 @@ describe("McpListPage", () => {
     // Open dropdown for Alpha Server (running)
     const triggers = screen.getAllByRole("button", { name: "更多操作" });
     fireEvent.click(triggers[0]);
+    expect(screen.getByRole("menu")).toHaveAccessibleName("更多操作");
+    expect(screen.getByRole("menu").parentElement).toBe(document.body);
 
     // Should show 停止 (running), not 启动
     expect(screen.getByRole("menuitem", { name: "停止" })).toBeInTheDocument();

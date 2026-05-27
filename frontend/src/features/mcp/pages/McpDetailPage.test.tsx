@@ -15,9 +15,12 @@ import { useMcpMutations, useMcpServerDetail, useMcpServers } from "../hooks";
 import type { McpServerDetail as McpServerDetailType } from "../types";
 import { McpDetailPage } from "./McpDetailPage";
 
-function renderDetailPage(route = "/mcp/srv-1") {
+function renderDetailPage(
+  route = "/mcp/srv-1",
+  state?: Record<string, unknown>,
+) {
   return render(
-    <MemoryRouter initialEntries={[route]}>
+    <MemoryRouter initialEntries={[state ? { pathname: route, state } : route]}>
       <Routes>
         <Route element={<McpDetailPage />} path="/mcp/:serverId">
           <Route element={null} path="edit" />
@@ -169,8 +172,17 @@ describe("McpDetailPage", () => {
   it("shows server configuration as a read-only form by default", () => {
     renderDetailPage();
 
+    expect(screen.getByRole("region", { name: "配置工作区" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "配置总览" })).toBeInTheDocument();
+    expect(screen.queryByText("READ ONLY")).not.toBeInTheDocument();
     expect(screen.getByLabelText("传输方式")).toBeDisabled();
     expect(screen.getByRole("textbox", { name: /command/ })).toHaveValue("echo");
+  });
+
+  it("shows success notice from navigation state", () => {
+    renderDetailPage("/mcp/srv-1", { mcpNotice: "MCP Server 配置已保存。" });
+
+    expect(screen.getByRole("status")).toHaveTextContent("MCP Server 配置已保存。");
   });
 
   it("shows status badge and transport in subtitle", () => {

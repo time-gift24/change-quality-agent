@@ -249,7 +249,7 @@ function EmptyState({
 
           <button
             aria-label="确认并发起运行"
-            className="h-10 shrink-0 rounded-xl bg-primary px-5 text-sm font-medium text-on-primary shadow-sm transition-colors hover:bg-primary-deep disabled:cursor-not-allowed disabled:bg-mute"
+            className="tech-primary-button h-10 shrink-0 rounded-full px-5 text-sm font-semibold text-on-primary transition-transform hover:-translate-y-px disabled:cursor-not-allowed disabled:translate-y-0"
             disabled={!canSend || starting}
             type="submit"
           >
