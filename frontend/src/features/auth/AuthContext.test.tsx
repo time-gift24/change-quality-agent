@@ -52,7 +52,7 @@ describe("AuthContext", () => {
     const user = buildUser({ account: "admin", is_admin: true });
     vi.mocked(getCurrentUser).mockRejectedValueOnce(new Error("not logged in"));
     vi.mocked(devLogin).mockResolvedValueOnce(user);
-    vi.mocked(logoutRequest).mockResolvedValueOnce({});
+    vi.mocked(logoutRequest).mockResolvedValueOnce(undefined);
 
     const { result } = renderHook(() => useAuth(), { wrapper: AuthWrapper });
 

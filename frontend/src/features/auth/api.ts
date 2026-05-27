@@ -13,8 +13,8 @@ export function devLogin(account: string): Promise<CurrentUser> {
   });
 }
 
-export function logout(): Promise<CurrentUser | Record<string, never>> {
-  return requestJson<CurrentUser | Record<string, never>>("/api/auth/logout", {
+export function logout(): Promise<void> {
+  return requestJson<void>("/api/auth/logout", {
     method: "POST",
   });
 }

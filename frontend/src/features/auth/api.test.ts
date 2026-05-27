@@ -53,10 +53,10 @@ describe("auth API", () => {
   });
 
   it("posts logout", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
+    const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(logout()).resolves.toEqual({});
+    await expect(logout()).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/logout",
@@ -82,5 +82,12 @@ function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
     status: 200,
+  });
+}
+
+function noContentResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    statusText: "No Content",
   });
 }

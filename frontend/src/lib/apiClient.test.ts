@@ -24,6 +24,20 @@ describe("requestJson", () => {
     );
   });
 
+  it("returns undefined for no-content responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 204,
+          statusText: "No Content",
+        }),
+      ),
+    );
+
+    await expect(requestJson<void>("/api/auth/logout")).resolves.toBeUndefined();
+  });
+
   it("includes FastAPI error details in ApiError", async () => {
     vi.stubGlobal(
       "fetch",
