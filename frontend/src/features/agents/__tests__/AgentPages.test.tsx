@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { useAgentDetail, useAgentMutations, useAgents } from "../hooks";
 import { formatAgentUpdatedAt } from "../components/AgentTable";
 import { AgentListPage } from "../pages/AgentListPage";
+import { AgentCreatePage, AgentEditPage } from "../pages/AgentFormPage";
 import type { AgentDetail, AgentSummary } from "../types";
 import { useLlmProviders } from "../../llmProviders/hooks";
 import type { LlmProviderSummary } from "../../llmProviders/types";
@@ -78,6 +79,8 @@ beforeEach(() => {
   refetchProviders.mockReset();
   createAgent.mockReset();
   updateAgentDraft.mockReset();
+  createAgent.mockResolvedValue(detail);
+  updateAgentDraft.mockResolvedValue(detail);
 
   vi.mocked(useAgents).mockReturnValue({
     data: [agent, enabledProviderAgent, disabledProviderAgent, missingProviderAgent],
@@ -185,6 +188,52 @@ describe("Agent pages", () => {
     expect(formatAgentUpdatedAt("2026-05-28T02:00:00Z")).toBe(
       new Date("2026-05-28T02:00:00Z").toLocaleString(),
     );
+  });
+
+  it("creates an agent and returns to the list", async () => {
+    render(
+      <MemoryRouter initialEntries={["/agents/new"]}>
+        <Routes>
+          <Route element={<AgentCreatePage />} path="/agents/new" />
+          <Route element={<div>Agent 列表</div>} path="/agents" />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Agent 名称"), {
+      target: { value: "Release Reviewer" },
+    });
+    fireEvent.change(screen.getByLabelText("System Prompt"), {
+      target: { value: "You are careful." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    await waitFor(() => expect(createAgent).toHaveBeenCalled());
+    expect(screen.getByText("Agent 列表")).toBeInTheDocument();
+  });
+
+  it("edits an existing agent and returns to the list", async () => {
+    render(
+      <MemoryRouter initialEntries={["/agents/agent-1/edit"]}>
+        <Routes>
+          <Route element={<AgentEditPage />} path="/agents/:agentId/edit" />
+          <Route element={<div>Agent 列表</div>} path="/agents" />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText("Agent 名称"), {
+      target: { value: "Release Reviewer Updated" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    await waitFor(() =>
+      expect(updateAgentDraft).toHaveBeenCalledWith(
+        "agent-1",
+        expect.objectContaining({ display_name: "Release Reviewer Updated" }),
+      ),
+    );
+    expect(screen.getByText("Agent 列表")).toBeInTheDocument();
   });
 });
 
