@@ -49,7 +49,7 @@ async def test_create_check_persists_business_fields(session) -> None:
     assert check.env_key == "dev"
     assert check.status == "pending"
     assert check.thread_id
-    assert check.checkpoint_ns == "sop_quality"
+    assert check.checkpoint_ns == ""
 
 
 async def test_duplicate_active_check_returns_active_id(session) -> None:

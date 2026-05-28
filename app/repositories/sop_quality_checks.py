@@ -41,7 +41,7 @@ class SopQualityCheckRepository:
             graph_name=graph_name,
             graph_version=graph_version,
             thread_id=str(uuid4()),
-            checkpoint_ns=graph_name,
+            checkpoint_ns="",
             status="pending",
             sop_snapshot=sop_snapshot,
             created_by=created_by,

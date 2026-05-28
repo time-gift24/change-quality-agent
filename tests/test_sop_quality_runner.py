@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 import pytest
+from langgraph.checkpoint.memory import InMemorySaver
 
 from app.services.sop_quality_runner import run_sop_quality_check
 
@@ -59,3 +60,18 @@ async def test_runner_marks_success_and_writes_lifecycle_events() -> None:
     assert repository.events[1]["event_type"] == "started"
     assert repository.terminal["status"] == "succeeded"
     assert repository.terminal["result"]["quality_result"] in {"pass", "warn"}
+
+
+@pytest.mark.asyncio
+async def test_runner_reads_latest_top_level_checkpoint() -> None:
+    check = FakeCheck()
+    repository = FakeRepository(check)
+
+    result = await run_sop_quality_check(
+        check.id,
+        repository,
+        checkpointer=InMemorySaver(),
+    )
+
+    assert result["status"] == "succeeded"
+    assert check.current_checkpoint_id

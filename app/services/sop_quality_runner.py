@@ -7,6 +7,9 @@ from app.core.database import async_session
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.services.sop_quality_streaming import SopQualityBroadcast
 
+# LangGraph treats non-empty checkpoint namespaces as subgraph paths.
+TOP_LEVEL_CHECKPOINT_NS = ""
+
 
 async def run_sop_quality_check(
     check_id: UUID,
@@ -26,12 +29,7 @@ async def run_sop_quality_check(
         await broadcast.publish(check_id, {"type": "started"})
 
     graph = build_sop_quality_graph(checkpointer=checkpointer)
-    config = {
-        "configurable": {
-            "thread_id": check.thread_id,
-            "checkpoint_ns": check.checkpoint_ns,
-        }
-    }
+    config = _top_level_checkpoint_config(check.thread_id)
     initial_state = {
         "check_id": str(check.id),
         "sop_id": check.sop_id,
@@ -107,3 +105,12 @@ def _checkpoint_id_from_config(config: dict[str, Any] | None) -> str | None:
         return None
     checkpoint_id = configurable.get("checkpoint_id")
     return checkpoint_id if isinstance(checkpoint_id, str) else None
+
+
+def _top_level_checkpoint_config(thread_id: str) -> dict[str, Any]:
+    return {
+        "configurable": {
+            "thread_id": thread_id,
+            "checkpoint_ns": TOP_LEVEL_CHECKPOINT_NS,
+        }
+    }
