@@ -7,10 +7,7 @@ import pytest
 from app.api import deps
 from app.core.database import get_session
 from app.main import app
-from app.repositories.llm_providers import (
-    LlmProviderAlreadyExistsError,
-    LlmProviderNotFoundError,
-)
+from app.repositories.llm_providers import LlmProviderNotFoundError
 
 
 class FakeSession:
@@ -25,13 +22,12 @@ class FakeProvider:
     def __init__(
         self,
         *,
-        key: str = "openai_main",
+        provider_id=None,
         display_name: str = "OpenAI Main",
         provider_type: str = "openai",
         api_key: str | None = "sk-secret",
     ) -> None:
-        self.id = uuid4()
-        self.key = key
+        self.id = provider_id or uuid4()
         self.display_name = display_name
         self.description = "Primary provider"
         self.provider_type = provider_type
@@ -50,47 +46,46 @@ class FakeProvider:
 
 class FakeRepository:
     def __init__(self) -> None:
-        self.providers = {"openai_main": FakeProvider()}
+        provider = FakeProvider()
+        self.provider_id = provider.id
+        self.providers = {provider.id: provider}
         self.created_values: dict[str, object] | None = None
         self.updated_values: dict[str, object] | None = None
-        self.deleted_key: str | None = None
+        self.deleted_id = None
 
     async def list(self):
         return list(self.providers.values())
 
-    async def get_by_key(self, key: str):
-        return self.providers.get(key)
+    async def get_by_id(self, provider_id):
+        return self.providers.get(provider_id)
 
     async def create(self, **values):
-        if values["key"] in self.providers:
-            raise LlmProviderAlreadyExistsError(values["key"])
         self.created_values = values
         provider = FakeProvider(
-            key=values["key"],
             display_name=values["display_name"],
             provider_type=values["provider_type"],
             api_key=values.get("api_key"),
         )
         for field, value in values.items():
             setattr(provider, field, value)
-        self.providers[provider.key] = provider
+        self.providers[provider.id] = provider
         return provider
 
-    async def update(self, key: str, **values):
-        provider = self.providers.get(key)
+    async def update(self, provider_id, **values):
+        provider = self.providers.get(provider_id)
         if provider is None:
-            raise LlmProviderNotFoundError(key)
+            raise LlmProviderNotFoundError(provider_id)
         self.updated_values = values
         for field, value in values.items():
             setattr(provider, field, value)
         return provider
 
-    async def soft_delete(self, key: str):
-        provider = self.providers.get(key)
+    async def soft_delete(self, provider_id):
+        provider = self.providers.get(provider_id)
         if provider is None:
-            raise LlmProviderNotFoundError(key)
-        self.deleted_key = key
-        del self.providers[key]
+            raise LlmProviderNotFoundError(provider_id)
+        self.deleted_id = provider_id
+        del self.providers[provider_id]
         return provider
 
 
@@ -128,7 +123,6 @@ async def test_create_provider_persists_and_masks_response() -> None:
         response = await client.post(
             "/api/v1/llm-providers",
             json={
-                "key": "azure_openai",
                 "display_name": "Azure OpenAI",
                 "description": "Azure provider",
                 "provider_type": "openai",
@@ -142,9 +136,10 @@ async def test_create_provider_persists_and_masks_response() -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert body["key"] == "azure_openai"
+    assert body["display_name"] == "Azure OpenAI"
     assert body["api_key_configured"] is True
     assert "api_key" not in body
+    assert "key" not in body
     assert repository.created_values is not None
     assert repository.created_values["api_key"] == "sk-azure"
     assert session.commits == 1
@@ -165,6 +160,7 @@ async def test_list_providers_returns_masked_summaries() -> None:
     body = response.json()
     assert body[0]["api_key_configured"] is True
     assert "api_key" not in body[0]
+    assert "key" not in body[0]
     assert body[0]["default_headers"]["Authorization"] == "********"
     assert body[0]["default_headers"]["X-Tenant"] == "quality"
 
@@ -178,7 +174,7 @@ async def test_get_provider_returns_404_when_missing() -> None:
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/v1/llm-providers/missing")
+        response = await client.get(f"/api/v1/llm-providers/{uuid4()}")
 
     assert response.status_code == 404
 
@@ -194,7 +190,7 @@ async def test_update_provider_preserves_api_key_when_omitted() -> None:
         base_url="http://test",
     ) as client:
         response = await client.patch(
-            "/api/v1/llm-providers/openai_main",
+            f"/api/v1/llm-providers/{repository.provider_id}",
             json={"display_name": "OpenAI Renamed"},
         )
 
@@ -214,7 +210,7 @@ async def test_update_provider_clears_api_key_when_null() -> None:
         base_url="http://test",
     ) as client:
         response = await client.patch(
-            "/api/v1/llm-providers/openai_main",
+            f"/api/v1/llm-providers/{repository.provider_id}",
             json={"api_key": None},
         )
 
@@ -233,7 +229,7 @@ async def test_update_provider_clears_headers_and_query_when_null() -> None:
         base_url="http://test",
     ) as client:
         response = await client.patch(
-            "/api/v1/llm-providers/openai_main",
+            f"/api/v1/llm-providers/{repository.provider_id}",
             json={"default_headers": None, "default_query": None},
         )
 
@@ -253,52 +249,14 @@ async def test_delete_provider_soft_deletes() -> None:
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        response = await client.delete("/api/v1/llm-providers/openai_main")
-        get_response = await client.get("/api/v1/llm-providers/openai_main")
+        response = await client.delete(
+            f"/api/v1/llm-providers/{repository.provider_id}"
+        )
+        get_response = await client.get(
+            f"/api/v1/llm-providers/{repository.provider_id}"
+        )
 
     assert response.status_code == 204
     assert get_response.status_code == 404
-    assert repository.deleted_key == "openai_main"
+    assert repository.deleted_id == repository.provider_id
     assert session.commits == 1
-
-
-@pytest.mark.asyncio
-async def test_create_duplicate_provider_returns_409() -> None:
-    repository = FakeRepository()
-    override_dependencies(repository, FakeSession())
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app, raise_app_exceptions=False),
-        base_url="http://test",
-    ) as client:
-        response = await client.post(
-            "/api/v1/llm-providers",
-            json={
-                "key": "openai_main",
-                "display_name": "Duplicate",
-                "provider_type": "openai",
-            },
-        )
-
-    assert response.status_code == 409
-
-
-@pytest.mark.asyncio
-async def test_invalid_provider_key_returns_422() -> None:
-    repository = FakeRepository()
-    override_dependencies(repository, FakeSession())
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app, raise_app_exceptions=False),
-        base_url="http://test",
-    ) as client:
-        response = await client.post(
-            "/api/v1/llm-providers",
-            json={
-                "key": "Invalid Key",
-                "display_name": "Invalid",
-                "provider_type": "openai",
-            },
-        )
-
-    assert response.status_code == 422

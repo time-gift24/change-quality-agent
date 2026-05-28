@@ -51,8 +51,8 @@ export function App() {
             <Route element={<ProtectedRoute route={workspaceRoutes["llm-providers"]} />}>
               <Route element={<LlmProviderListPage />} path="llm-providers" />
               <Route element={<LlmProviderCreatePage />} path="llm-providers/new" />
-              <Route element={<LlmProviderEditPage />} path="llm-providers/:providerKey/edit" />
-              <Route element={<LlmProviderDetailPage />} path="llm-providers/:providerKey" />
+              <Route element={<LlmProviderEditPage />} path="llm-providers/:providerId/edit" />
+              <Route element={<LlmProviderDetailPage />} path="llm-providers/:providerId" />
             </Route>
             <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>

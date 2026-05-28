@@ -7,11 +7,7 @@ import pytest
 from app.api import deps
 from app.core.database import get_session
 from app.main import app
-from app.repositories.agents import (
-    AgentDraftInvalidError,
-    AgentKeyExistsError,
-    AgentNotFoundError,
-)
+from app.repositories.agents import AgentDraftInvalidError, AgentNotFoundError
 from app.schemas.agents import AgentDraftConfig
 
 
@@ -39,7 +35,7 @@ class FakeVersion:
         self.version_number = version_number
         self.system_prompt = "You are careful."
         self.model = "openai:gpt-5-mini"
-        self.provider_key = None
+        self.provider_id = None
         self.model_config = {"temperature": 0}
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
@@ -51,13 +47,11 @@ class FakeAgent:
     def __init__(
         self,
         *,
-        key: str = "release-reviewer",
         display_name: str = "Release Reviewer",
         description: str | None = "Checks release quality",
         draft_config: dict[str, object] | None = None,
     ) -> None:
         self.id = uuid4()
-        self.key = key
         self.display_name = display_name
         self.description = description
         self.enabled = True
@@ -73,30 +67,26 @@ class FakeAgentRepository:
         self,
         *,
         agents: list[FakeAgent] | None = None,
-        duplicate_key: str | None = None,
-        invalid_publish_key: str | None = None,
+        invalid_publish_id=None,
     ) -> None:
-        self.agents = {agent.key: agent for agent in agents or []}
-        self.versions: dict[str, list[FakeVersion]] = {key: [] for key in self.agents}
-        self.duplicate_key = duplicate_key
-        self.invalid_publish_key = invalid_publish_key
+        self.agents = {agent.id: agent for agent in agents or []}
+        self.versions: dict[object, list[FakeVersion]] = {
+            agent.id: [] for agent in agents or []
+        }
+        self.invalid_publish_id = invalid_publish_id
         self.list_include_deleted: list[bool] = []
-        self.updated_key: str | None = None
+        self.updated_id = None
         self.updated_kwargs: dict[str, object] | None = None
-        self.deleted_key: str | None = None
+        self.deleted_id = None
 
     async def create_agent(self, **kwargs):
-        key = kwargs["key"]
-        if key == self.duplicate_key:
-            raise AgentKeyExistsError(key)
         agent = FakeAgent(
-            key=key,
             display_name=kwargs["display_name"],
             description=kwargs["description"],
             draft_config=to_draft_payload(kwargs["draft"]),
         )
-        self.agents[key] = agent
-        self.versions[key] = []
+        self.agents[agent.id] = agent
+        self.versions[agent.id] = []
         return agent
 
     async def list_agents(self, *, include_deleted: bool = False):
@@ -106,19 +96,19 @@ class FakeAgentRepository:
             agents = [agent for agent in agents if agent.deleted_at is None]
         return agents
 
-    async def get_agent(self, key: str, *, include_deleted: bool = False):
-        agent = self.agents.get(key)
+    async def get_agent(self, agent_id, *, include_deleted: bool = False):
+        agent = self.agents.get(agent_id)
         if agent is None:
             return None
         if agent.deleted_at is not None and not include_deleted:
             return None
         return agent
 
-    async def update_draft(self, key: str, **kwargs):
-        agent = self.agents.get(key)
+    async def update_draft(self, agent_id, **kwargs):
+        agent = self.agents.get(agent_id)
         if agent is None:
-            raise AgentNotFoundError(key)
-        self.updated_key = key
+            raise AgentNotFoundError(agent_id)
+        self.updated_id = agent_id
         self.updated_kwargs = kwargs
         if "display_name" in kwargs:
             agent.display_name = kwargs["display_name"]
@@ -130,38 +120,38 @@ class FakeAgentRepository:
             agent.draft_config = to_draft_payload(kwargs["draft"])
         return agent
 
-    async def publish_agent(self, key: str):
-        agent = self.agents.get(key)
+    async def publish_agent(self, agent_id):
+        agent = self.agents.get(agent_id)
         if agent is None:
-            raise AgentNotFoundError(key)
-        if key == self.invalid_publish_key:
-            raise AgentDraftInvalidError(key)
+            raise AgentNotFoundError(agent_id)
+        if agent_id == self.invalid_publish_id:
+            raise AgentDraftInvalidError(agent_id)
         version = FakeVersion(
             agent_id=agent.id,
-            version_number=len(self.versions.setdefault(key, [])) + 1,
+            version_number=len(self.versions.setdefault(agent_id, [])) + 1,
         )
-        self.versions[key].append(version)
+        self.versions[agent_id].append(version)
         agent.latest_version = version
         return version
 
-    async def list_versions(self, key: str):
+    async def list_versions(self, agent_id):
         return sorted(
-            self.versions.get(key, []),
+            self.versions.get(agent_id, []),
             key=lambda version: version.version_number,
             reverse=True,
         )
 
-    async def get_version_by_number(self, key: str, version_number: int):
-        for version in self.versions.get(key, []):
+    async def get_version_by_number(self, agent_id, version_number: int):
+        for version in self.versions.get(agent_id, []):
             if version.version_number == version_number:
                 return version
         return None
 
-    async def soft_delete(self, key: str):
-        agent = self.agents.get(key)
+    async def soft_delete(self, agent_id):
+        agent = self.agents.get(agent_id)
         if agent is None:
-            raise AgentNotFoundError(key)
-        self.deleted_key = key
+            raise AgentNotFoundError(agent_id)
+        self.deleted_id = agent_id
         agent.deleted_at = BASE_TIME + timedelta(minutes=5)
         return agent
 
@@ -177,7 +167,7 @@ def draft_payload() -> dict[str, object]:
     return {
         "system_prompt": "You are careful.",
         "model": "openai:gpt-5-mini",
-        "provider_key": None,
+        "provider_id": None,
         "model_config": {"temperature": 0},
         "tool_allowlist": ["search_sop"],
         "mcp_server_ids": ["change-docs"],
@@ -190,9 +180,8 @@ def to_draft_payload(draft: object) -> dict[str, object]:
     return dict(draft)
 
 
-def create_payload(key: str = "release-reviewer") -> dict[str, object]:
+def create_payload() -> dict[str, object]:
     return {
-        "key": key,
         "display_name": "Release Reviewer",
         "description": "Checks release quality",
         "draft": draft_payload(),
@@ -227,7 +216,8 @@ async def test_create_agent_returns_detail_and_commits() -> None:
 
     assert response.status_code == 201
     body = response.json()
-    assert body["key"] == "release-reviewer"
+    assert body["display_name"] == "Release Reviewer"
+    assert "key" not in body
     assert body["has_draft"] is True
     assert body["draft"]["model_config"] == {"temperature": 0}
     assert body["latest_version"] is None
@@ -235,28 +225,14 @@ async def test_create_agent_returns_detail_and_commits() -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_agent_returns_409_when_key_exists() -> None:
-    repository = FakeAgentRepository(duplicate_key="release-reviewer")
-    override_dependencies(repository, FakeSession())
-
-    async with AsyncClient(
-        transport=ASGITransport(app=app, raise_app_exceptions=False),
-        base_url="http://test",
-    ) as client:
-        response = await client.post("/api/agents", json=create_payload())
-
-    assert response.status_code == 409
-
-
-@pytest.mark.asyncio
 async def test_list_agents_returns_summaries_without_deleted_by_default() -> None:
     active_agent = FakeAgent()
-    deleted_agent = FakeAgent(key="deleted-reviewer", display_name="Deleted Reviewer")
+    deleted_agent = FakeAgent(display_name="Deleted Reviewer")
     deleted_agent.deleted_at = BASE_TIME
     repository = FakeAgentRepository(agents=[active_agent, deleted_agent])
     version = FakeVersion(agent_id=active_agent.id)
     active_agent.latest_version = version
-    repository.versions[active_agent.key].append(version)
+    repository.versions[active_agent.id].append(version)
     override_dependencies(repository, FakeSession())
 
     async with AsyncClient(
@@ -267,7 +243,7 @@ async def test_list_agents_returns_summaries_without_deleted_by_default() -> Non
 
     assert response.status_code == 200
     body = response.json()
-    assert [agent["key"] for agent in body] == ["release-reviewer"]
+    assert [agent["id"] for agent in body] == [str(active_agent.id)]
     assert body[0]["latest_version"]["version_number"] == 1
     assert "draft" not in body[0]
     assert repository.list_include_deleted == [False]
@@ -276,7 +252,7 @@ async def test_list_agents_returns_summaries_without_deleted_by_default() -> Non
 @pytest.mark.asyncio
 async def test_list_agents_can_include_deleted() -> None:
     active_agent = FakeAgent()
-    deleted_agent = FakeAgent(key="deleted-reviewer", display_name="Deleted Reviewer")
+    deleted_agent = FakeAgent(display_name="Deleted Reviewer")
     deleted_agent.deleted_at = BASE_TIME
     repository = FakeAgentRepository(agents=[active_agent, deleted_agent])
     override_dependencies(repository, FakeSession())
@@ -288,9 +264,9 @@ async def test_list_agents_can_include_deleted() -> None:
         response = await client.get("/api/agents?include_deleted=true")
 
     assert response.status_code == 200
-    assert [agent["key"] for agent in response.json()] == [
-        "release-reviewer",
-        "deleted-reviewer",
+    assert [agent["id"] for agent in response.json()] == [
+        str(active_agent.id),
+        str(deleted_agent.id),
     ]
     assert repository.list_include_deleted == [True]
 
@@ -303,14 +279,15 @@ async def test_get_agent_returns_404_when_missing() -> None:
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/agents/missing-agent")
+        response = await client.get(f"/api/agents/{uuid4()}")
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_patch_draft_preserves_explicit_body_fields() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
     session = FakeSession()
     override_dependencies(repository, session)
     patch_payload = {
@@ -327,10 +304,7 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.patch(
-            "/api/agents/release-reviewer/draft",
-            json=patch_payload,
-        )
+        response = await client.patch(f"/api/agents/{agent.id}/draft", json=patch_payload)
 
     assert response.status_code == 200
     body = response.json()
@@ -338,7 +312,7 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
     assert body["enabled"] is False
     assert body["draft"]["system_prompt"] == "Review only risky changes."
     assert body["draft"]["model_config"] == {"temperature": 0.2}
-    assert repository.updated_key == "release-reviewer"
+    assert repository.updated_id == agent.id
     assert repository.updated_kwargs is not None
     assert repository.updated_kwargs["description"] is None
     assert repository.updated_kwargs["enabled"] is False
@@ -347,8 +321,10 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
 
 
 @pytest.mark.asyncio
-async def test_patch_draft_accepts_provider_key_with_bare_model() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+async def test_patch_draft_accepts_provider_id_with_bare_model() -> None:
+    agent = FakeAgent()
+    provider_id = uuid4()
+    repository = FakeAgentRepository(agents=[agent])
     session = FakeSession()
     override_dependencies(repository, session)
 
@@ -357,27 +333,28 @@ async def test_patch_draft_accepts_provider_key_with_bare_model() -> None:
         base_url="http://test",
     ) as client:
         response = await client.patch(
-            "/api/agents/release-reviewer/draft",
+            f"/api/agents/{agent.id}/draft",
             json={
                 "draft": {
                     **draft_payload(),
                     "model": "gpt-5-mini",
-                    "provider_key": "openai_main",
+                    "provider_id": str(provider_id),
                 },
             },
         )
 
     assert response.status_code == 200
-    assert response.json()["draft"]["provider_key"] == "openai_main"
+    assert response.json()["draft"]["provider_id"] == str(provider_id)
     assert repository.updated_kwargs is not None
     draft = repository.updated_kwargs["draft"]
     assert isinstance(draft, AgentDraftConfig)
-    assert draft.provider_key == "openai_main"
+    assert draft.provider_id == provider_id
 
 
 @pytest.mark.asyncio
-async def test_patch_draft_rejects_provider_key_with_prefixed_model() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+async def test_patch_draft_rejects_provider_id_with_prefixed_model() -> None:
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
     override_dependencies(repository, FakeSession())
 
     async with AsyncClient(
@@ -385,12 +362,12 @@ async def test_patch_draft_rejects_provider_key_with_prefixed_model() -> None:
         base_url="http://test",
     ) as client:
         response = await client.patch(
-            "/api/agents/release-reviewer/draft",
+            f"/api/agents/{agent.id}/draft",
             json={
                 "draft": {
                     **draft_payload(),
                     "model": "openai:gpt-5-mini",
-                    "provider_key": "openai_main",
+                    "provider_id": str(uuid4()),
                 },
             },
         )
@@ -400,7 +377,8 @@ async def test_patch_draft_rejects_provider_key_with_prefixed_model() -> None:
 
 @pytest.mark.asyncio
 async def test_publish_agent_returns_created_version_detail() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
     session = FakeSession()
     override_dependencies(repository, session)
 
@@ -408,30 +386,28 @@ async def test_publish_agent_returns_created_version_detail() -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.post("/api/agents/release-reviewer/publish")
+        response = await client.post(f"/api/agents/{agent.id}/publish")
 
     assert response.status_code == 201
     body = response.json()
     assert body["version_number"] == 1
     assert body["model_config"] == {"temperature": 0}
-    assert body["provider_key"] is None
+    assert body["provider_id"] is None
     assert "model_parameters" not in body
     assert session.commits == 1
 
 
 @pytest.mark.asyncio
 async def test_publish_agent_returns_400_for_invalid_draft() -> None:
-    repository = FakeAgentRepository(
-        agents=[FakeAgent()],
-        invalid_publish_key="release-reviewer",
-    )
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent], invalid_publish_id=agent.id)
     override_dependencies(repository, FakeSession())
 
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        response = await client.post("/api/agents/release-reviewer/publish")
+        response = await client.post(f"/api/agents/{agent.id}/publish")
 
     assert response.status_code == 400
 
@@ -440,7 +416,7 @@ async def test_publish_agent_returns_400_for_invalid_draft() -> None:
 async def test_list_versions_returns_descending_summaries() -> None:
     agent = FakeAgent()
     repository = FakeAgentRepository(agents=[agent])
-    repository.versions[agent.key] = [
+    repository.versions[agent.id] = [
         FakeVersion(agent_id=agent.id, version_number=1, published_at=BASE_TIME),
         FakeVersion(
             agent_id=agent.id,
@@ -454,7 +430,7 @@ async def test_list_versions_returns_descending_summaries() -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/agents/release-reviewer/versions")
+        response = await client.get(f"/api/agents/{agent.id}/versions")
 
     assert response.status_code == 200
     assert [version["version_number"] for version in response.json()] == [2, 1]
@@ -464,40 +440,42 @@ async def test_list_versions_returns_descending_summaries() -> None:
 async def test_get_version_returns_detail_or_404() -> None:
     agent = FakeAgent()
     repository = FakeAgentRepository(agents=[agent])
-    repository.versions[agent.key] = [FakeVersion(agent_id=agent.id, version_number=3)]
+    repository.versions[agent.id] = [FakeVersion(agent_id=agent.id, version_number=3)]
     override_dependencies(repository, FakeSession())
 
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        found = await client.get("/api/agents/release-reviewer/versions/3")
-        missing = await client.get("/api/agents/release-reviewer/versions/99")
+        found = await client.get(f"/api/agents/{agent.id}/versions/3")
+        missing = await client.get(f"/api/agents/{agent.id}/versions/99")
 
     assert found.status_code == 200
     assert found.json()["version_number"] == 3
     assert found.json()["model_config"] == {"temperature": 0}
-    assert found.json()["provider_key"] is None
+    assert found.json()["provider_id"] is None
     assert missing.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_get_version_rejects_non_positive_version_number() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
     override_dependencies(repository, FakeSession())
 
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/agents/release-reviewer/versions/0")
+        response = await client.get(f"/api/agents/{agent.id}/versions/0")
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_delete_agent_returns_no_content_and_commits() -> None:
-    repository = FakeAgentRepository(agents=[FakeAgent()])
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
     session = FakeSession()
     override_dependencies(repository, session)
 
@@ -505,9 +483,9 @@ async def test_delete_agent_returns_no_content_and_commits() -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.delete("/api/agents/release-reviewer")
+        response = await client.delete(f"/api/agents/{agent.id}")
 
     assert response.status_code == 204
     assert response.content == b""
-    assert repository.deleted_key == "release-reviewer"
+    assert repository.deleted_id == agent.id
     assert session.commits == 1

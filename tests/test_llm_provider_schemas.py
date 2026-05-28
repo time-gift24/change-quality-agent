@@ -2,30 +2,16 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
-import pytest
-from pydantic import ValidationError
-
 from app.schemas.llm_providers import (
-    LlmProviderCreate,
     LlmProviderDetail,
     LlmProviderUpdate,
 )
-
-
-def test_create_rejects_invalid_key() -> None:
-    with pytest.raises(ValidationError, match="String should match pattern"):
-        LlmProviderCreate(
-            key="OpenAI Main",
-            display_name="OpenAI",
-            provider_type="openai",
-        )
 
 
 def test_detail_masks_secret_like_values_and_reports_api_key_configured() -> None:
     detail = LlmProviderDetail.model_validate(
         SimpleNamespace(
             id=uuid4(),
-            key="openai_main",
             display_name="OpenAI",
             description=None,
             provider_type="openai",
@@ -63,7 +49,6 @@ def test_detail_reports_missing_api_key() -> None:
     detail = LlmProviderDetail.model_validate(
         SimpleNamespace(
             id=uuid4(),
-            key="openai_main",
             display_name="OpenAI",
             description=None,
             provider_type="openai",

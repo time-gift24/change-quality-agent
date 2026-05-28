@@ -39,7 +39,6 @@ describe("LLM provider API", () => {
       default_query: { "api-version": "2026-01-01" },
       display_name: "OpenAI Main",
       enabled: true,
-      key: "openai_main",
       provider_type: "openai",
     };
     const detail = buildProvider();
@@ -57,7 +56,7 @@ describe("LLM provider API", () => {
     );
   });
 
-  it("calls get and patch endpoints with encoded provider key", async () => {
+  it("calls get and patch endpoints with encoded provider id", async () => {
     const detail = buildProvider();
     const fetchMock = vi
       .fn()
@@ -65,17 +64,17 @@ describe("LLM provider API", () => {
       .mockResolvedValueOnce(jsonResponse(detail));
     vi.stubGlobal("fetch", fetchMock);
 
-    await getLlmProvider("openai/main");
-    await updateLlmProvider("openai/main", { display_name: "OpenAI Renamed" });
+    await getLlmProvider("provider-1");
+    await updateLlmProvider("provider-1", { display_name: "OpenAI Renamed" });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "/api/v1/llm-providers/openai%2Fmain",
+      "/api/v1/llm-providers/provider-1",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "/api/v1/llm-providers/openai%2Fmain",
+      "/api/v1/llm-providers/provider-1",
       expect.objectContaining({
         body: JSON.stringify({ display_name: "OpenAI Renamed" }),
         method: "PATCH",
@@ -87,10 +86,10 @@ describe("LLM provider API", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(deleteLlmProvider("openai_main")).resolves.toBeUndefined();
+    await expect(deleteLlmProvider("provider-1")).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/llm-providers/openai_main",
+      "/api/v1/llm-providers/provider-1",
       expect.objectContaining({
         headers: expect.any(Headers),
         method: "DELETE",
@@ -123,7 +122,6 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
-    key: "openai_main",
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

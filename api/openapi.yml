@@ -565,6 +565,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/LlmProviderSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
       tags:
       - llm-providers
@@ -583,22 +585,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LlmProviderDetail'
-        '409':
-          description: LLM provider key already exists.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/v1/llm-providers/{provider_key}:
+  /api/v1/llm-providers/{provider_id}:
     get:
       tags:
       - llm-providers
       summary: Get an LLM provider
       operationId: getLlmProvider
       parameters:
-      - $ref: '#/components/parameters/LlmProviderKey'
+      - $ref: '#/components/parameters/LlmProviderId'
       responses:
         '200':
           description: LLM provider detail with masked secret-like config values.
@@ -612,6 +610,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
     patch:
@@ -620,7 +620,7 @@ paths:
       summary: Update an LLM provider
       operationId: updateLlmProvider
       parameters:
-      - $ref: '#/components/parameters/LlmProviderKey'
+      - $ref: '#/components/parameters/LlmProviderId'
       requestBody:
         required: true
         content:
@@ -640,6 +640,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
@@ -648,7 +650,7 @@ paths:
       summary: Delete an LLM provider
       operationId: deleteLlmProvider
       parameters:
-      - $ref: '#/components/parameters/LlmProviderKey'
+      - $ref: '#/components/parameters/LlmProviderId'
       responses:
         '204':
           description: LLM provider deleted.
@@ -658,6 +660,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
   /api/agents:
@@ -704,24 +708,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
-        '409':
-          description: Agent key already exists.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}:
+  /api/agents/{agent_id}:
     get:
       tags:
       - agents
       summary: Get a ReAct agent
       operationId: getAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
           description: Agent detail including the current draft, when present.
@@ -745,7 +743,7 @@ paths:
       summary: Delete a ReAct agent
       operationId: deleteAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '204':
           description: Agent deleted.
@@ -759,14 +757,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/draft:
+  /api/agents/{agent_id}/draft:
     patch:
       tags:
       - agents
       summary: Update a ReAct agent draft
       operationId: updateAgentDraft
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       requestBody:
         required: true
         content:
@@ -790,14 +788,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/publish:
+  /api/agents/{agent_id}/publish:
     post:
       tags:
       - agents
       summary: Publish a ReAct agent draft
       operationId: publishAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '201':
           description: Published agent version.
@@ -821,14 +819,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/versions:
+  /api/agents/{agent_id}/versions:
     get:
       tags:
       - agents
       summary: List published ReAct agent versions
       operationId: listAgentVersions
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
           description: Published versions for the agent.
@@ -848,14 +846,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/versions/{version_number}:
+  /api/agents/{agent_id}/versions/{version_number}:
     get:
       tags:
       - agents
       summary: Get a published ReAct agent version
       operationId: getAgentVersion
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       - $ref: '#/components/parameters/AgentVersionNumber'
       responses:
         '200':
@@ -874,14 +872,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/test-runs:
+  /api/agents/{agent_id}/test-runs:
     post:
       tags:
       - agents
       summary: Start a ReAct agent test run
       operationId: startAgentTestRun
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       requestBody:
         required: true
         content:
@@ -946,13 +944,13 @@ components:
       schema:
         type: string
       example: dev
-    AgentKey:
-      name: agent_key
+    AgentId:
+      name: agent_id
       in: path
       required: true
       schema:
         type: string
-      example: release-reviewer
+        format: uuid
     AgentVersionNumber:
       name: version_number
       in: path
@@ -961,14 +959,13 @@ components:
         type: integer
         minimum: 1
       example: 1
-    LlmProviderKey:
-      name: provider_key
+    LlmProviderId:
+      name: provider_id
       in: path
       required: true
       schema:
         type: string
-        pattern: ^[a-z0-9][a-z0-9_-]*$
-      example: openai_main
+        format: uuid
   responses:
     Unauthorized:
       description: Authentication is required or the session cookie is invalid.
@@ -1465,14 +1462,9 @@ components:
     LlmProviderCreate:
       type: object
       required:
-      - key
       - display_name
       - provider_type
       properties:
-        key:
-          type: string
-          pattern: ^[a-z0-9][a-z0-9_-]*$
-          example: openai_main
         display_name:
           type: string
           example: OpenAI Main
@@ -1538,7 +1530,6 @@ components:
       type: object
       required:
       - id
-      - key
       - display_name
       - provider_type
       - default_headers
@@ -1551,9 +1542,6 @@ components:
         id:
           type: string
           format: uuid
-        key:
-          type: string
-          example: openai_main
         display_name:
           type: string
           example: OpenAI Main
@@ -1604,11 +1592,11 @@ components:
         model:
           type: string
           minLength: 1
-        provider_key:
+        provider_id:
           type: string
+          format: uuid
           nullable: true
-          pattern: ^[a-z0-9][a-z0-9_-]*$
-          description: Stored provider key. When set, model must be a bare model name without a provider prefix.
+          description: Stored provider id. When set, model must be a bare model name without a provider prefix.
         model_config:
           type: object
           additionalProperties: true
@@ -1623,14 +1611,9 @@ components:
     AgentCreate:
       type: object
       required:
-      - key
       - display_name
       - draft
       properties:
-        key:
-          type: string
-          pattern: ^[a-z0-9][a-z0-9_-]*$
-          example: release-reviewer
         display_name:
           type: string
           minLength: 1
@@ -1676,10 +1659,10 @@ components:
         model:
           type: string
           example: codeagent:codeagent-v4-pro
-        provider_key:
+        provider_id:
           type: string
+          format: uuid
           nullable: true
-          example: openai_main
         published_at:
           type: string
           format: date-time
@@ -1687,7 +1670,6 @@ components:
       type: object
       required:
       - id
-      - key
       - display_name
       - enabled
       - has_draft
@@ -1697,9 +1679,6 @@ components:
         id:
           type: string
           format: uuid
-        key:
-          type: string
-          example: release-reviewer
         display_name:
           type: string
           example: Release Reviewer
@@ -1724,7 +1703,6 @@ components:
       type: object
       required:
       - id
-      - key
       - display_name
       - enabled
       - has_draft
@@ -1734,9 +1712,6 @@ components:
         id:
           type: string
           format: uuid
-        key:
-          type: string
-          example: release-reviewer
         display_name:
           type: string
           example: Release Reviewer
@@ -1780,10 +1755,10 @@ components:
         model:
           type: string
           example: codeagent:codeagent-v4-pro
-        provider_key:
+        provider_id:
           type: string
+          format: uuid
           nullable: true
-          example: openai_main
         published_at:
           type: string
           format: date-time

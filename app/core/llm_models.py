@@ -1,5 +1,6 @@
 from typing import Any
 from dataclasses import dataclass
+from uuid import UUID
 
 import httpx
 from langchain.chat_models import init_chat_model
@@ -25,7 +26,7 @@ _CODEAGENT_PROVIDER_CONFIG_KEYS = frozenset(
 
 @dataclass(frozen=True)
 class LlmProviderRuntimeConfig:
-    key: str
+    id: UUID
     provider_type: str
     base_url: str | None
     api_key: str | None
@@ -43,9 +44,11 @@ def create_chat_model(model: str, **model_config: Any) -> BaseChatModel:
         raise ValueError("CodeAgent model name is required after 'codeagent:'.")
     if not settings.codeagent_base_url:
         raise ValueError("CODEAGENT_BASE_URL is required for CodeAgent models.")
-    provider_keys = sorted(_CODEAGENT_PROVIDER_CONFIG_KEYS.intersection(model_config))
-    if provider_keys:
-        joined = ", ".join(provider_keys)
+    provider_config_keys = sorted(
+        _CODEAGENT_PROVIDER_CONFIG_KEYS.intersection(model_config)
+    )
+    if provider_config_keys:
+        joined = ", ".join(provider_config_keys)
         raise ValueError(
             f"CodeAgent model_config cannot include provider config: {joined}"
         )

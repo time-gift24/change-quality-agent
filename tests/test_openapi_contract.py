@@ -103,23 +103,23 @@ def test_agents_tag_and_paths_are_documented() -> None:
     paths = contract["paths"]
     expected_operations = {
         ("/api/agents", "get"): {"200", "422"},
-        ("/api/agents", "post"): {"201", "409", "422"},
-        ("/api/agents/{agent_key}", "get"): {"200", "404", "422"},
-        ("/api/agents/{agent_key}", "delete"): {"204", "404", "422"},
-        ("/api/agents/{agent_key}/draft", "patch"): {"200", "404", "422"},
-        ("/api/agents/{agent_key}/publish", "post"): {
+        ("/api/agents", "post"): {"201", "422"},
+        ("/api/agents/{agent_id}", "get"): {"200", "404", "422"},
+        ("/api/agents/{agent_id}", "delete"): {"204", "404", "422"},
+        ("/api/agents/{agent_id}/draft", "patch"): {"200", "404", "422"},
+        ("/api/agents/{agent_id}/publish", "post"): {
             "201",
             "400",
             "404",
             "422",
         },
-        ("/api/agents/{agent_key}/versions", "get"): {"200", "404", "422"},
-        ("/api/agents/{agent_key}/versions/{version_number}", "get"): {
+        ("/api/agents/{agent_id}/versions", "get"): {"200", "404", "422"},
+        ("/api/agents/{agent_id}/versions/{version_number}", "get"): {
             "200",
             "404",
             "422",
         },
-        ("/api/agents/{agent_key}/test-runs", "post"): {"202", "400", "404", "422"},
+        ("/api/agents/{agent_id}/test-runs", "post"): {"202", "400", "404", "422"},
     }
 
     for (path, method), statuses in expected_operations.items():
@@ -139,10 +139,10 @@ def test_llm_provider_tag_and_paths_are_documented() -> None:
     paths = contract["paths"]
     expected_operations = {
         ("/api/v1/llm-providers", "get"): {"200"},
-        ("/api/v1/llm-providers", "post"): {"201", "409", "422"},
-        ("/api/v1/llm-providers/{provider_key}", "get"): {"200", "404", "422"},
-        ("/api/v1/llm-providers/{provider_key}", "patch"): {"200", "404", "422"},
-        ("/api/v1/llm-providers/{provider_key}", "delete"): {"204", "404", "422"},
+        ("/api/v1/llm-providers", "post"): {"201", "422"},
+        ("/api/v1/llm-providers/{provider_id}", "get"): {"200", "404", "422"},
+        ("/api/v1/llm-providers/{provider_id}", "patch"): {"200", "404", "422"},
+        ("/api/v1/llm-providers/{provider_id}", "delete"): {"204", "404", "422"},
     }
 
     for (path, method), statuses in expected_operations.items():
@@ -155,12 +155,11 @@ def test_agents_parameters_are_reusable_and_referenced() -> None:
     contract = load_contract()
     parameters = contract["components"]["parameters"]
 
-    assert parameters["AgentKey"] == {
-        "name": "agent_key",
+    assert parameters["AgentId"] == {
+        "name": "agent_id",
         "in": "path",
         "required": True,
-        "schema": {"type": "string"},
-        "example": "release-reviewer",
+        "schema": {"type": "string", "format": "uuid"},
     }
     assert parameters["AgentVersionNumber"] == {
         "name": "version_number",
@@ -169,26 +168,25 @@ def test_agents_parameters_are_reusable_and_referenced() -> None:
         "schema": {"type": "integer", "minimum": 1},
         "example": 1,
     }
-    assert parameters["LlmProviderKey"] == {
-        "name": "provider_key",
+    assert parameters["LlmProviderId"] == {
+        "name": "provider_id",
         "in": "path",
         "required": True,
-        "schema": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
-        "example": "openai_main",
+        "schema": {"type": "string", "format": "uuid"},
     }
 
     paths = contract["paths"]
-    agent_key_ref = {"$ref": "#/components/parameters/AgentKey"}
+    agent_id_ref = {"$ref": "#/components/parameters/AgentId"}
     version_ref = {"$ref": "#/components/parameters/AgentVersionNumber"}
-    assert agent_key_ref in paths["/api/agents/{agent_key}"]["get"]["parameters"]
-    assert agent_key_ref in paths["/api/agents/{agent_key}/draft"]["patch"][
+    assert agent_id_ref in paths["/api/agents/{agent_id}"]["get"]["parameters"]
+    assert agent_id_ref in paths["/api/agents/{agent_id}/draft"]["patch"][
         "parameters"
     ]
-    assert version_ref in paths["/api/agents/{agent_key}/versions/{version_number}"][
+    assert version_ref in paths["/api/agents/{agent_id}/versions/{version_number}"][
         "get"
     ]["parameters"]
-    provider_ref = {"$ref": "#/components/parameters/LlmProviderKey"}
-    assert provider_ref in paths["/api/v1/llm-providers/{provider_key}"]["get"][
+    provider_ref = {"$ref": "#/components/parameters/LlmProviderId"}
+    assert provider_ref in paths["/api/v1/llm-providers/{provider_id}"]["get"][
         "parameters"
     ]
 
@@ -212,11 +210,11 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     draft_properties = schemas["AgentDraftConfig"]["properties"]
     assert "model_config" in draft_properties
     assert "model_parameters" not in draft_properties
-    assert draft_properties["provider_key"] == {
+    assert draft_properties["provider_id"] == {
         "type": "string",
+        "format": "uuid",
         "nullable": True,
-        "pattern": "^[a-z0-9][a-z0-9_-]*$",
-        "description": "Stored provider key. When set, model must be a bare model name without a provider prefix.",
+        "description": "Stored provider id. When set, model must be a bare model name without a provider prefix.",
     }
     assert schemas["AgentCreate"]["properties"]["draft"] == {
         "$ref": "#/components/schemas/AgentDraftConfig"
@@ -228,7 +226,7 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     version_properties = schemas["AgentVersionDetail"]["properties"]
     assert "model_config" in version_properties
     assert "model_parameters" not in version_properties
-    assert "provider_key" in version_properties
+    assert "provider_id" in version_properties
 
 
 def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None:
@@ -252,7 +250,7 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
 def test_agent_test_runs_response_reuses_run_start_response() -> None:
     contract = load_contract()
 
-    responses = contract["paths"]["/api/agents/{agent_key}/test-runs"]["post"][
+    responses = contract["paths"]["/api/agents/{agent_id}/test-runs"]["post"][
         "responses"
     ]
     response_schema = responses["202"]["content"]["application/json"]["schema"]

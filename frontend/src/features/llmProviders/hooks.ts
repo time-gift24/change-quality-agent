@@ -67,7 +67,7 @@ export function useLlmProviders(): AsyncStateWithRefetch<LlmProviderSummary[]> {
 }
 
 export function useLlmProviderDetail(
-  providerKey: string | null | undefined,
+  providerId: string | null | undefined,
 ): AsyncStateWithRefetch<LlmProviderDetail | null> {
   const [state, setState] = useState<AsyncState<LlmProviderDetail | null>>({
     data: null,
@@ -88,7 +88,7 @@ export function useLlmProviderDetail(
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
-    if (!providerKey) {
+    if (!providerId) {
       setState({ data: null, error: null, loading: false });
       return;
     }
@@ -96,14 +96,14 @@ export function useLlmProviderDetail(
     setState({ data: null, error: null, loading: true });
 
     try {
-      const provider = await getLlmProvider(providerKey);
+      const provider = await getLlmProvider(providerId);
       if (!mountedRef.current || requestIdRef.current !== requestId) return;
       setState({ data: provider, error: null, loading: false });
     } catch (error) {
       if (!mountedRef.current || requestIdRef.current !== requestId) return;
       setState({ data: null, error: asError(error), loading: false });
     }
-  }, [providerKey]);
+  }, [providerId]);
 
   useEffect(() => {
     void refetch();
@@ -143,15 +143,15 @@ export function useLlmProviderMutations() {
       payload: LlmProviderCreate,
       options?: MutationOptions<LlmProviderDetail>,
     ) => runMutation(() => createLlmProvider(payload), options),
-    deleteProvider: (providerKey: string, options?: MutationOptions<void>) =>
-      runMutation(() => deleteLlmProvider(providerKey), options),
+    deleteProvider: (providerId: string, options?: MutationOptions<void>) =>
+      runMutation(() => deleteLlmProvider(providerId), options),
     error,
     pending: pendingCount > 0,
     updateProvider: (
-      providerKey: string,
+      providerId: string,
       payload: LlmProviderUpdate,
       options?: MutationOptions<LlmProviderDetail>,
-    ) => runMutation(() => updateLlmProvider(providerKey, payload), options),
+    ) => runMutation(() => updateLlmProvider(providerId, payload), options),
   };
 }
 

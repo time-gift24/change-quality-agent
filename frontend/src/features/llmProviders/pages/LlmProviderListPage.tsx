@@ -15,7 +15,7 @@ export function LlmProviderListPage() {
     if (!query) return providersState.data;
     return providersState.data.filter((provider) => {
       return (
-        provider.key.toLowerCase().includes(query) ||
+        provider.id.toLowerCase().includes(query) ||
         provider.display_name.toLowerCase().includes(query) ||
         provider.provider_type.toLowerCase().includes(query)
       );

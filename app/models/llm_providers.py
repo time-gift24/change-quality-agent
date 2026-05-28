@@ -11,7 +11,6 @@ from app.core.database import Base
 class LlmProvider(Base):
     __tablename__ = "llm_providers"
     __table_args__ = (
-        Index("uq_llm_providers_key", "key", unique=True),
         Index("ix_llm_providers_deleted_at", "deleted_at"),
     )
 
@@ -20,7 +19,6 @@ class LlmProvider(Base):
         primary_key=True,
         default=uuid4,
     )
-    key: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     provider_type: Mapped[str] = mapped_column(Text, nullable=False)

@@ -69,7 +69,7 @@ describe("LLM provider pages", () => {
     );
 
     expect(screen.getByRole("main", { name: "LLM Provider 管理主内容" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /OpenAI Main/ })).toHaveAttribute("href", "/llm-providers/openai_main");
+    expect(screen.getByRole("link", { name: /OpenAI Main/ })).toHaveAttribute("href", "/llm-providers/provider-1");
     expect(screen.getByText("openai")).toBeInTheDocument();
     expect(screen.getByText("已配置")).toBeInTheDocument();
 
@@ -83,9 +83,9 @@ describe("LLM provider pages", () => {
     deleteProvider.mockResolvedValue(undefined);
 
     render(
-      <MemoryRouter initialEntries={["/llm-providers/openai_main"]}>
+      <MemoryRouter initialEntries={["/llm-providers/provider-1"]}>
         <Routes>
-          <Route element={<LlmProviderDetailPage />} path="/llm-providers/:providerKey" />
+          <Route element={<LlmProviderDetailPage />} path="/llm-providers/:providerId" />
           <Route element={<div>Provider 列表</div>} path="/llm-providers" />
         </Routes>
       </MemoryRouter>,
@@ -97,7 +97,7 @@ describe("LLM provider pages", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
 
-    await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith("openai_main"));
+    await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith("provider-1"));
     expect(screen.getByText("Provider 列表")).toBeInTheDocument();
   });
 
@@ -108,14 +108,11 @@ describe("LLM provider pages", () => {
       <MemoryRouter initialEntries={["/llm-providers/new"]}>
         <Routes>
           <Route element={<LlmProviderCreatePage />} path="/llm-providers/new" />
-          <Route element={<div>Provider 详情</div>} path="/llm-providers/:providerKey" />
+          <Route element={<div>Provider 详情</div>} path="/llm-providers/:providerId" />
         </Routes>
       </MemoryRouter>,
     );
 
-    fireEvent.change(screen.getByLabelText(/Provider Key/), {
-      target: { value: "openai_main" },
-    });
     fireEvent.change(screen.getByLabelText(/Display Name/), {
       target: { value: "OpenAI Main" },
     });
@@ -130,9 +127,9 @@ describe("LLM provider pages", () => {
 
   it("renders edit page for existing provider", () => {
     render(
-      <MemoryRouter initialEntries={["/llm-providers/openai_main/edit"]}>
+      <MemoryRouter initialEntries={["/llm-providers/provider-1/edit"]}>
         <Routes>
-          <Route element={<LlmProviderEditPage />} path="/llm-providers/:providerKey/edit" />
+          <Route element={<LlmProviderEditPage />} path="/llm-providers/:providerId/edit" />
         </Routes>
       </MemoryRouter>,
     );
@@ -153,7 +150,6 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
-    key: "openai_main",
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

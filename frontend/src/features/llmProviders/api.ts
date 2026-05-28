@@ -12,8 +12,8 @@ export function listLlmProviders(): Promise<LlmProviderSummary[]> {
   return requestJson<LlmProviderSummary[]>(LLM_PROVIDERS_BASE);
 }
 
-export function getLlmProvider(providerKey: string): Promise<LlmProviderDetail> {
-  return requestJson<LlmProviderDetail>(buildProviderUrl(providerKey));
+export function getLlmProvider(providerId: string): Promise<LlmProviderDetail> {
+  return requestJson<LlmProviderDetail>(buildProviderUrl(providerId));
 }
 
 export function createLlmProvider(
@@ -29,10 +29,10 @@ export function createLlmProvider(
 }
 
 export function updateLlmProvider(
-  providerKey: string,
+  providerId: string,
   payload: LlmProviderUpdate,
 ): Promise<LlmProviderDetail> {
-  return requestJson<LlmProviderDetail>(buildProviderUrl(providerKey), {
+  return requestJson<LlmProviderDetail>(buildProviderUrl(providerId), {
     body: JSON.stringify(payload),
     headers: {
       "Content-Type": "application/json",
@@ -41,11 +41,11 @@ export function updateLlmProvider(
   });
 }
 
-export async function deleteLlmProvider(providerKey: string): Promise<void> {
+export async function deleteLlmProvider(providerId: string): Promise<void> {
   const headers = new Headers();
   headers.set("Accept", "application/json");
 
-  const response = await fetch(buildProviderUrl(providerKey), {
+  const response = await fetch(buildProviderUrl(providerId), {
     headers,
     method: "DELETE",
   });
@@ -55,6 +55,6 @@ export async function deleteLlmProvider(providerKey: string): Promise<void> {
   }
 }
 
-function buildProviderUrl(providerKey: string): string {
-  return `${LLM_PROVIDERS_BASE}/${encodeURIComponent(providerKey)}`;
+function buildProviderUrl(providerId: string): string {
+  return `${LLM_PROVIDERS_BASE}/${encodeURIComponent(providerId)}`;
 }

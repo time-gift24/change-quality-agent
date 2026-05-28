@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from uuid import uuid4
 
 from app.core import llm_models
 from app.core.config import settings
@@ -71,7 +72,7 @@ def test_create_provider_chat_model_passes_provider_config_to_init_chat_model(
 
     monkeypatch.setattr(llm_models, "init_chat_model", fake_init_chat_model)
     provider = LlmProviderRuntimeConfig(
-        key="openai_main",
+        id=uuid4(),
         provider_type="openai",
         base_url="https://api.openai.com/v1",
         api_key="sk-test",
@@ -115,7 +116,7 @@ def test_create_provider_chat_model_omits_empty_provider_config(
 
     monkeypatch.setattr(llm_models, "init_chat_model", fake_init_chat_model)
     provider = LlmProviderRuntimeConfig(
-        key="anthropic_main",
+        id=uuid4(),
         provider_type="anthropic",
         base_url=None,
         api_key=None,
@@ -195,7 +196,7 @@ def test_create_chat_model_requires_codeagent_refresh_implementation(
 
 
 @pytest.mark.parametrize(
-    "provider_key",
+    "provider_config_key",
     [
         "api_key",
         "api_base",
@@ -207,12 +208,12 @@ def test_create_chat_model_requires_codeagent_refresh_implementation(
 )
 def test_create_chat_model_rejects_codeagent_provider_config_in_model_config(
     monkeypatch: pytest.MonkeyPatch,
-    provider_key: str,
+    provider_config_key: str,
 ) -> None:
     monkeypatch.setattr(settings, "codeagent_base_url", "https://llm.internal/v1")
 
     with pytest.raises(ValueError, match="provider config"):
         llm_models.create_chat_model(
             "codeagent:codeagent-v4-pro",
-            **{provider_key: "x"},
+            **{provider_config_key: "x"},
         )

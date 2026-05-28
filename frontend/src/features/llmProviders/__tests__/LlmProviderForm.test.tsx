@@ -16,9 +16,6 @@ describe("LlmProviderForm", () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(<LlmProviderForm mode="create" onCreate={onCreate} provider={null} />);
 
-    fireEvent.change(screen.getByLabelText(/Provider Key/), {
-      target: { value: "openai_main" },
-    });
     fireEvent.change(screen.getByLabelText(/Display Name/), {
       target: { value: "OpenAI Main" },
     });
@@ -48,7 +45,6 @@ describe("LlmProviderForm", () => {
       description: null,
       display_name: "OpenAI Main",
       enabled: true,
-      key: "openai_main",
       provider_type: "openai",
     });
   });
@@ -69,9 +65,9 @@ describe("LlmProviderForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存 Provider" }));
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
-    expect(onUpdate).toHaveBeenCalledWith("openai_main", expect.not.objectContaining({ api_key: expect.anything() }));
+    expect(onUpdate).toHaveBeenCalledWith("provider-1", expect.not.objectContaining({ api_key: expect.anything() }));
     expect(onUpdate).toHaveBeenCalledWith(
-      "openai_main",
+      "provider-1",
       expect.not.objectContaining({ default_headers: expect.anything() }),
     );
 
@@ -80,7 +76,7 @@ describe("LlmProviderForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存 Provider" }));
 
     await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
-    expect(onUpdate).toHaveBeenCalledWith("openai_main", expect.objectContaining({ api_key: null }));
+    expect(onUpdate).toHaveBeenCalledWith("provider-1", expect.objectContaining({ api_key: null }));
   });
 
   it("rejects changed redacted header placeholders on edit", async () => {
@@ -106,9 +102,6 @@ describe("LlmProviderForm", () => {
     const onCreate = vi.fn();
     render(<LlmProviderForm mode="create" onCreate={onCreate} provider={null} />);
 
-    fireEvent.change(screen.getByLabelText(/Provider Key/), {
-      target: { value: "openai_main" },
-    });
     fireEvent.change(screen.getByLabelText(/Display Name/), {
       target: { value: "OpenAI Main" },
     });
@@ -136,7 +129,6 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
-    key: "openai_main",
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

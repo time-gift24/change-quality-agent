@@ -1,5 +1,4 @@
 export type LlmProviderCreate = {
-  key: string;
   display_name: string;
   description?: string | null;
   provider_type: string;
@@ -23,7 +22,6 @@ export type LlmProviderUpdate = {
 
 export type LlmProviderSummary = {
   id: string;
-  key: string;
   display_name: string;
   description: string | null;
   provider_type: string;

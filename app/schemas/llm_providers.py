@@ -29,7 +29,6 @@ def _is_secret_key(key: str) -> bool:
 
 
 class LlmProviderCreate(BaseModel):
-    key: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     display_name: str
     description: str | None = None
     provider_type: str
@@ -55,7 +54,6 @@ class LlmProviderSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    key: str
     display_name: str
     description: str | None
     provider_type: str

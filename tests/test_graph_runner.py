@@ -21,7 +21,7 @@ class FakeVersion:
 
 class FakeAgent:
     def __init__(self, version: FakeVersion | None) -> None:
-        self.key = "sop-quality-v1"
+        self.id = uuid4()
         self.enabled = True
         self.latest_version = version
 
@@ -75,10 +75,10 @@ class FakeRepository:
 class FakeAgentRepository:
     def __init__(self, agent: Agent | FakeAgent | None) -> None:
         self.agent = agent
-        self.lookups: list[str] = []
+        self.lookups: list[object] = []
 
-    async def get_agent(self, key: str):
-        self.lookups.append(key)
+    async def get_agent(self, agent_id):
+        self.lookups.append(agent_id)
         return self.agent
 
 
@@ -132,7 +132,8 @@ async def test_graph_runner_streams_sop_quality_agent_events() -> None:
     run = FakeRun()
     repository = FakeRepository(run)
     version = FakeVersion()
-    agent_repository = FakeAgentRepository(FakeAgent(version))
+    agent = FakeAgent(version)
+    agent_repository = FakeAgentRepository(agent)
     runtime = FakeStreamingRuntime()
 
     await run_sop_quality_graph(
@@ -140,6 +141,7 @@ async def test_graph_runner_streams_sop_quality_agent_events() -> None:
         repository,
         agent_repository=agent_repository,
         runtime=runtime,
+        agent_id=agent.id,
     )
 
     assert repository.marked_running is True
@@ -149,7 +151,7 @@ async def test_graph_runner_streams_sop_quality_agent_events() -> None:
         "messages",
         "done",
     ]
-    assert agent_repository.lookups == ["sop-quality-v1"]
+    assert agent_repository.lookups == [agent.id]
     assert runtime.calls[0]["version"] is version
     assert runtime.calls[0]["messages"][0]["role"] == "user"
     assert "release-checklist" in runtime.calls[0]["messages"][0]["content"]
@@ -176,24 +178,26 @@ async def test_graph_runner_streams_sop_quality_agent_events() -> None:
 async def test_graph_runner_marks_error_when_sop_quality_agent_is_missing() -> None:
     run = FakeRun()
     repository = FakeRepository(run)
+    missing_agent_id = uuid4()
 
     result = await run_sop_quality_graph(
         run.id,
         repository,
         agent_repository=FakeAgentRepository(None),
         runtime=FakeStreamingRuntime(),
+        agent_id=missing_agent_id,
     )
 
     assert result["status"] == "error"
     assert repository.terminal_status == RunStatus.error
     assert repository.terminal_kwargs["error"] == {
         "type": "RuntimeError",
-        "message": "SOP quality agent not found: sop-quality-v1",
+        "message": f"SOP quality agent not found: {missing_agent_id}",
     }
     assert repository.events[-1]["event_type"] == "error"
     assert repository.events[-1]["payload"] == {
         "type": "RuntimeError",
-        "message": "SOP quality agent not found: sop-quality-v1",
+        "message": f"SOP quality agent not found: {missing_agent_id}",
     }
     assert repository.committed is True
 
@@ -218,11 +222,13 @@ async def test_graph_runner_marks_error_when_agent_stream_yields_error() -> None
         ]
     )
 
+    agent = FakeAgent(version)
     result = await run_sop_quality_graph(
         run.id,
         repository,
-        agent_repository=FakeAgentRepository(FakeAgent(version)),
+        agent_repository=FakeAgentRepository(agent),
         runtime=runtime,
+        agent_id=agent.id,
     )
 
     assert result["status"] == "error"
@@ -260,11 +266,13 @@ async def test_graph_runner_does_not_duplicate_streamed_done_event() -> None:
         ]
     )
 
+    agent = FakeAgent(version)
     result = await run_sop_quality_graph(
         run.id,
         repository,
-        agent_repository=FakeAgentRepository(FakeAgent(version)),
+        agent_repository=FakeAgentRepository(agent),
         runtime=runtime,
+        agent_id=agent.id,
     )
 
     assert result["status"] == "success"

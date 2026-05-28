@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -6,7 +7,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.database import Base
 from app.repositories.llm_providers import (
-    LlmProviderAlreadyExistsError,
     LlmProviderNotFoundError,
     LlmProviderRepository,
 )
@@ -35,11 +35,10 @@ async def session():
     await engine.dispose()
 
 
-async def test_create_and_get_provider_by_key(session) -> None:
+async def test_create_and_get_provider_by_id(session) -> None:
     repository = LlmProviderRepository(session)
 
     provider = await repository.create(
-        key="openai_main",
         display_name="OpenAI Main",
         description="Primary OpenAI provider",
         provider_type="openai",
@@ -50,7 +49,7 @@ async def test_create_and_get_provider_by_key(session) -> None:
         enabled=True,
     )
 
-    fetched = await repository.get_by_key("openai_main")
+    fetched = await repository.get_by_id(provider.id)
 
     assert fetched is not None
     assert fetched.id == provider.id
@@ -63,61 +62,40 @@ async def test_create_and_get_provider_by_key(session) -> None:
     assert fetched.enabled is True
 
 
-async def test_duplicate_key_is_rejected_even_after_soft_delete(session) -> None:
-    repository = LlmProviderRepository(session)
-    await repository.create(
-        key="openai_main",
-        display_name="OpenAI Main",
-        provider_type="openai",
-    )
-
-    with pytest.raises(LlmProviderAlreadyExistsError, match="openai_main"):
-        await repository.create(
-            key="openai_main",
-            display_name="OpenAI Duplicate",
-            provider_type="openai",
-        )
-
-    await repository.soft_delete("openai_main")
-
-    with pytest.raises(LlmProviderAlreadyExistsError, match="openai_main"):
-        await repository.create(
-            key="openai_main",
-            display_name="OpenAI Reused",
-            provider_type="openai",
-        )
-
-
 async def test_list_excludes_soft_deleted_providers(session) -> None:
     repository = LlmProviderRepository(session)
-    await repository.create(key="openai_main", display_name="OpenAI", provider_type="openai")
-    await repository.create(
-        key="anthropic_main",
+    openai = await repository.create(
+        display_name="OpenAI",
+        provider_type="openai",
+    )
+    anthropic = await repository.create(
         display_name="Anthropic",
         provider_type="anthropic",
         enabled=False,
     )
-    await repository.soft_delete("openai_main")
+    await repository.soft_delete(openai.id)
 
     providers = await repository.list()
 
-    assert [provider.key for provider in providers] == ["anthropic_main"]
+    assert [provider.id for provider in providers] == [anthropic.id]
     assert providers[0].enabled is False
 
 
-async def test_get_by_key_returns_disabled_but_not_deleted_provider(session) -> None:
+async def test_get_by_id_returns_disabled_but_not_deleted_provider(session) -> None:
     repository = LlmProviderRepository(session)
-    await repository.create(
-        key="anthropic_main",
+    disabled_provider = await repository.create(
         display_name="Anthropic",
         provider_type="anthropic",
         enabled=False,
     )
-    await repository.create(key="openai_main", display_name="OpenAI", provider_type="openai")
-    await repository.soft_delete("openai_main")
+    deleted_provider = await repository.create(
+        display_name="OpenAI",
+        provider_type="openai",
+    )
+    await repository.soft_delete(deleted_provider.id)
 
-    disabled = await repository.get_by_key("anthropic_main")
-    deleted = await repository.get_by_key("openai_main")
+    disabled = await repository.get_by_id(disabled_provider.id)
+    deleted = await repository.get_by_id(deleted_provider.id)
 
     assert disabled is not None
     assert disabled.enabled is False
@@ -126,33 +104,33 @@ async def test_get_by_key_returns_disabled_but_not_deleted_provider(session) -> 
 
 async def test_soft_delete_sets_deleted_at(session) -> None:
     repository = LlmProviderRepository(session)
-    await repository.create(key="openai_main", display_name="OpenAI", provider_type="openai")
+    provider = await repository.create(display_name="OpenAI", provider_type="openai")
 
-    deleted = await repository.soft_delete("openai_main")
+    deleted = await repository.soft_delete(provider.id)
 
     assert deleted.deleted_at is not None
-    assert await repository.get_by_key("openai_main") is None
+    assert await repository.get_by_id(provider.id) is None
 
 
 async def test_soft_delete_missing_provider_raises(session) -> None:
     repository = LlmProviderRepository(session)
+    provider_id = uuid4()
 
-    with pytest.raises(LlmProviderNotFoundError, match="missing"):
-        await repository.soft_delete("missing")
+    with pytest.raises(LlmProviderNotFoundError, match=str(provider_id)):
+        await repository.soft_delete(provider_id)
 
 
 async def test_update_api_key_preserve_clear_and_replace(session) -> None:
     repository = LlmProviderRepository(session)
-    await repository.create(
-        key="openai_main",
+    provider = await repository.create(
         display_name="OpenAI",
         provider_type="openai",
         api_key="sk-original",
     )
 
-    preserved = await repository.update("openai_main", display_name="OpenAI Renamed")
-    cleared = await repository.update("openai_main", api_key=None)
-    replaced = await repository.update("openai_main", api_key="sk-replaced")
+    preserved = await repository.update(provider.id, display_name="OpenAI Renamed")
+    cleared = await repository.update(provider.id, api_key=None)
+    replaced = await repository.update(provider.id, api_key="sk-replaced")
 
     assert preserved.display_name == "OpenAI Renamed"
     assert preserved.api_key == "sk-original"

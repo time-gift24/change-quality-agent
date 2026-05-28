@@ -1,10 +1,10 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Path, Response, status
 
 from app.api.deps import LlmProviderRepositoryDep, SessionDep
 from app.repositories.llm_providers import (
-    LlmProviderAlreadyExistsError,
     LlmProviderNotFoundError,
 )
 from app.schemas.llm_providers import (
@@ -31,49 +31,46 @@ async def create_llm_provider(
     session: SessionDep,
     repository: LlmProviderRepositoryDep,
 ) -> LlmProviderDetail:
-    try:
-        provider = await repository.create(**payload.model_dump(mode="json"))
-    except LlmProviderAlreadyExistsError as exc:
-        raise _conflict() from exc
+    provider = await repository.create(**payload.model_dump(mode="json"))
     await session.commit()
     return LlmProviderDetail.model_validate(provider)
 
 
-@router.get("/{provider_key}")
+@router.get("/{provider_id}")
 async def get_llm_provider(
-    provider_key: Annotated[str, Path()],
+    provider_id: Annotated[UUID, Path()],
     repository: LlmProviderRepositoryDep,
 ) -> LlmProviderDetail:
-    provider = await repository.get_by_key(provider_key)
+    provider = await repository.get_by_id(provider_id)
     if provider is None:
         raise _not_found()
     return LlmProviderDetail.model_validate(provider)
 
 
-@router.patch("/{provider_key}")
+@router.patch("/{provider_id}")
 async def update_llm_provider(
-    provider_key: Annotated[str, Path()],
+    provider_id: Annotated[UUID, Path()],
     payload: LlmProviderUpdate,
     session: SessionDep,
     repository: LlmProviderRepositoryDep,
 ) -> LlmProviderDetail:
     values = _normalize_update_values(payload.model_dump(exclude_unset=True, mode="json"))
     try:
-        provider = await repository.update(provider_key, **values)
+        provider = await repository.update(provider_id, **values)
     except LlmProviderNotFoundError as exc:
         raise _not_found() from exc
     await session.commit()
     return LlmProviderDetail.model_validate(provider)
 
 
-@router.delete("/{provider_key}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_llm_provider(
-    provider_key: Annotated[str, Path()],
+    provider_id: Annotated[UUID, Path()],
     session: SessionDep,
     repository: LlmProviderRepositoryDep,
 ) -> Response:
     try:
-        await repository.soft_delete(provider_key)
+        await repository.soft_delete(provider_id)
     except LlmProviderNotFoundError as exc:
         raise _not_found() from exc
     await session.commit()
@@ -84,13 +81,6 @@ def _not_found() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="LLM provider not found.",
-    )
-
-
-def _conflict() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_409_CONFLICT,
-        detail="LLM provider key already exists.",
     )
 
 

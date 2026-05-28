@@ -3,6 +3,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
+from uuid import UUID
 
 from langchain.agents import create_agent as langchain_create_agent
 
@@ -30,7 +31,7 @@ class StaticToolResolver:
 
 
 class LlmProviderResolver(Protocol):
-    async def resolve(self, provider_key: str) -> LlmProviderRuntimeConfig:
+    async def resolve(self, provider_id: UUID) -> LlmProviderRuntimeConfig:
         pass
 
 
@@ -105,11 +106,11 @@ class AgentRuntime:
         if inspect.isawaitable(tools):
             tools = await tools
         model_config = getattr(version, "model_config", {}) or {}
-        provider_key = getattr(version, "provider_key", None)
-        if provider_key:
+        provider_id = getattr(version, "provider_id", None)
+        if provider_id:
             if self._provider_resolver is None:
                 raise RuntimeError("LLM provider resolver is not configured.")
-            provider = await self._provider_resolver.resolve(str(provider_key))
+            provider = await self._provider_resolver.resolve(provider_id)
             model = self._provider_model_factory(
                 version.model,
                 provider,

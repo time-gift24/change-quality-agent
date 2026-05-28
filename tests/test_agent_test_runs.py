@@ -55,12 +55,10 @@ class FakeAgent:
     def __init__(
         self,
         *,
-        key: str = "release-reviewer",
         enabled: bool = True,
         latest_version: FakeVersion | None = None,
     ) -> None:
         self.id = uuid4()
-        self.key = key
         self.enabled = enabled
         self.latest_version = latest_version
         if latest_version is not None:
@@ -78,18 +76,18 @@ class FakeAgentRepository:
         self.agent = agent
         self.versions = versions or []
         self.order = order
-        self.number_lookup: tuple[str, int] | None = None
+        self.number_lookup: tuple[object, int] | None = None
         self.id_lookup = None
 
-    async def get_agent(self, key: str):
+    async def get_agent(self, agent_id):
         if self.order is not None:
             self.order.append("get_agent")
-        if self.agent is None or self.agent.key != key:
+        if self.agent is None or self.agent.id != agent_id:
             return None
         return self.agent
 
-    async def get_version_by_number(self, key: str, version_number: int):
-        self.number_lookup = (key, version_number)
+    async def get_version_by_number(self, agent_id, version_number: int):
+        self.number_lookup = (agent_id, version_number)
         for version in self.versions:
             if version.version_number == version_number:
                 return version
@@ -147,7 +145,7 @@ async def test_create_agent_test_run_persists_agent_test_payload() -> None:
     messages = [{"role": "user", "content": "Can this deploy?"}]
 
     run = await repository.create_agent_test_run(
-        agent_key="release-reviewer",
+        agent_id=version.agent_id,
         agent_version=version,
         messages=messages,
         input_preview="Can this deploy?",
@@ -158,22 +156,21 @@ async def test_create_agent_test_run_persists_agent_test_payload() -> None:
     assert session.flushes == 1
     assert run.assistant_id == "react-agent-test-v1"
     assert run.subject_type == "agent_test"
-    assert run.subject_id == "release-reviewer"
+    assert run.subject_id == str(version.agent_id)
     assert run.env_key is None
     assert run.status == RunStatus.pending.value
     assert run.active_conflict_key is None
     assert run.metadata_ == {
         "subject_type": "agent_test",
-        "subject_id": "release-reviewer",
+        "subject_id": str(version.agent_id),
         "agent_id": str(version.agent_id),
-        "agent_key": "release-reviewer",
         "agent_version_id": str(version.id),
         "agent_version_number": 7,
         "run_kind": "agent_test",
         "input_preview": "Can this deploy?",
     }
     assert run.kwargs == {
-        "agent_key": "release-reviewer",
+        "agent_id": str(version.agent_id),
         "agent_version_id": str(version.id),
         "agent_version_number": 7,
     }
@@ -215,7 +212,7 @@ async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -
     )
 
     result = await service.start_test_run(
-        "release-reviewer",
+        agent.id,
         AgentTestRunCreate(messages=[{"role": "user", "content": "Can this deploy?"}]),
     )
 
@@ -225,7 +222,7 @@ async def test_start_test_run_uses_latest_version_and_schedules_after_commit() -
     assert result.status_url == f"/api/runs/{run_repository.run.id}"
     assert result.events_url == f"/api/runs/{run_repository.run.id}/events"
     assert run_repository.created_kwargs is not None
-    assert run_repository.created_kwargs["agent_key"] == "release-reviewer"
+    assert run_repository.created_kwargs["agent_id"] == agent.id
     assert run_repository.created_kwargs["agent_version"] is version
     assert run_repository.created_kwargs["messages"] == [
         {"role": "user", "content": "Can this deploy?"}
@@ -249,14 +246,14 @@ async def test_start_test_run_resolves_explicit_version_number() -> None:
     )
 
     await service.start_test_run(
-        "release-reviewer",
+        agent.id,
         AgentTestRunCreate(
             version_number=1,
             messages=[{"role": "user", "content": "Use v1."}],
         ),
     )
 
-    assert agent_repository.number_lookup == ("release-reviewer", 1)
+    assert agent_repository.number_lookup == (agent.id, 1)
     assert run_repository.created_kwargs is not None
     assert run_repository.created_kwargs["agent_version"] is old_version
 
@@ -274,7 +271,7 @@ async def test_start_test_run_resolves_explicit_version_id() -> None:
     )
 
     await service.start_test_run(
-        "release-reviewer",
+        agent.id,
         AgentTestRunCreate(
             version_id=version.id,
             messages=[{"role": "user", "content": "Use this version."}],
@@ -300,7 +297,7 @@ async def test_start_test_run_raises_when_no_version_exists() -> None:
 
     with pytest.raises(AgentVersionNotFoundError):
         await service.start_test_run(
-            "release-reviewer",
+            agent.id,
             AgentTestRunCreate(
                 messages=[{"role": "user", "content": "Can this deploy?"}],
             ),
@@ -325,7 +322,7 @@ async def test_start_test_run_raises_when_agent_is_disabled() -> None:
 
     with pytest.raises(AgentDisabledError):
         await service.start_test_run(
-            "release-reviewer",
+            agent.id,
             AgentTestRunCreate(
                 messages=[{"role": "user", "content": "Can this deploy?"}],
             ),
@@ -357,7 +354,7 @@ async def test_start_agent_test_run_endpoint_returns_accepted_and_schedules() ->
         base_url="http://test",
     ) as client:
         response = await client.post(
-            "/api/agents/release-reviewer/test-runs",
+            f"/api/agents/{agent.id}/test-runs",
             json={"messages": [{"role": "user", "content": "Can this deploy?"}]},
         )
 
@@ -390,7 +387,7 @@ async def test_start_agent_test_run_endpoint_returns_400_when_agent_disabled() -
         base_url="http://test",
     ) as client:
         response = await client.post(
-            "/api/agents/release-reviewer/test-runs",
+            f"/api/agents/{agent.id}/test-runs",
             json={"messages": [{"role": "user", "content": "Can this deploy?"}]},
         )
 

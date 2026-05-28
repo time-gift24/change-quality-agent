@@ -12,7 +12,7 @@ export function LlmProviderCreatePage() {
 
   return (
     <LlmProviderPageLayout
-      description="保存普通 LangChain provider，Agent version 可通过 provider_key 引用。"
+      description="保存普通 LangChain provider，Agent version 可通过 provider_id 引用。"
       items={[{ label: "LLM Providers", to: "/llm-providers" }, { label: "新增" }]}
       title="新增 LLM Provider"
     >
@@ -23,7 +23,7 @@ export function LlmProviderCreatePage() {
           onCancel={() => navigate("/llm-providers")}
           onCreate={async (payload) => {
             const created = await mutations.createProvider(payload);
-            navigate(`/llm-providers/${created.key}`, {
+            navigate(`/llm-providers/${created.id}`, {
               state: { llmProviderNotice: "LLM Provider 已创建。" },
             });
           }}
@@ -36,19 +36,19 @@ export function LlmProviderCreatePage() {
 }
 
 export function LlmProviderEditPage() {
-  const { providerKey } = useParams<{ providerKey: string }>();
+  const { providerId } = useParams<{ providerId: string }>();
   const navigate = useNavigate();
-  const detailState = useLlmProviderDetail(providerKey ?? null);
+  const detailState = useLlmProviderDetail(providerId ?? null);
   const mutations = useLlmProviderMutations();
   const provider = detailState.data;
-  const targetKey = provider?.key ?? providerKey ?? "";
+  const targetId = provider?.id ?? providerId ?? "";
 
   return (
     <LlmProviderPageLayout
       description={provider ? `${provider.provider_type} · ${provider.enabled ? "enabled" : "disabled"}` : "修改 provider 配置。"}
       items={[
         { label: "LLM Providers", to: "/llm-providers" },
-        { label: provider?.display_name ?? providerKey ?? "...", to: `/llm-providers/${targetKey}` },
+        { label: provider?.display_name ?? providerId ?? "...", to: `/llm-providers/${targetId}` },
         { label: "编辑" },
       ]}
       title="编辑 LLM Provider"
@@ -60,11 +60,11 @@ export function LlmProviderEditPage() {
           {mutations.error ? <ErrorAlert message={mutations.error.message} /> : null}
           <LlmProviderForm
             mode="edit"
-            onCancel={() => navigate(`/llm-providers/${targetKey}`)}
-            onUpdate={async (key, payload) => {
-              await mutations.updateProvider(key, payload);
+            onCancel={() => navigate(`/llm-providers/${targetId}`)}
+            onUpdate={async (id, payload) => {
+              await mutations.updateProvider(id, payload);
               await detailState.refetch();
-              navigate(`/llm-providers/${targetKey}`, {
+              navigate(`/llm-providers/${targetId}`, {
                 state: { llmProviderNotice: "LLM Provider 已保存。" },
               });
             }}
@@ -117,7 +117,7 @@ function ProviderSummary({ provider }: { provider: LlmProviderDetail }) {
     <ProviderNote
       title={provider.display_name}
       lines={[
-        `key: ${provider.key}`,
+        `id: ${provider.id}`,
         `provider_type: ${provider.provider_type}`,
         `api_key: ${provider.api_key_configured ? "configured" : "missing"}`,
       ]}

@@ -14,7 +14,7 @@ class FakeVersion:
     def __init__(self) -> None:
         self.id = uuid4()
         self.model = "openai:gpt-5-mini"
-        self.provider_key = None
+        self.provider_id = None
         self.model_config = {"temperature": 0.2}
         self.system_prompt = "Review risky changes carefully."
         self.tool_allowlist = ["search_sop"]
@@ -39,9 +39,9 @@ class AsyncFakeResolver(FakeResolver):
 
 class FakeProviderResolver:
     def __init__(self) -> None:
-        self.calls: list[str] = []
+        self.calls: list[object] = []
         self.provider = LlmProviderRuntimeConfig(
-            key="openai_main",
+            id=uuid4(),
             provider_type="openai",
             base_url="https://api.openai.com/v1",
             api_key="sk-test",
@@ -50,8 +50,8 @@ class FakeProviderResolver:
             enabled=True,
         )
 
-    async def resolve(self, provider_key: str) -> LlmProviderRuntimeConfig:
-        self.calls.append(provider_key)
+    async def resolve(self, provider_id) -> LlmProviderRuntimeConfig:
+        self.calls.append(provider_id)
         return self.provider
 
 
@@ -149,10 +149,11 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_uses_provider_resolver_when_provider_key_is_set() -> None:
+async def test_runtime_uses_provider_resolver_when_provider_id_is_set() -> None:
     version = FakeVersion()
     version.model = "gpt-5-mini"
-    version.provider_key = "openai_main"
+    provider_id = uuid4()
+    version.provider_id = provider_id
     provider_resolver = FakeProviderResolver()
     provider_model = object()
     default_factory_calls: list[str] = []
@@ -176,7 +177,7 @@ async def test_runtime_uses_provider_resolver_when_provider_key_is_set() -> None
 
     await runtime.run(version=version, messages=[])
 
-    assert provider_resolver.calls == ["openai_main"]
+    assert provider_resolver.calls == [provider_id]
     assert provider_factory_calls == [
         ("gpt-5-mini", provider_resolver.provider, {"temperature": 0.2})
     ]
@@ -185,10 +186,10 @@ async def test_runtime_uses_provider_resolver_when_provider_key_is_set() -> None
 
 
 @pytest.mark.asyncio
-async def test_runtime_requires_provider_resolver_when_provider_key_is_set() -> None:
+async def test_runtime_requires_provider_resolver_when_provider_id_is_set() -> None:
     version = FakeVersion()
     version.model = "gpt-5-mini"
-    version.provider_key = "openai_main"
+    version.provider_id = uuid4()
     runtime = AgentRuntime(
         create_agent=lambda **_: FakeAgent({"messages": []}),
         model_factory=lambda model, **_: model,

@@ -3,7 +3,6 @@ import {
   isValidElement,
   useEffect,
   useId,
-  useRef,
   useState,
   type FormEvent,
   type ReactElement,
@@ -27,7 +26,7 @@ type LlmProviderFormProps = {
   pending?: boolean;
   onCancel?: () => void;
   onCreate?: (payload: LlmProviderCreate) => Promise<void>;
-  onUpdate?: (providerKey: string, payload: LlmProviderUpdate) => Promise<void>;
+  onUpdate?: (providerId: string, payload: LlmProviderUpdate) => Promise<void>;
 };
 
 export function LlmProviderForm({
@@ -38,7 +37,6 @@ export function LlmProviderForm({
   onCreate,
   onUpdate,
 }: LlmProviderFormProps) {
-  const [key, setKey] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [providerType, setProviderType] = useState("");
@@ -49,14 +47,12 @@ export function LlmProviderForm({
   const [queryText, setQueryText] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const keyRef = useRef<HTMLInputElement | null>(null);
   const errorId = useId();
   const readOnly = mode === "view";
 
   useEffect(() => {
     setError(null);
     if ((mode === "edit" || mode === "view") && provider) {
-      setKey(provider.key);
       setDisplayName(provider.display_name);
       setDescription(provider.description ?? "");
       setProviderType(provider.provider_type);
@@ -69,7 +65,6 @@ export function LlmProviderForm({
       return;
     }
 
-    setKey("");
     setDisplayName("");
     setDescription("");
     setProviderType("");
@@ -80,12 +75,6 @@ export function LlmProviderForm({
     setQueryText("");
     setEnabled(true);
   }, [mode, provider]);
-
-  useEffect(() => {
-    if (mode === "create") {
-      keyRef.current?.focus();
-    }
-  }, [mode]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,12 +89,6 @@ export function LlmProviderForm({
     const parsedQuery = parseKeyValueText("Default Query", queryText);
     if (parsedQuery.error) {
       setError(parsedQuery.error);
-      return;
-    }
-
-    if (!key.trim()) {
-      setError("Provider Key 必填。");
-      keyRef.current?.focus();
       return;
     }
 
@@ -130,7 +113,6 @@ export function LlmProviderForm({
         description: description.trim() || null,
         display_name: displayName.trim(),
         enabled,
-        key: key.trim(),
         provider_type: providerType.trim(),
       });
       return;
@@ -178,7 +160,7 @@ export function LlmProviderForm({
     } else if (clearApiKey) {
       payload.api_key = null;
     }
-    await onUpdate?.(provider.key, payload);
+    await onUpdate?.(provider.id, payload);
   }
 
   const inputClass =
@@ -196,16 +178,6 @@ export function LlmProviderForm({
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Provider Key" required={mode === "create"}>
-            <input
-              aria-describedby={error ? errorId : undefined}
-              className={inputClass}
-              onChange={(event) => setKey(event.target.value)}
-              readOnly={readOnly || mode !== "create"}
-              ref={keyRef}
-              value={key}
-            />
-          </Field>
           <Field label="Display Name" required={!readOnly}>
             <input
               className={inputClass}

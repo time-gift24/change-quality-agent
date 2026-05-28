@@ -22,7 +22,6 @@ def upgrade() -> None:
     op.create_table(
         "llm_providers",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("key", sa.Text(), nullable=False),
         sa.Column("display_name", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("provider_type", sa.Text(), nullable=False),
@@ -61,7 +60,6 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_llm_providers_key", "llm_providers", ["key"], unique=True)
     op.create_index(
         "ix_llm_providers_deleted_at",
         "llm_providers",
@@ -71,5 +69,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_llm_providers_deleted_at", table_name="llm_providers")
-    op.drop_index("uq_llm_providers_key", table_name="llm_providers")
     op.drop_table("llm_providers")

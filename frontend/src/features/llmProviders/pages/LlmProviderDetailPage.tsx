@@ -7,19 +7,19 @@ import type { LlmProviderDetail } from "../types";
 import { LlmProviderPageLayout } from "./LlmProviderPageLayout";
 
 export function LlmProviderDetailPage() {
-  const { providerKey } = useParams<{ providerKey: string }>();
+  const { providerId } = useParams<{ providerId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const detailState = useLlmProviderDetail(providerKey ?? null);
+  const detailState = useLlmProviderDetail(providerId ?? null);
   const mutations = useLlmProviderMutations();
   const provider = detailState.data;
-  const targetKey = provider?.key ?? providerKey ?? "";
+  const targetId = provider?.id ?? providerId ?? "";
   const notice = getNavigationNotice(location.state);
 
   async function handleDelete() {
     if (!provider) return;
     if (!window.confirm(`确认删除 ${provider.display_name}？`)) return;
-    await mutations.deleteProvider(targetKey);
+    await mutations.deleteProvider(targetId);
     navigate("/llm-providers", { replace: true });
   }
 
@@ -27,7 +27,7 @@ export function LlmProviderDetailPage() {
     <LlmProviderPageLayout
       actions={provider ? (
         <>
-          <Button onClick={() => navigate(`/llm-providers/${targetKey}/edit`)} variant="secondary">
+          <Button onClick={() => navigate(`/llm-providers/${targetId}/edit`)} variant="secondary">
             编辑
           </Button>
           <Button disabled={mutations.pending} onClick={() => { void handleDelete(); }} variant="destructive">
@@ -38,10 +38,10 @@ export function LlmProviderDetailPage() {
       description={provider ? `${provider.provider_type} · ${provider.enabled ? "enabled" : "disabled"}` : "查看 provider 配置。"}
       items={[
         { label: "LLM Providers", to: "/llm-providers" },
-        { label: provider?.display_name ?? providerKey ?? "...", to: `/llm-providers/${targetKey}` },
+        { label: provider?.display_name ?? providerId ?? "...", to: `/llm-providers/${targetId}` },
         { label: "查看" },
       ]}
-      title={provider?.display_name ?? providerKey ?? "LLM Provider"}
+      title={provider?.display_name ?? providerId ?? "LLM Provider"}
     >
       {notice ? <SuccessNotice message={notice} /> : null}
       {mutations.error ? <ErrorAlert message={mutations.error.message} /> : null}
@@ -67,7 +67,7 @@ function DetailContent({ provider }: { provider: LlmProviderDetail }) {
               Provider Overview
             </p>
             <h2 className="mt-1 text-sm font-semibold text-ink">配置总览</h2>
-            <p className="mt-1 truncate text-xs text-body">{provider.key}</p>
+            <p className="mt-1 truncate text-xs text-body">{provider.id}</p>
           </div>
           <dl className="space-y-3 p-4 text-xs">
             <InfoRow label="Provider Type" value={provider.provider_type} />

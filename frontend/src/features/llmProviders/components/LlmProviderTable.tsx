@@ -39,7 +39,7 @@ export function LlmProviderTable({
             aria-label="搜索 LLM Provider"
             className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink outline-none transition-colors placeholder:text-mute focus:border-primary focus:ring-2 focus:ring-primary/15 sm:w-64"
             onChange={(event) => onSearchTextChange(event.target.value)}
-            placeholder="按名称或 key 搜索…"
+            placeholder="按名称或类型搜索…"
             type="search"
             value={searchText}
           />
@@ -99,17 +99,17 @@ export function LlmProviderTable({
               </TableRow>
             ) : (
               providers.map((provider) => (
-                <TableRow className="group border-0" key={provider.key}>
+                <TableRow className="group border-0" key={provider.id}>
                   <MetricCell className="rounded-l-3xl border-l px-4 py-4">
                     <Link
                       className="block min-w-0 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                      to={`/llm-providers/${provider.key}`}
+                      to={`/llm-providers/${provider.id}`}
                     >
                       <p className="truncate text-sm font-semibold tracking-tight text-ink transition-colors group-hover:text-primary-deep">
                         {provider.display_name}
                       </p>
                       <p className="mt-1 truncate font-mono text-2xs text-stone">
-                        {provider.key}
+                        {provider.id}
                       </p>
                     </Link>
                   </MetricCell>
