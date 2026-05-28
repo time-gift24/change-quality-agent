@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from uuid import uuid4
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core import llm_models
 from app.core.config import settings
@@ -135,6 +136,54 @@ def test_create_provider_chat_model_omits_empty_provider_config(
             },
         )
     ]
+
+
+def test_create_provider_chat_model_preserves_deepseek_reasoning_content() -> None:
+    provider = LlmProviderRuntimeConfig(
+        id=uuid4(),
+        provider_type="deepseek",
+        base_url="https://api.deepseek.com/v1",
+        api_key="sk-test",
+        default_headers={},
+        default_query={},
+        enabled=True,
+    )
+    model = llm_models.create_provider_chat_model("deepseek-chat", provider)
+
+    payload = model._get_request_payload(
+        [
+            HumanMessage(content="review this SOP"),
+            AIMessage(
+                content="",
+                additional_kwargs={"reasoning_content": "private reasoning"},
+            ),
+            HumanMessage(content="continue"),
+        ]
+    )
+
+    assert payload["messages"][1]["reasoning_content"] == "private reasoning"
+
+
+def test_create_chat_model_preserves_codeagent_reasoning_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "codeagent_base_url", "https://llm.internal/v1")
+    monkeypatch.setattr(settings, "codeagent_token_provider", "codeagent")
+
+    model = llm_models.create_chat_model("codeagent:codeagent-v4-pro")
+
+    payload = model._get_request_payload(
+        [
+            HumanMessage(content="review this SOP"),
+            AIMessage(
+                content="",
+                additional_kwargs={"reasoning_content": "private reasoning"},
+            ),
+            HumanMessage(content="continue"),
+        ]
+    )
+
+    assert payload["messages"][1]["reasoning_content"] == "private reasoning"
 
 
 def test_create_chat_model_sets_codeagent_api_base_on_real_client(
