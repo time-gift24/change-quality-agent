@@ -1866,6 +1866,13 @@ components:
         node:
           type: string
           nullable: true
+        channel:
+          type: string
+          enum:
+          - thinking
+          - summary
+          - result
+          nullable: true
         checkpoint_id:
           type: string
           nullable: true

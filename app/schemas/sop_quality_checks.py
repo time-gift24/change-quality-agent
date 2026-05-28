@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -60,6 +60,7 @@ class SopQualityCheckEvent(BaseModel):
     sequence: int
     type: str
     node: str | None = None
+    channel: Literal["thinking", "summary", "result"] | None = None
     checkpoint_id: str | None = None
     task_id: str | None = None
     message: str | None = None

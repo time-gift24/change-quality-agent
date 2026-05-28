@@ -167,7 +167,7 @@ async def test_sop_quality_graph_normalizes_common_agent_severity_variants() -> 
 
 
 @pytest.mark.asyncio
-async def test_sop_quality_graph_streams_thinking_status_and_final_summary() -> None:
+async def test_sop_quality_graph_streams_content_deltas_without_reasoning_text() -> None:
     repository = FakeLlmProviderRepository()
     chunks = [
         AIMessageChunk(
@@ -211,6 +211,21 @@ async def test_sop_quality_graph_streams_thinking_status_and_final_summary() -> 
             "node": "check_steps",
             "channel": "thinking",
             "message": "正在分析 SOP...",
+        },
+        {
+            "type": "messages",
+            "node": "check_steps",
+            "message": '{"quality_result":"pass","summary":"',
+        },
+        {
+            "type": "messages",
+            "node": "check_steps",
+            "message": "Looks ready.",
+        },
+        {
+            "type": "messages",
+            "node": "check_steps",
+            "message": '","findings":[],"report_markdown":"## SOP Quality Report"}',
         },
         {
             "type": "messages",

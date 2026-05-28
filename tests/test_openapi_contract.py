@@ -195,6 +195,7 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
         "SopQualityCheckEvent",
     } <= set(schemas)
     assert "payload" not in schemas["SopQualityCheckEvent"]["properties"]
+    assert "channel" in schemas["SopQualityCheckEvent"]["properties"]
 
 
 def test_agents_parameters_are_reusable_and_referenced() -> None:

@@ -26,4 +26,5 @@ def test_event_schema_has_no_payload() -> None:
     fields = SopQualityCheckEvent.model_fields
 
     assert "payload" not in fields
+    assert "channel" in fields
     assert "message" in fields

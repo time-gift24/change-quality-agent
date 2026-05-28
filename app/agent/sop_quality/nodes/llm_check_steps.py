@@ -120,6 +120,14 @@ async def _run_agent(
         delta = _event_delta(event)
         if delta:
             chunks.append(delta)
+            await _publish_live_event(
+                on_live_event,
+                {
+                    "type": "messages",
+                    "node": event["node"],
+                    "message": delta,
+                },
+            )
         elif event["type"] == "updates":
             await _publish_live_event(
                 on_live_event,
