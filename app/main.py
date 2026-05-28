@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_mcp_runtime_manager
-from app.api.v1 import agents, auth, llm_providers, mcp, runs, sop
+from app.api.v1 import agents, auth, llm_providers, mcp, runs, sop, sop_quality_checks
 from app.core.config import settings
 from app.core.database import async_session
 from app.core.logging import configure_logging
@@ -15,17 +15,17 @@ from app.core.security import (
     is_auth_bypass_path,
     resolve_current_user,
 )
-from app.repositories.runs import RunRepository
+from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository, seed_dev_users
 
 configure_logging(settings)
 access_logger = logging.getLogger("app.access")
 
 
-async def interrupt_leftover_runs() -> None:
+async def interrupt_leftover_sop_quality_checks() -> None:
     async with async_session() as session:
-        repository = RunRepository(session)
-        await repository.interrupt_active_runs_on_startup()
+        repository = SopQualityCheckRepository(session)
+        await repository.interrupt_active_checks_on_startup()
         await session.commit()
 
 
@@ -38,7 +38,7 @@ async def seed_dev_users_on_startup() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await interrupt_leftover_runs()
+    await interrupt_leftover_sop_quality_checks()
     if settings.auth_dev_mode:
         await seed_dev_users_on_startup()
     mcp_runtime = get_mcp_runtime_manager()
@@ -80,6 +80,7 @@ app.include_router(llm_providers.router)
 app.include_router(agents.router)
 app.include_router(runs.router)
 app.include_router(sop.router)
+app.include_router(sop_quality_checks.router)
 
 
 @app.middleware("http")

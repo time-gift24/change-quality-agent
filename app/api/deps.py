@@ -10,6 +10,7 @@ from app.repositories.agents import AgentRepository
 from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.runs import RunRepository
+from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.sop_client import MockSopClient, SopClient
@@ -29,6 +30,18 @@ def get_run_repository(session: SessionDep) -> RunRepository:
 
 
 RunRepositoryDep = Annotated[RunRepository, Depends(get_run_repository)]
+
+
+def get_sop_quality_check_repository(
+    session: SessionDep,
+) -> SopQualityCheckRepository:
+    return SopQualityCheckRepository(session)
+
+
+SopQualityCheckRepositoryDep = Annotated[
+    SopQualityCheckRepository,
+    Depends(get_sop_quality_check_repository),
+]
 
 
 def get_agent_repository(session: SessionDep) -> AgentRepository:
