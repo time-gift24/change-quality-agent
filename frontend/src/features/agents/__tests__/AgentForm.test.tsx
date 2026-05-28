@@ -227,6 +227,76 @@ describe("AgentForm", () => {
 
     expect(onUpdate).not.toHaveBeenCalled();
   });
+
+  it("blocks edit save when provider draft model is unavailable", () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    const agent = buildAgent({
+      draft: {
+        mcp_server_ids: [],
+        model: "gpt-legacy",
+        model_config: {},
+        provider_id: "provider-1",
+        system_prompt: "Existing prompt.",
+        tool_allowlist: [],
+      },
+    });
+    render(
+      <AgentForm
+        agent={agent}
+        mode="edit"
+        onUpdate={onUpdate}
+        providers={[
+          buildProvider({
+            display_name: "OpenAI Main",
+            id: "provider-1",
+            models: ["gpt-5-mini", "gpt-5"],
+          }),
+        ]}
+        providersLoading={false}
+      />,
+    );
+
+    expect(screen.getByLabelText("Provider 模型")).toHaveValue("gpt-legacy");
+    expect(screen.getByRole("option", { name: "gpt-legacy (不可用)" })).toBeInTheDocument();
+    expect(screen.getByText("当前 draft 引用的模型不在所选 Provider 的模型列表中，请重新选择模型。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存 Agent" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("blocks edit save when CodeAgent draft model is unavailable", () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    const agent = buildAgent({
+      draft: {
+        mcp_server_ids: [],
+        model: "codeagent:legacy",
+        model_config: {},
+        provider_id: null,
+        system_prompt: "Existing prompt.",
+        tool_allowlist: [],
+      },
+    });
+    render(
+      <AgentForm
+        agent={agent}
+        mode="edit"
+        onUpdate={onUpdate}
+        providers={buildProviders()}
+        providersLoading={false}
+      />,
+    );
+
+    expect(screen.getByLabelText("CodeAgent 模型")).toHaveValue("codeagent:legacy");
+    expect(screen.getByRole("option", { name: "codeagent:legacy (不可用)" })).toBeInTheDocument();
+    expect(screen.getByText("当前 draft 引用的 CodeAgent 模型不在可选列表中，请重新选择模型。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存 Agent" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });
 
 function buildProviders(): LlmProviderSummary[] {

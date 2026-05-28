@@ -76,7 +76,11 @@ export function AgentForm({
       setSystemPrompt(draft?.system_prompt ?? "");
       setEnabled(agent.enabled);
       setModelSource(draft?.provider_id ? "provider" : "codeagent");
-      setCodeAgentModel(getCodeAgentModel(draft?.model));
+      setCodeAgentModel(
+        draft?.provider_id
+          ? DEFAULT_CODEAGENT_MODEL
+          : (draft?.model ?? DEFAULT_CODEAGENT_MODEL),
+      );
       setSelectedProviderId(draft?.provider_id ?? "");
       setSelectedProviderModel(draft?.provider_id ? (draft?.model ?? "") : "");
       return;
@@ -103,14 +107,27 @@ export function AgentForm({
     (provider) => provider.id === selectedProviderId,
   );
   const selectedProviderModels = selectedProvider?.models ?? [];
+  const unavailableCodeAgentModel =
+    mode === "edit" &&
+    modelSource === "codeagent" &&
+    Boolean(codeAgentModel) &&
+    !(CODEAGENT_MODEL_OPTIONS as readonly string[]).includes(codeAgentModel);
   const unavailableDraftProvider =
     mode === "edit" &&
     modelSource === "provider" &&
     !providersLoading &&
     Boolean(selectedProviderId) &&
     !selectedProvider;
+  const unavailableProviderModel =
+    mode === "edit" &&
+    modelSource === "provider" &&
+    Boolean(selectedProvider) &&
+    Boolean(selectedProviderModel) &&
+    selectedProviderModels.length > 0 &&
+    !selectedProviderModels.includes(selectedProviderModel);
 
   useEffect(() => {
+    if (mode !== "create") return;
     if (modelSource !== "provider" || !selectedProvider) return;
     if (selectedProvider.models.length === 0) {
       if (selectedProviderModel) setSelectedProviderModel("");
@@ -119,7 +136,7 @@ export function AgentForm({
     if (!selectedProvider.models.includes(selectedProviderModel)) {
       setSelectedProviderModel(selectedProvider.models[0] ?? "");
     }
-  }, [modelSource, selectedProvider, selectedProviderModel]);
+  }, [mode, modelSource, selectedProvider, selectedProviderModel]);
 
   const providerSaveBlocked =
     modelSource === "provider" &&
@@ -128,11 +145,15 @@ export function AgentForm({
       !selectedProvider ||
       selectedProviderModels.length === 0);
   const showUnavailableProviderMessage = unavailableDraftProvider;
+  const modelSaveBlocked = unavailableCodeAgentModel || unavailableProviderModel;
+  const saveBlocked = providerSaveBlocked || modelSaveBlocked;
   const showProviderModelsMessage =
     modelSource === "provider" &&
     !providersLoading &&
     Boolean(selectedProvider) &&
     selectedProviderModels.length === 0;
+  const showUnavailableCodeAgentModelMessage = unavailableCodeAgentModel;
+  const showUnavailableProviderModelMessage = unavailableProviderModel;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -152,7 +173,7 @@ export function AgentForm({
       return;
     }
 
-    if (providerSaveBlocked) return;
+    if (saveBlocked) return;
 
     const draft = buildAgentDraftPayload({
       codeAgentModel,
@@ -257,6 +278,11 @@ export function AgentForm({
                 onChange={(event) => setCodeAgentModel(event.target.value)}
                 value={codeAgentModel}
               >
+                {unavailableCodeAgentModel ? (
+                  <option value={codeAgentModel}>
+                    {codeAgentModel} (不可用)
+                  </option>
+                ) : null}
                 {CODEAGENT_MODEL_OPTIONS.map((model) => (
                   <option key={model} value={model}>
                     {model}
@@ -307,6 +333,11 @@ export function AgentForm({
                   onChange={(event) => setSelectedProviderModel(event.target.value)}
                   value={selectedProviderModel}
                 >
+                  {unavailableProviderModel ? (
+                    <option value={selectedProviderModel}>
+                      {selectedProviderModel} (不可用)
+                    </option>
+                  ) : null}
                   {selectedProviderModels.length === 0 ? (
                     <option value={selectedProviderModel}>
                       {selectedProviderModel || "暂无模型"}
@@ -326,6 +357,18 @@ export function AgentForm({
         {showUnavailableProviderMessage ? (
           <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
             当前 draft 引用的 Provider 不可用，请选择一个已启用的 LLM Provider。
+          </p>
+        ) : null}
+
+        {showUnavailableProviderModelMessage ? (
+          <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+            当前 draft 引用的模型不在所选 Provider 的模型列表中，请重新选择模型。
+          </p>
+        ) : null}
+
+        {showUnavailableCodeAgentModelMessage ? (
+          <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+            当前 draft 引用的 CodeAgent 模型不在可选列表中，请重新选择模型。
           </p>
         ) : null}
 
@@ -355,7 +398,7 @@ export function AgentForm({
           ) : null}
           <Button
             aria-busy={pending}
-            disabled={pending || providerSaveBlocked}
+            disabled={pending || saveBlocked}
             type="submit"
             variant="primary"
           >
@@ -416,11 +459,4 @@ export function buildAgentDraftPayload({
 function cloneWithId(children: ReactNode, id: string) {
   if (!isValidElement(children)) return children;
   return cloneElement(children as ReactElement<{ id?: string }>, { id });
-}
-
-function getCodeAgentModel(model: string | undefined): string {
-  if (model && (CODEAGENT_MODEL_OPTIONS as readonly string[]).includes(model)) {
-    return model;
-  }
-  return DEFAULT_CODEAGENT_MODEL;
 }
