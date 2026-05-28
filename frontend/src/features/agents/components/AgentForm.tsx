@@ -93,15 +93,22 @@ export function AgentForm({
   }, [agent, mode]);
 
   useEffect(() => {
+    if (mode !== "create") return;
     if (modelSource !== "provider" || enabledProviders.length === 0) return;
     if (enabledProviders.some((provider) => provider.id === selectedProviderId)) return;
     setSelectedProviderId(enabledProviders[0]?.id ?? "");
-  }, [enabledProviders, modelSource, selectedProviderId]);
+  }, [enabledProviders, mode, modelSource, selectedProviderId]);
 
   const selectedProvider = enabledProviders.find(
     (provider) => provider.id === selectedProviderId,
   );
   const selectedProviderModels = selectedProvider?.models ?? [];
+  const unavailableDraftProvider =
+    mode === "edit" &&
+    modelSource === "provider" &&
+    !providersLoading &&
+    Boolean(selectedProviderId) &&
+    !selectedProvider;
 
   useEffect(() => {
     if (modelSource !== "provider" || !selectedProvider) return;
@@ -116,11 +123,15 @@ export function AgentForm({
 
   const providerSaveBlocked =
     modelSource === "provider" &&
-    (providersLoading || !selectedProvider || selectedProviderModels.length === 0);
+    (providersLoading ||
+      unavailableDraftProvider ||
+      !selectedProvider ||
+      selectedProviderModels.length === 0);
+  const showUnavailableProviderMessage = unavailableDraftProvider;
   const showProviderModelsMessage =
     modelSource === "provider" &&
     !providersLoading &&
-    Boolean(selectedProviderId) &&
+    Boolean(selectedProvider) &&
     selectedProviderModels.length === 0;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -276,6 +287,11 @@ export function AgentForm({
                   {!providersLoading && enabledProviders.length === 0 ? (
                     <option value="">暂无可用 Provider</option>
                   ) : null}
+                  {unavailableDraftProvider ? (
+                    <option value={selectedProviderId}>
+                      {selectedProviderId} (不可用)
+                    </option>
+                  ) : null}
                   {enabledProviders.map((provider) => (
                     <option key={provider.id} value={provider.id}>
                       {provider.display_name}
@@ -292,7 +308,9 @@ export function AgentForm({
                   value={selectedProviderModel}
                 >
                   {selectedProviderModels.length === 0 ? (
-                    <option value="">暂无模型</option>
+                    <option value={selectedProviderModel}>
+                      {selectedProviderModel || "暂无模型"}
+                    </option>
                   ) : null}
                   {selectedProviderModels.map((model) => (
                     <option key={model} value={model}>
@@ -304,6 +322,12 @@ export function AgentForm({
             </>
           )}
         </div>
+
+        {showUnavailableProviderMessage ? (
+          <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+            当前 draft 引用的 Provider 不可用，请选择一个已启用的 LLM Provider。
+          </p>
+        ) : null}
 
         {showProviderModelsMessage ? (
           <p className="rounded-lg bg-warning/15 px-3 py-2 text-xs text-charcoal">

@@ -189,6 +189,44 @@ describe("AgentForm", () => {
       enabled: false,
     });
   });
+
+  it("blocks edit save when draft provider is unavailable", () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    const agent = buildAgent({
+      draft: {
+        mcp_server_ids: [],
+        model: "disabled-model",
+        model_config: {},
+        provider_id: "provider-disabled",
+        system_prompt: "Existing prompt.",
+        tool_allowlist: [],
+      },
+    });
+    render(
+      <AgentForm
+        agent={agent}
+        mode="edit"
+        onUpdate={onUpdate}
+        providers={[
+          buildProvider({
+            display_name: "OpenAI Main",
+            id: "provider-1",
+            models: ["gpt-5-mini"],
+          }),
+        ]}
+        providersLoading={false}
+      />,
+    );
+
+    expect(screen.getByLabelText("LLM Provider")).toHaveValue("provider-disabled");
+    expect(screen.getByRole("option", { name: "provider-disabled (不可用)" })).toBeInTheDocument();
+    expect(screen.getByText("当前 draft 引用的 Provider 不可用，请选择一个已启用的 LLM Provider。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存 Agent" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });
 
 function buildProviders(): LlmProviderSummary[] {
@@ -232,7 +270,7 @@ function buildProvider(overrides: Partial<LlmProviderSummary> = {}): LlmProvider
   };
 }
 
-function buildAgent(): AgentDetail {
+function buildAgent(overrides: Partial<AgentDetail> = {}): AgentDetail {
   return {
     created_at: "2026-05-28T00:00:00Z",
     description: "Existing description",
@@ -250,5 +288,6 @@ function buildAgent(): AgentDetail {
     id: "agent-1",
     latest_version: null,
     updated_at: "2026-05-28T00:00:00Z",
+    ...overrides,
   };
 }
