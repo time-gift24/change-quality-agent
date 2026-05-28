@@ -36,6 +36,12 @@ class LlmProvider(Base):
         default=dict,
         server_default=text("'{}'::jsonb"),
     )
+    models: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'::jsonb"),
+    )
     enabled: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

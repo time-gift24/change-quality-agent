@@ -23,6 +23,7 @@ const refetchDetail = vi.fn();
 const createProvider = vi.fn();
 const updateProvider = vi.fn();
 const deleteProvider = vi.fn();
+const testProviderModel = vi.fn();
 
 beforeEach(() => {
   refetchProviders.mockReset();
@@ -30,6 +31,7 @@ beforeEach(() => {
   createProvider.mockReset();
   updateProvider.mockReset();
   deleteProvider.mockReset();
+  testProviderModel.mockReset();
 
   vi.mocked(useLlmProviders).mockReturnValue({
     data: [provider],
@@ -48,6 +50,7 @@ beforeEach(() => {
     deleteProvider,
     error: null,
     pending: false,
+    testProviderModel,
     updateProvider,
   });
 });
@@ -79,7 +82,6 @@ describe("LLM provider pages", () => {
   });
 
   it("renders detail with masked config and deletes after confirmation", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     deleteProvider.mockResolvedValue(undefined);
 
     render(
@@ -96,9 +98,44 @@ describe("LLM provider pages", () => {
     expect(screen.queryByText("sk-test")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "删除" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("确认删除 Provider");
+    fireEvent.click(screen.getByRole("button", { name: "确认删除" }));
 
     await waitFor(() => expect(deleteProvider).toHaveBeenCalledWith("provider-1"));
     expect(screen.getByText("Provider 列表")).toBeInTheDocument();
+  });
+
+  it("tests a configured model from detail page", async () => {
+    testProviderModel.mockResolvedValue({
+      error: null,
+      latency_ms: 20,
+      message: "pong",
+      request: {
+        messages: [{ content: "ping", role: "user" }],
+        model: "gpt-5-mini",
+        provider_type: "openai",
+      },
+      response: {
+        content: "**pong**",
+        raw: { content: "**pong**", type: "ai" },
+      },
+      status: "ok",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/llm-providers/provider-1"]}>
+        <Routes>
+          <Route element={<LlmProviderDetailPage />} path="/llm-providers/:providerId" />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "测试 gpt-5-mini" }));
+
+    await waitFor(() => expect(testProviderModel).toHaveBeenCalledWith("provider-1", "gpt-5-mini"));
+    expect(await screen.findByRole("status")).toHaveTextContent("20ms");
+    expect(screen.getByTestId("stream-markdown")).toHaveTextContent("pong");
+    expect(screen.getByText(/provider_type/)).toBeInTheDocument();
   });
 
   it("creates provider and navigates to detail", async () => {
@@ -116,9 +153,7 @@ describe("LLM provider pages", () => {
     fireEvent.change(screen.getByLabelText(/Display Name/), {
       target: { value: "OpenAI Main" },
     });
-    fireEvent.change(screen.getByLabelText(/Provider Type/), {
-      target: { value: "openai" },
-    });
+    expect(screen.getByRole("combobox", { name: /Provider Type/ })).toHaveValue("openai");
     fireEvent.click(screen.getByRole("button", { name: "保存 Provider" }));
 
     await waitFor(() => expect(createProvider).toHaveBeenCalled());
@@ -150,6 +185,7 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
+    models: ["gpt-5-mini"],
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from app.schemas.llm_providers import (
+    LlmProviderCreate,
     LlmProviderDetail,
     LlmProviderUpdate,
 )
@@ -71,3 +72,23 @@ def test_update_distinguishes_omitted_and_null_api_key() -> None:
 
     assert "api_key" not in omitted.model_fields_set
     assert "api_key" in cleared.model_fields_set
+
+
+def test_create_rejects_unsupported_provider_type() -> None:
+    try:
+        LlmProviderCreate(display_name="Unsupported", provider_type="custom")
+    except ValueError as exc:
+        assert "provider_type" in str(exc)
+        return
+
+    raise AssertionError("unsupported provider_type should fail validation")
+
+
+def test_create_normalizes_models() -> None:
+    provider = LlmProviderCreate(
+        display_name="OpenAI",
+        provider_type="openai",
+        models=[" gpt-5-mini ", "gpt-5-mini", "", "gpt-5"],
+    )
+
+    assert provider.models == ["gpt-5-mini", "gpt-5"]

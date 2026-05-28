@@ -8,9 +8,10 @@ import {
   deleteLlmProvider,
   getLlmProvider,
   listLlmProviders,
+  testLlmProviderModel,
   updateLlmProvider,
 } from "./api";
-import type { LlmProviderCreate, LlmProviderDetail } from "./types";
+import type { LlmProviderCreate, LlmProviderDetail, LlmProviderModelTestResponse } from "./types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -39,6 +40,7 @@ describe("LLM provider API", () => {
       default_query: { "api-version": "2026-01-01" },
       display_name: "OpenAI Main",
       enabled: true,
+      models: ["gpt-5-mini"],
       provider_type: "openai",
     };
     const detail = buildProvider();
@@ -97,6 +99,53 @@ describe("LLM provider API", () => {
     );
   });
 
+  it("calls provider model test endpoint with selected model", async () => {
+    const result: LlmProviderModelTestResponse = {
+      error: null,
+      latency_ms: 25,
+      message: "pong",
+      request: {
+        messages: [{ content: "ping", role: "user" }],
+        model: "gpt-5-mini",
+        provider_type: "openai",
+      },
+      response: {
+        content: "pong",
+        raw: { content: "pong", type: "ai" },
+      },
+      status: "ok",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(result));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(testLlmProviderModel("provider-1", "gpt-5-mini")).resolves.toEqual(result);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/llm-providers/provider-1/test",
+      expect.objectContaining({
+        body: JSON.stringify({ model: "gpt-5-mini" }),
+        method: "POST",
+      }),
+    );
+  });
+
+  it("returns provider model test body when endpoint reports 502", async () => {
+    const result: LlmProviderModelTestResponse = {
+      error: "upstream rejected request",
+      latency_ms: 25,
+      message: null,
+      request: { model: "gpt-5-mini", provider_type: "openai" },
+      response: null,
+      status: "failed",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse(result, 502, "Bad Gateway")),
+    );
+
+    await expect(testLlmProviderModel("provider-1", "gpt-5-mini")).resolves.toEqual(result);
+  });
+
   it("throws ApiError detail when delete fails", async () => {
     vi.stubGlobal(
       "fetch",
@@ -122,6 +171,7 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
+    models: ["gpt-5-mini"],
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

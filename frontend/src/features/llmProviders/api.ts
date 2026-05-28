@@ -2,6 +2,7 @@ import { apiErrorFromResponse, requestJson } from "../../lib/apiClient";
 import type {
   LlmProviderCreate,
   LlmProviderDetail,
+  LlmProviderModelTestResponse,
   LlmProviderSummary,
   LlmProviderUpdate,
 } from "./types";
@@ -53,6 +54,27 @@ export async function deleteLlmProvider(providerId: string): Promise<void> {
   if (!response.ok) {
     throw await apiErrorFromResponse(response);
   }
+}
+
+export async function testLlmProviderModel(
+  providerId: string,
+  model: string,
+): Promise<LlmProviderModelTestResponse> {
+  const response = await fetch(`${buildProviderUrl(providerId)}/test`, {
+    body: JSON.stringify({ model }),
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  if (response.ok || response.status === 502) {
+    return JSON.parse(await response.text()) as LlmProviderModelTestResponse;
+  }
+
+  throw await apiErrorFromResponse(response);
 }
 
 function buildProviderUrl(providerId: string): string {

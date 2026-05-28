@@ -5,11 +5,13 @@ import {
   deleteLlmProvider,
   getLlmProvider,
   listLlmProviders,
+  testLlmProviderModel,
   updateLlmProvider,
 } from "./api";
 import type {
   LlmProviderCreate,
   LlmProviderDetail,
+  LlmProviderModelTestResponse,
   LlmProviderSummary,
   LlmProviderUpdate,
 } from "./types";
@@ -147,6 +149,11 @@ export function useLlmProviderMutations() {
       runMutation(() => deleteLlmProvider(providerId), options),
     error,
     pending: pendingCount > 0,
+    testProviderModel: (
+      providerId: string,
+      model: string,
+      options?: MutationOptions<LlmProviderModelTestResponse>,
+    ) => runMutation(() => testLlmProviderModel(providerId, model), options),
     updateProvider: (
       providerId: string,
       payload: LlmProviderUpdate,

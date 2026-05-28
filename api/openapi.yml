@@ -664,6 +664,49 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers/{provider_id}/test:
+    post:
+      tags:
+      - llm-providers
+      summary: Test an LLM provider model
+      operationId: testLlmProviderModel
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderModelTestRequest'
+      responses:
+        '200':
+          description: Provider model responded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderModelTestResponse'
+        '400':
+          description: Requested model is not configured for this provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Provider model connectivity test failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderModelTestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/agents:
     get:
       tags:
@@ -1473,6 +1516,33 @@ components:
           nullable: true
         provider_type:
           type: string
+          enum:
+          - openai
+          - anthropic
+          - azure_openai
+          - azure_ai
+          - google_vertexai
+          - google_genai
+          - anthropic_bedrock
+          - bedrock
+          - bedrock_converse
+          - cohere
+          - fireworks
+          - together
+          - mistralai
+          - huggingface
+          - groq
+          - ollama
+          - google_anthropic_vertex
+          - deepseek
+          - ibm
+          - nvidia
+          - xai
+          - openrouter
+          - perplexity
+          - upstage
+          - baseten
+          - litellm
           example: openai
         base_url:
           type: string
@@ -1490,6 +1560,12 @@ components:
           type: object
           additionalProperties:
             type: string
+        models:
+          type: array
+          items:
+            type: string
+          default: []
+          description: Model names this provider can serve.
         enabled:
           type: boolean
           default: true
@@ -1504,6 +1580,33 @@ components:
           nullable: true
         provider_type:
           type: string
+          enum:
+          - openai
+          - anthropic
+          - azure_openai
+          - azure_ai
+          - google_vertexai
+          - google_genai
+          - anthropic_bedrock
+          - bedrock
+          - bedrock_converse
+          - cohere
+          - fireworks
+          - together
+          - mistralai
+          - huggingface
+          - groq
+          - ollama
+          - google_anthropic_vertex
+          - deepseek
+          - ibm
+          - nvidia
+          - xai
+          - openrouter
+          - perplexity
+          - upstage
+          - baseten
+          - litellm
           nullable: true
         base_url:
           type: string
@@ -1523,6 +1626,12 @@ components:
           nullable: true
           additionalProperties:
             type: string
+        models:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Model names this provider can serve.
         enabled:
           type: boolean
           nullable: true
@@ -1534,6 +1643,7 @@ components:
       - provider_type
       - default_headers
       - default_query
+      - models
       - enabled
       - created_at
       - updated_at
@@ -1565,6 +1675,11 @@ components:
           additionalProperties:
             type: string
           description: Secret-like keys are masked in responses.
+        models:
+          type: array
+          items:
+            type: string
+          description: Model names this provider can serve.
         enabled:
           type: boolean
         created_at:
@@ -1580,6 +1695,42 @@ components:
       allOf:
       - $ref: '#/components/schemas/LlmProviderSummary'
       properties: {}
+    LlmProviderModelTestRequest:
+      type: object
+      required:
+      - model
+      properties:
+        model:
+          type: string
+          minLength: 1
+    LlmProviderModelTestResponse:
+      type: object
+      required:
+      - status
+      - latency_ms
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - failed
+        latency_ms:
+          type: number
+          format: float
+        message:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        request:
+          type: object
+          additionalProperties: true
+          nullable: true
+        response:
+          type: object
+          additionalProperties: true
+          nullable: true
     AgentDraftConfig:
       type: object
       required:

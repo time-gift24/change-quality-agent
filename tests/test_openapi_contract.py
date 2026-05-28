@@ -143,6 +143,7 @@ def test_llm_provider_tag_and_paths_are_documented() -> None:
         ("/api/v1/llm-providers/{provider_id}", "get"): {"200", "404", "422"},
         ("/api/v1/llm-providers/{provider_id}", "patch"): {"200", "404", "422"},
         ("/api/v1/llm-providers/{provider_id}", "delete"): {"204", "404", "422"},
+        ("/api/v1/llm-providers/{provider_id}/test", "post"): {"200", "400", "404", "502", "422"},
     }
 
     for (path, method), statuses in expected_operations.items():
@@ -237,6 +238,8 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
         "LlmProviderUpdate",
         "LlmProviderSummary",
         "LlmProviderDetail",
+        "LlmProviderModelTestRequest",
+        "LlmProviderModelTestResponse",
     ):
         assert schema_name in schemas
 
@@ -245,6 +248,59 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
     assert "api_key" not in schemas["LlmProviderSummary"]["properties"]
     assert "api_key" not in schemas["LlmProviderDetail"]["properties"]
     assert "api_key_configured" in schemas["LlmProviderSummary"]["properties"]
+    assert schemas["LlmProviderCreate"]["properties"]["models"] == {
+        "type": "array",
+        "items": {"type": "string"},
+        "default": [],
+        "description": "Model names this provider can serve.",
+    }
+    assert "models" in schemas["LlmProviderSummary"]["properties"]
+    assert schemas["LlmProviderModelTestRequest"]["properties"]["model"] == {
+        "type": "string",
+        "minLength": 1,
+    }
+    assert schemas["LlmProviderModelTestResponse"]["properties"]["request"] == {
+        "type": "object",
+        "additionalProperties": True,
+        "nullable": True,
+    }
+    assert schemas["LlmProviderModelTestResponse"]["properties"]["response"] == {
+        "type": "object",
+        "additionalProperties": True,
+        "nullable": True,
+    }
+    provider_type_schema = schemas["LlmProviderCreate"]["properties"]["provider_type"]
+    assert provider_type_schema["enum"] == [
+        "openai",
+        "anthropic",
+        "azure_openai",
+        "azure_ai",
+        "google_vertexai",
+        "google_genai",
+        "anthropic_bedrock",
+        "bedrock",
+        "bedrock_converse",
+        "cohere",
+        "fireworks",
+        "together",
+        "mistralai",
+        "huggingface",
+        "groq",
+        "ollama",
+        "google_anthropic_vertex",
+        "deepseek",
+        "ibm",
+        "nvidia",
+        "xai",
+        "openrouter",
+        "perplexity",
+        "upstage",
+        "baseten",
+        "litellm",
+    ]
+    assert schemas["LlmProviderUpdate"]["properties"]["provider_type"]["enum"] == (
+        provider_type_schema["enum"]
+    )
 
 
 def test_agent_test_runs_response_reuses_run_start_response() -> None:

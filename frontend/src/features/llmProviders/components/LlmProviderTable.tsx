@@ -37,14 +37,16 @@ export function LlmProviderTable({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
             aria-label="搜索 LLM Provider"
-            className="h-9 w-full rounded-lg border border-hairline bg-canvas px-3 text-xs text-ink outline-none transition-colors placeholder:text-mute focus:border-primary focus:ring-2 focus:ring-primary/15 sm:w-64"
+            autoComplete="off"
+            className="h-10 w-full rounded-lg border border-hairline bg-canvas px-3 text-sm text-ink outline-none transition-colors placeholder:text-mute focus:border-primary focus:ring-2 focus:ring-primary/15 sm:w-64"
+            name="llm_provider_search"
             onChange={(event) => onSearchTextChange(event.target.value)}
             placeholder="按名称或类型搜索…"
             type="search"
             value={searchText}
           />
-          <Button onClick={onRefresh} variant="secondary">
-            刷新
+          <Button aria-busy={loading} disabled={loading} onClick={onRefresh} variant="secondary">
+            {loading ? "刷新中…" : "刷新"}
           </Button>
         </div>
         <Button
@@ -57,6 +59,7 @@ export function LlmProviderTable({
         </Button>
       </div>
 
+      <p className="mb-2 text-xs text-mute md:hidden">表格可横向滑动查看更多字段。</p>
       <div className="overflow-x-auto pb-2">
         <Table className="min-w-[940px] border-separate border-spacing-y-2">
           <TableHeader>
@@ -108,13 +111,13 @@ export function LlmProviderTable({
                       <p className="truncate text-sm font-semibold tracking-tight text-ink transition-colors group-hover:text-primary-deep">
                         {provider.display_name}
                       </p>
-                      <p className="mt-1 truncate font-mono text-2xs text-stone">
+                      <p className="mt-1 truncate font-mono text-xs text-stone">
                         {provider.id}
                       </p>
                     </Link>
                   </MetricCell>
                   <MetricCell>
-                    <span className="inline-flex h-6 items-center rounded-full border border-hairline bg-canvas px-2.5 font-mono text-2xs text-ink">
+                    <span className="inline-flex h-7 items-center rounded-full border border-hairline bg-canvas px-2.5 font-mono text-xs text-ink">
                       {provider.provider_type}
                     </span>
                   </MetricCell>

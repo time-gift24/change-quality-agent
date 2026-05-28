@@ -5,9 +5,11 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
+from app.api.v1 import llm_providers as llm_provider_api
 from app.core.database import get_session
 from app.main import app
 from app.repositories.llm_providers import LlmProviderNotFoundError
+from app.schemas.llm_providers import LlmProviderModelTestResponse
 
 
 class FakeSession:
@@ -38,6 +40,7 @@ class FakeProvider:
             "X-Tenant": "quality",
         }
         self.default_query = {"token": "secret", "api-version": "2026-01-01"}
+        self.models = ["gpt-5-mini", "gpt-5"]
         self.enabled = True
         self.created_at = datetime.now(UTC)
         self.updated_at = datetime.now(UTC)
@@ -131,6 +134,7 @@ async def test_create_provider_persists_and_masks_response() -> None:
                 "default_headers": {"X-Tenant": "quality"},
                 "default_query": {"api-version": "2026-01-01"},
                 "enabled": True,
+                "models": ["gpt-5-mini", "gpt-5"],
             },
         )
 
@@ -142,7 +146,31 @@ async def test_create_provider_persists_and_masks_response() -> None:
     assert "key" not in body
     assert repository.created_values is not None
     assert repository.created_values["api_key"] == "sk-azure"
+    assert repository.created_values["models"] == ["gpt-5-mini", "gpt-5"]
     assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_create_provider_rejects_unsupported_provider_type() -> None:
+    repository = FakeRepository()
+    session = FakeSession()
+    override_dependencies(repository, session)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/llm-providers",
+            json={
+                "display_name": "Unsupported",
+                "provider_type": "custom",
+            },
+        )
+
+    assert response.status_code == 422
+    assert repository.created_values is None
+    assert session.commits == 0
 
 
 @pytest.mark.asyncio
@@ -237,6 +265,121 @@ async def test_update_provider_clears_headers_and_query_when_null() -> None:
     assert repository.updated_values == {"default_headers": {}, "default_query": {}}
     assert response.json()["default_headers"] == {}
     assert response.json()["default_query"] == {}
+
+
+@pytest.mark.asyncio
+async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
+    repository = FakeRepository()
+    override_dependencies(repository, FakeSession())
+    calls: list[tuple[object, str]] = []
+
+    async def fake_test_provider_model(provider, model):
+        calls.append((provider, model))
+        return LlmProviderModelTestResponse(
+            status="ok",
+            latency_ms=12.5,
+            message="pong",
+            error=None,
+            request={
+                "model": model,
+                "messages": [{"role": "user", "content": "ping"}],
+                "provider_type": provider.provider_type,
+            },
+            response={
+                "content": "pong",
+                "raw": {"type": "ai", "content": "pong"},
+            },
+        )
+
+    monkeypatch.setattr(
+        llm_provider_api,
+        "test_provider_model_connectivity",
+        fake_test_provider_model,
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/v1/llm-providers/{repository.provider_id}/test",
+            json={"model": "gpt-5-mini"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "latency_ms": 12.5,
+        "message": "pong",
+        "error": None,
+        "request": {
+            "model": "gpt-5-mini",
+            "messages": [{"role": "user", "content": "ping"}],
+            "provider_type": "openai",
+        },
+        "response": {
+            "content": "pong",
+            "raw": {"type": "ai", "content": "pong"},
+        },
+    }
+    assert len(calls) == 1
+    provider_config, model = calls[0]
+    assert provider_config.id == repository.provider_id
+    assert provider_config.provider_type == "openai"
+    assert model == "gpt-5-mini"
+
+
+@pytest.mark.asyncio
+async def test_test_provider_model_rejects_model_not_in_provider_models() -> None:
+    repository = FakeRepository()
+    override_dependencies(repository, FakeSession())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/v1/llm-providers/{repository.provider_id}/test",
+            json={"model": "unknown-model"},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Model is not configured for this provider."
+
+
+@pytest.mark.asyncio
+async def test_test_provider_model_returns_502_on_failure(monkeypatch) -> None:
+    repository = FakeRepository()
+    override_dependencies(repository, FakeSession())
+
+    async def fake_test_provider_model(provider, model):
+        return LlmProviderModelTestResponse(
+            status="failed",
+            latency_ms=3.0,
+            message=None,
+            error="upstream rejected request",
+            request={"model": model, "provider_type": provider.provider_type},
+            response=None,
+        )
+
+    monkeypatch.setattr(
+        llm_provider_api,
+        "test_provider_model_connectivity",
+        fake_test_provider_model,
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/v1/llm-providers/{repository.provider_id}/test",
+            json={"model": "gpt-5-mini"},
+        )
+
+    assert response.status_code == 502
+    assert response.json()["status"] == "failed"
+    assert response.json()["error"] == "upstream rejected request"
 
 
 @pytest.mark.asyncio

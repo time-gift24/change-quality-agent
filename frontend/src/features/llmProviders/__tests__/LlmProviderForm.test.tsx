@@ -34,6 +34,9 @@ describe("LlmProviderForm", () => {
     fireEvent.change(screen.getByLabelText(/Default Query/), {
       target: { value: "api-version=2026-01-01" },
     });
+    fireEvent.change(screen.getByLabelText(/Models/), {
+      target: { value: "gpt-5-mini\ngpt-5-mini\n\ngpt-5" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "保存 Provider" }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
@@ -45,8 +48,20 @@ describe("LlmProviderForm", () => {
       description: null,
       display_name: "OpenAI Main",
       enabled: true,
+      models: ["gpt-5-mini", "gpt-5"],
       provider_type: "openai",
     });
+  });
+
+  it("renders provider type as init_chat_model provider options", () => {
+    render(<LlmProviderForm mode="create" onCreate={vi.fn()} provider={null} />);
+
+    const providerType = screen.getByRole("combobox", { name: /Provider Type/ });
+
+    expect(providerType).toHaveValue("openai");
+    expect(screen.getByRole("option", { name: "deepseek" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "azure_openai" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "openrouter" })).toBeInTheDocument();
   });
 
   it("omits api_key on edit unless replacement or clear is requested", async () => {
@@ -129,6 +144,7 @@ function buildProvider(): LlmProviderDetail {
     display_name: "OpenAI Main",
     enabled: true,
     id: "provider-1",
+    models: ["gpt-5-mini"],
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
   };

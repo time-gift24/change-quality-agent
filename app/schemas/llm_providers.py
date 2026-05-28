@@ -1,8 +1,17 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
+
+from app.core.llm_provider_types import LlmProviderType
 
 
 REDACTED = "********"
@@ -31,23 +40,43 @@ def _is_secret_key(key: str) -> bool:
 class LlmProviderCreate(BaseModel):
     display_name: str
     description: str | None = None
-    provider_type: str
+    provider_type: LlmProviderType
     base_url: str | None = None
     api_key: str | None = None
     default_headers: dict[str, str] = Field(default_factory=dict)
     default_query: dict[str, str] = Field(default_factory=dict)
+    models: list[str] = Field(
+        default_factory=list,
+        description="Model names this provider can serve.",
+    )
     enabled: bool = True
+
+    @field_validator("models")
+    @classmethod
+    def normalize_models(cls, value: list[str]) -> list[str]:
+        return _normalize_models(value)
 
 
 class LlmProviderUpdate(BaseModel):
     display_name: str | None = None
     description: str | None = None
-    provider_type: str | None = None
+    provider_type: LlmProviderType | None = None
     base_url: str | None = None
     api_key: str | None = None
     default_headers: dict[str, str] | None = None
     default_query: dict[str, str] | None = None
+    models: list[str] | None = Field(
+        default=None,
+        description="Model names this provider can serve.",
+    )
     enabled: bool | None = None
+
+    @field_validator("models")
+    @classmethod
+    def normalize_models(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        return _normalize_models(value)
 
 
 class LlmProviderSummary(BaseModel):
@@ -60,6 +89,7 @@ class LlmProviderSummary(BaseModel):
     base_url: str | None
     default_headers: dict[str, str]
     default_query: dict[str, str]
+    models: list[str] = Field(default_factory=list)
     enabled: bool
     created_at: datetime
     updated_at: datetime
@@ -90,3 +120,28 @@ class LlmProviderSummary(BaseModel):
 
 class LlmProviderDetail(LlmProviderSummary):
     pass
+
+
+class LlmProviderModelTestRequest(BaseModel):
+    model: str = Field(min_length=1)
+
+
+class LlmProviderModelTestResponse(BaseModel):
+    status: Literal["ok", "failed"]
+    latency_ms: float
+    message: str | None = None
+    error: str | None = None
+    request: dict[str, Any] | None = None
+    response: dict[str, Any] | None = None
+
+
+def _normalize_models(value: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        model = item.strip()
+        if not model or model in seen:
+            continue
+        normalized.append(model)
+        seen.add(model)
+    return normalized
