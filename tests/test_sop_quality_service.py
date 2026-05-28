@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.core.config import EnvironmentConfig, Settings
-from app.repositories.runs import ActiveRunExistsError
+from app.repositories.sop_quality_checks import ActiveSopQualityCheckExistsError
 from app.schemas.sop import SopSnapshot
 from app.services.sop_quality import SopQualityService
 
@@ -27,20 +27,32 @@ class FakeRepository:
     def __init__(
         self,
         order: list[str],
-        conflict_run_id: UUID | None = None,
+        active_check_id: UUID | None = None,
     ) -> None:
         self.order = order
-        self.conflict_run_id = conflict_run_id
+        self.active_check_id = active_check_id
         self.created_kwargs = {}
         self.id = uuid4()
-        self.thread_id = "thread-1"
+        self.status = "pending"
 
-    async def create_sop_run(self, **kwargs):
-        self.order.append("create_run")
+    async def create_check(self, **kwargs):
+        self.order.append("create_check")
         self.created_kwargs = kwargs
-        if self.conflict_run_id is not None:
-            raise ActiveRunExistsError(self.conflict_run_id)
+        if self.active_check_id is not None:
+            raise ActiveSopQualityCheckExistsError(self.active_check_id)
         return self
+
+    async def get_check(self, check_id):
+        if self.active_check_id == check_id:
+            active = FakeRepository([])
+            active.id = check_id
+            active.status = "running"
+            return active
+        return None
+
+    async def append_event(self, check_id, **kwargs):
+        self.order.append(kwargs["event_type"])
+        return None
 
 
 @pytest.fixture
@@ -49,7 +61,7 @@ def settings() -> Settings:
         environments=[
             EnvironmentConfig(
                 key="dev",
-                name_zh="开发",
+                name_zh="dev",
                 name_en="Development",
             )
         ]
@@ -57,7 +69,7 @@ def settings() -> Settings:
 
 
 @pytest.mark.asyncio
-async def test_start_sop_run_fetches_sop_before_creating_run(
+async def test_start_check_fetches_sop_before_creating_check(
     settings: Settings,
 ) -> None:
     order: list[str] = []
@@ -67,41 +79,71 @@ async def test_start_sop_run_fetches_sop_before_creating_run(
         repository=FakeRepository(order),
     )
 
-    await service.start_run("release-checklist", "dev")
+    await service.start_check("release-checklist", "dev")
 
-    assert order == ["fetch_sop", "create_run"]
+    assert order[:2] == ["fetch_sop", "create_check"]
 
 
 @pytest.mark.asyncio
-async def test_start_sop_run_returns_conflict_for_active_run(
-    settings: Settings,
-) -> None:
-    active_run_id = uuid4()
+async def test_start_check_returns_existing_active_check(settings: Settings) -> None:
+    order: list[str] = []
+    active_check_id = uuid4()
     service = SopQualityService(
         settings=settings,
-        sop_client=FakeSopClient([]),
-        repository=FakeRepository([], conflict_run_id=active_run_id),
+        sop_client=FakeSopClient(order),
+        repository=FakeRepository(order, active_check_id=active_check_id),
+        schedule_check=lambda check_id: order.append(f"schedule:{check_id}"),
+        commit=lambda: order.append("commit"),
     )
 
-    result = await service.start_run("release-checklist", "dev")
+    result = await service.start_check("release-checklist", "dev")
 
-    assert result.accepted is False
-    assert result.active_run_id == active_run_id
-    assert result.status_url == f"/api/runs/{active_run_id}"
+    assert result.created is False
+    assert result.check_id == active_check_id
+    assert result.status_url == f"/api/sop-quality-checks/{active_check_id}"
+    assert order == ["fetch_sop", "create_check"]
 
 
 @pytest.mark.asyncio
-async def test_start_sop_run_builds_conflict_key(settings: Settings) -> None:
-    repository = FakeRepository([])
+async def test_start_check_uses_graph_constants_and_writes_created_event(
+    settings: Settings,
+) -> None:
+    order: list[str] = []
+    repository = FakeRepository(order)
     service = SopQualityService(
         settings=settings,
-        sop_client=FakeSopClient([]),
+        sop_client=FakeSopClient(order),
         repository=repository,
     )
 
-    await service.start_run("release-checklist", "dev")
+    result = await service.start_check("release-checklist", "dev")
 
-    assert (
-        repository.created_kwargs["active_conflict_key"]
-        == "sop:release-checklist:env:dev"
+    assert result.created is True
+    assert repository.created_kwargs["graph_name"] == "sop_quality"
+    assert repository.created_kwargs["graph_version"] == "sop-quality@1"
+    assert order == ["fetch_sop", "create_check", "created"]
+
+
+@pytest.mark.asyncio
+async def test_start_check_commits_before_scheduling_new_check(
+    settings: Settings,
+) -> None:
+    order: list[str] = []
+    repository = FakeRepository(order)
+    service = SopQualityService(
+        settings=settings,
+        sop_client=FakeSopClient(order),
+        repository=repository,
+        schedule_check=lambda check_id: order.append(f"schedule:{check_id}"),
+        commit=lambda: order.append("commit"),
     )
+
+    result = await service.start_check("release-checklist", "dev")
+
+    assert order == [
+        "fetch_sop",
+        "create_check",
+        "created",
+        "commit",
+        f"schedule:{result.check_id}",
+    ]

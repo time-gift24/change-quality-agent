@@ -1,27 +1,30 @@
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
 from app.core.config import Settings
-from app.repositories.runs import ActiveRunExistsError, RunRepository
-from app.schemas.runs import RunStatus
+from app.repositories.sop_quality_checks import (
+    ActiveSopQualityCheckExistsError,
+    SopQualityCheckRepository,
+)
+from app.schemas.sop_quality_checks import SopQualityCheckStatus
 from app.services.sop_client import SopClient
+
+SOP_QUALITY_GRAPH_NAME = "sop_quality"
+SOP_QUALITY_GRAPH_VERSION = "sop-quality@1"
+
+Scheduler = Callable[[UUID], object]
+Committer = Callable[[], object]
 
 
 @dataclass(frozen=True)
-class RunStartResult:
-    accepted: bool
+class CheckStartResult:
+    check_id: UUID
+    status: SopQualityCheckStatus
+    created: bool
     status_url: str
-    events_url: str
-    run_id: UUID | None = None
-    active_run_id: UUID | None = None
-    status: RunStatus | None = None
-    message: str | None = None
-
-
-Scheduler = Callable[[UUID], object]
-Committer = Callable[[], Awaitable[None]]
+    stream_url: str
 
 
 async def _noop_commit() -> None:
@@ -34,61 +37,80 @@ class SopQualityService:
         *,
         settings: Settings,
         sop_client: SopClient,
-        repository: RunRepository,
-        schedule_run: Scheduler | None = None,
+        repository: SopQualityCheckRepository,
+        schedule_check: Scheduler | None = None,
         commit: Committer = _noop_commit,
     ) -> None:
         self._settings = settings
         self._sop_client = sop_client
         self._repository = repository
-        self._schedule_run = schedule_run
+        self._schedule_check = schedule_check
         self._commit = commit
 
-    async def start_run(
+    async def start_check(
         self,
         sop_id: str,
         env_key: str,
         created_by: str | None = None,
-    ) -> RunStartResult:
-        environment = self._settings.get_environment(env_key)
+    ) -> CheckStartResult:
+        self._settings.get_environment(env_key)
         sop_snapshot = await self._sop_client.get_sop(sop_id, env_key)
-        active_conflict_key = f"sop:{sop_id}:env:{env_key}"
 
         try:
-            run = await self._repository.create_sop_run(
+            check = await self._repository.create_check(
                 sop_id=sop_id,
                 env_key=env_key,
-                env_snapshot=environment.public_dict(),
+                graph_name=SOP_QUALITY_GRAPH_NAME,
+                graph_version=SOP_QUALITY_GRAPH_VERSION,
                 sop_snapshot=sop_snapshot.model_dump(mode="json"),
-                active_conflict_key=active_conflict_key,
                 created_by=created_by,
             )
-        except ActiveRunExistsError as exc:
-            return self._conflict_result(exc.active_run_id)
+        except ActiveSopQualityCheckExistsError as exc:
+            active = await self._repository.get_check(exc.active_check_id)
+            status = _status_from_check(active)
+            return self._result(exc.active_check_id, status=status, created=False)
 
-        await self._commit()
-        await self._schedule_if_configured(run.id)
-        return RunStartResult(
-            accepted=True,
-            run_id=run.id,
-            status=RunStatus.pending,
-            status_url=f"/api/runs/{run.id}",
-            events_url=f"/api/runs/{run.id}/events",
+        await self._repository.append_event(check.id, event_type="created")
+        await self._commit_if_configured()
+        await self._schedule_if_configured(check.id)
+        return self._result(
+            check.id,
+            status=SopQualityCheckStatus.pending,
+            created=True,
         )
 
-    async def _schedule_if_configured(self, run_id: UUID) -> None:
-        if self._schedule_run is None:
-            return
-        result = self._schedule_run(run_id)
+    async def _commit_if_configured(self) -> None:
+        result = self._commit()
         if inspect.isawaitable(result):
             await result
 
-    def _conflict_result(self, active_run_id: UUID) -> RunStartResult:
-        return RunStartResult(
-            accepted=False,
-            active_run_id=active_run_id,
-            status=RunStatus.running,
-            message="An active run already exists for this SOP and environment.",
-            status_url=f"/api/runs/{active_run_id}",
-            events_url=f"/api/runs/{active_run_id}/events",
+    async def _schedule_if_configured(self, check_id: UUID) -> None:
+        if self._schedule_check is None:
+            return
+        result = self._schedule_check(check_id)
+        if inspect.isawaitable(result):
+            await result
+
+    def _result(
+        self,
+        check_id: UUID,
+        *,
+        status: SopQualityCheckStatus,
+        created: bool,
+    ) -> CheckStartResult:
+        return CheckStartResult(
+            check_id=check_id,
+            status=status,
+            created=created,
+            status_url=f"/api/sop-quality-checks/{check_id}",
+            stream_url=f"/api/sop-quality-checks/{check_id}/stream",
         )
+
+
+def _status_from_check(check) -> SopQualityCheckStatus:
+    if check is None:
+        return SopQualityCheckStatus.running
+    try:
+        return SopQualityCheckStatus(check.status)
+    except ValueError:
+        return SopQualityCheckStatus.running
