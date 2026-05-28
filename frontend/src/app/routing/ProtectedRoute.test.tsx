@@ -47,6 +47,19 @@ vi.mock("../../features/mcp/pages/McpServerFormPage", () => ({
   McpEditPage: () => <div>编辑 MCP Server</div>,
 }));
 
+vi.mock("../../features/agents/pages/AgentListPage", () => ({
+  AgentListPage: () => (
+    <div role="region" aria-label="Agent 配置 mock">
+      <h1>Agent 配置</h1>
+    </div>
+  ),
+}));
+
+vi.mock("../../features/agents/pages/AgentFormPage", () => ({
+  AgentCreatePage: () => <div>新增 Agent 页面</div>,
+  AgentEditPage: () => <div>编辑 Agent 页面</div>,
+}));
+
 vi.mock("../../features/auth/AuthContext", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   useAuth: vi.fn(),
@@ -86,6 +99,28 @@ describe("ProtectedRoute", () => {
       screen.getByRole("heading", {
         name: "MCP 管理",
       }),
+    ).toBeInTheDocument();
+  });
+
+  it("blocks non-admin access to /agents", () => {
+    vi.mocked(useAuth).mockReturnValue(buildAuthValue(buildUser({ is_admin: false })));
+    window.history.pushState({}, "", "/agents");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "403 Forbidden" }),
+    ).toBeInTheDocument();
+  });
+
+  it("allows admin access to /agents", () => {
+    vi.mocked(useAuth).mockReturnValue(buildAuthValue(buildUser({ is_admin: true })));
+    window.history.pushState({}, "", "/agents");
+
+    render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "Agent 配置" }),
     ).toBeInTheDocument();
   });
 });

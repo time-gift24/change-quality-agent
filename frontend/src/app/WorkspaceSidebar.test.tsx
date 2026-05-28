@@ -41,6 +41,7 @@ describe("WorkspaceSidebar", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "MCP 管理" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "LLM Provider 管理" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Agent 配置" })).toBeInTheDocument();
   });
 
   it("places management entries below 发起新SOP质检 inside the same nav", () => {
@@ -52,6 +53,7 @@ describe("WorkspaceSidebar", () => {
     expect(buttons[0]).toHaveAccessibleName("发起新SOP质检");
     expect(buttons[1]).toHaveAccessibleName("MCP 管理");
     expect(buttons[2]).toHaveAccessibleName("LLM Provider 管理");
+    expect(buttons[3]).toHaveAccessibleName("Agent 配置");
   });
 
   it("keeps nav entries visible with icons when collapsed", () => {
@@ -60,13 +62,16 @@ describe("WorkspaceSidebar", () => {
     const newSopButton = screen.getByRole("button", { name: "发起新SOP质检" });
     const mcpButton = screen.getByRole("button", { name: "MCP 管理" });
     const llmButton = screen.getByRole("button", { name: "LLM Provider 管理" });
+    const agentButton = screen.getByRole("button", { name: "Agent 配置" });
 
     expect(newSopButton).toBeInTheDocument();
     expect(mcpButton).toBeInTheDocument();
     expect(llmButton).toBeInTheDocument();
+    expect(agentButton).toBeInTheDocument();
     expect(newSopButton.querySelector("svg")).not.toBeNull();
     expect(mcpButton.querySelector("svg")).not.toBeNull();
     expect(llmButton.querySelector("svg")).not.toBeNull();
+    expect(agentButton.querySelector("svg")).not.toBeNull();
   });
 
   it("hides MCP 管理 when routing does not expose that nav route", () => {
@@ -122,6 +127,14 @@ describe("WorkspaceSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "LLM Provider 管理" }));
 
     expect(props.onNavigate).toHaveBeenCalledWith("llm-providers");
+  });
+
+  it("invokes onNavigate when Agent 配置 is clicked", () => {
+    const { props } = renderSidebar({ activeKey: "sop" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Agent 配置" }));
+
+    expect(props.onNavigate).toHaveBeenCalledWith("agents");
   });
 
   it("invokes onNewConversation when on sop and 发起新SOP质检 is clicked", () => {
