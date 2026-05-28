@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import models so Alembic autogenerate can see their metadata.
-from app.models import agents, mcp, runs, users  # noqa: F401
+from app.models import agents, mcp, sop_quality_checks, users  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
