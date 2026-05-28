@@ -140,7 +140,7 @@ async def test_runtime_start_enabled_servers_skips_without_single_instance_confi
 async def test_lifespan_starts_and_shuts_down_mcp_runtime(monkeypatch) -> None:
     events = []
 
-    async def fake_interrupt_leftover_runs():
+    async def fake_interrupt_leftover_sop_quality_checks():
         events.append("interrupt")
 
     class FakeRuntime:
@@ -150,7 +150,11 @@ async def test_lifespan_starts_and_shuts_down_mcp_runtime(monkeypatch) -> None:
         async def shutdown(self):
             events.append("mcp-shutdown")
 
-    monkeypatch.setattr(main, "interrupt_leftover_runs", fake_interrupt_leftover_runs)
+    monkeypatch.setattr(
+        main,
+        "interrupt_leftover_sop_quality_checks",
+        fake_interrupt_leftover_sop_quality_checks,
+    )
     monkeypatch.setattr(main, "get_mcp_runtime_manager", lambda: FakeRuntime())
 
     async with main.lifespan(main.app):

@@ -1,18 +1,19 @@
 # Change Quality Agent
 
 Change Quality Agent provides the backend substrate for running SOP quality
-checks, managing ReAct agent definitions, and observing long-running work.
+checks, managing agent definitions, and observing SOP quality check progress.
 
 ## Capabilities
 
-- Starts SOP quality runs from a mocked SOP source in v1.
+- Starts or joins global SOP quality checks from a mocked SOP source in v1.
 - Manages draft and published ReAct agent definitions for dynamically created
   agent nodes.
-- Starts ReAct agent test runs through the shared run and event substrate.
-- Persists run history and durable run events in Postgres.
-- Exposes generic run observation so clients can inspect status without
-  depending on subject-specific fields.
-- Streams persisted run events for replay and progress observation.
+- Persists SOP quality check history and lightweight lifecycle events in
+  Postgres.
+- Stores graph state, messages, and resume data in LangGraph Postgres
+  checkpoints.
+- Streams SOP quality check lifecycle events for reconnectable progress
+  observation.
 - Manages MCP server configuration and stdio runtime lifecycle for admin users.
   Allow commands with `mcp_allowed_stdio_commands`, pin launchable
   command/first-arg pairs with `mcp_allowed_stdio_specs` such as
@@ -22,13 +23,13 @@ checks, managing ReAct agent definitions, and observing long-running work.
   model factory. Configure `CODEAGENT_BASE_URL` and
   `CODEAGENT_TOKEN_PROVIDER=codeagent` on the API process; token headers are
   refreshed before each model HTTP request by the CodeAgent token provider.
-- Uses in-process v1 runners while worker leases, checkpoint resume, tool/MCP
+- Uses in-process v1 check runners while worker leases, checkpoint resume, tool/MCP
   resolution, LLM provider UI, and the real SOP client remain future integration
   points.
 
 ## Full-Stack SOP Debugging
 
-Use Postgres 13 for local end-to-end SOP run debugging.
+Use Postgres 13 for local end-to-end SOP quality check debugging.
 
 Database and migrations:
 

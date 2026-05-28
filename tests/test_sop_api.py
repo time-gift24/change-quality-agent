@@ -1,7 +1,7 @@
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from app.api.deps import get_run_repository, get_sop_client
+from app.api.deps import get_sop_client
 from app.main import app
 from app.schemas.sop import SopSnapshot
 
@@ -15,14 +15,6 @@ class FakeSopClient:
             updated_at=None,
             payload={"id": sop_id, "title": f"Mock SOP {sop_id}"},
         )
-
-
-class FakeRunRepository:
-    def __init__(self) -> None:
-        self.created = False
-
-    async def create_sop_run(self, **kwargs):
-        self.created = True
 
 
 @pytest.fixture(autouse=True)
@@ -48,9 +40,7 @@ async def test_list_environments() -> None:
 
 @pytest.mark.asyncio
 async def test_get_sop_preview_does_not_create_run() -> None:
-    repository = FakeRunRepository()
     app.dependency_overrides[get_sop_client] = FakeSopClient
-    app.dependency_overrides[get_run_repository] = lambda: repository
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -60,7 +50,6 @@ async def test_get_sop_preview_does_not_create_run() -> None:
 
     assert response.status_code == 200
     assert response.json()["sop_id"] == "release-checklist"
-    assert repository.created is False
 
 
 @pytest.mark.asyncio

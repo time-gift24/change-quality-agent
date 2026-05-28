@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_mcp_runtime_manager
-from app.api.v1 import agents, auth, llm_providers, mcp, runs, sop, sop_quality_checks
+from app.api.v1 import agents, auth, llm_providers, mcp, sop, sop_quality_checks
 from app.core.config import settings
 from app.core.database import async_session
 from app.core.logging import configure_logging
@@ -78,7 +78,6 @@ app.include_router(auth.router)
 app.include_router(mcp.router)
 app.include_router(llm_providers.router)
 app.include_router(agents.router)
-app.include_router(runs.router)
 app.include_router(sop.router)
 app.include_router(sop_quality_checks.router)
 

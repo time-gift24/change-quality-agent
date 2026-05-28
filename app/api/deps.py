@@ -9,7 +9,6 @@ from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.mcp_servers import McpServerRepository
-from app.repositories.runs import RunRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
@@ -23,13 +22,6 @@ def get_sop_client() -> SopClient:
 
 
 SopClientDep = Annotated[SopClient, Depends(get_sop_client)]
-
-
-def get_run_repository(session: SessionDep) -> RunRepository:
-    return RunRepository(session)
-
-
-RunRepositoryDep = Annotated[RunRepository, Depends(get_run_repository)]
 
 
 def get_sop_quality_check_repository(

@@ -1,388 +1,135 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: Change Quality Agent API
+  title: Change Quality Agent
   version: 0.1.0
-  description: 'API contract for SOP quality runs, run history, and generic run observation.
-    SOP fetching is mocked in v1.
-
-    '
-servers:
-- url: /
-tags:
-- name: auth
-  description: Cookie-backed user authentication APIs for local development.
-- name: sop
-  description: SOP entry points and SOP-scoped run history.
-- name: runs
-  description: Generic run observation APIs.
-- name: mcp
-  description: MCP server configuration and runtime management APIs.
-- name: agents
-  description: ReAct agent definitions, versions, and test runs.
-- name: llm-providers
-  description: Stored LangChain chat model provider configuration.
-security:
-- CookieAuth: []
 paths:
   /api/auth/me:
     get:
       tags:
       - auth
-      summary: Get the current authenticated user
-      operationId: getCurrentUser
+      summary: Get Me
+      operationId: get_me_api_auth_me_get
       responses:
         '200':
-          description: Current authenticated user.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserPublic'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /api/auth/dev-login:
     post:
       tags:
       - auth
-      summary: Log in as a seeded development user
-      operationId: devLogin
-      security: []
+      summary: Dev Login
+      operationId: dev_login_api_auth_dev_login_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/DevLoginRequest'
+        required: true
       responses:
         '200':
-          description: Development user session was created.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserPublic'
-        '403':
-          description: Development login is disabled.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Requested development user was not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/auth/logout:
     post:
       tags:
       - auth
-      summary: Clear the development session cookie
-      operationId: logout
-      security: []
+      summary: Logout
+      operationId: logout_api_auth_logout_post
       responses:
         '204':
-          description: Session cookie cleared.
-  /api/sop/environments:
-    get:
-      tags:
-      - sop
-      summary: List configured SOP environments
-      operationId: listSopEnvironments
-      responses:
-        '200':
-          description: Configured public environments.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/EnvironmentPublic'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-  /api/sop/{sop_id}:
-    get:
-      tags:
-      - sop
-      summary: Preview a mocked SOP snapshot
-      operationId: getSopPreview
-      parameters:
-      - $ref: '#/components/parameters/SopId'
-      - $ref: '#/components/parameters/EnvironmentKey'
-      responses:
-        '200':
-          description: Mocked SOP snapshot.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SopSnapshot'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-  /api/sop/{sop_id}/runs:
-    post:
-      tags:
-      - sop
-      summary: Start a quality run for a mocked SOP snapshot
-      operationId: startSopRun
-      parameters:
-      - $ref: '#/components/parameters/SopId'
-      - $ref: '#/components/parameters/EnvironmentKey'
-      responses:
-        '202':
-          description: Run accepted and scheduled.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RunStartResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: An active run already exists for this SOP and environment.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActiveRunConflict'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    get:
-      tags:
-      - sop
-      summary: List SOP run history
-      operationId: listSopRuns
-      parameters:
-      - $ref: '#/components/parameters/SopId'
-      - $ref: '#/components/parameters/EnvironmentKey'
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 20
-      responses:
-        '200':
-          description: SOP run history, newest first.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RunSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-  /api/sop/recent/runs:
-    get:
-      tags:
-      - sop
-      summary: List recent SOP runs for one environment
-      operationId: listRecentSopRuns
-      parameters:
-      - $ref: '#/components/parameters/EnvironmentKey'
-      - name: limit
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 20
-      responses:
-        '200':
-          description: Recent SOP runs for the environment, newest first.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/RunSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-  /api/runs/{run_id}:
-    get:
-      tags:
-      - runs
-      summary: Get generic run details
-      description: 'Generic run details intentionally do not expose SOP-specific fields
-        such as env_key at the top level.
-
-        '
-      operationId: getRun
-      parameters:
-      - $ref: '#/components/parameters/RunId'
-      - name: debug
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-      responses:
-        '200':
-          description: Generic run details.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RunDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-  /api/runs/{run_id}/events:
-    get:
-      tags:
-      - runs
-      summary: Stream persisted run events
-      description: 'Server-Sent Events stream. The server first replays persisted
-        events with sequence greater than after, then polls persisted events until
-        it sends terminal done or error.
-
-        '
-      operationId: streamRunEvents
-      parameters:
-      - $ref: '#/components/parameters/RunId'
-      - name: after
-        in: query
-        required: false
-        schema:
-          type: integer
-          minimum: 0
-          default: 0
-      responses:
-        '200':
-          description: 'SSE frames using id as sequence, event as event type, and
-            data as a JSON RunEvent envelope.
-
-            '
-          content:
-            text/event-stream:
-              schema:
-                type: string
-                example: 'id: 3
-
-                  event: done
-
-                  data: {"run_id":"2f4f9c1c-5f97-4c9c-89d2-9e7e3b6a1a11","sequence":3,"type":"done","node":null,"thread_id":"thread-id","checkpoint_id":null,"task_id":null,"payload":{"status":"done"},"created_at":"2026-05-25T00:00:00Z"}
-
-                  '
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Successful Response
   /api/mcp/servers:
     get:
       tags:
       - mcp
-      summary: List MCP servers
-      operationId: listMcpServers
-      security:
-      - CookieAuth: []
+      summary: List Mcp Servers
+      operationId: list_mcp_servers_api_mcp_servers_get
       responses:
         '200':
-          description: MCP servers with redacted config values.
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: array
                 items:
                   $ref: '#/components/schemas/McpServerSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+                type: array
+                title: Response List Mcp Servers Api Mcp Servers Get
     post:
       tags:
       - mcp
-      summary: Create an MCP server configuration
-      operationId: createMcpServer
-      security:
-      - CookieAuth: []
+      summary: Create Mcp Server
+      operationId: create_mcp_server_api_mcp_servers_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/McpServerCreate'
+        required: true
       responses:
         '201':
-          description: Created MCP server with redacted config values.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpServerDetail'
-        '409':
-          description: An MCP server with this name already exists.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/mcp/servers/{server_id}:
     get:
       tags:
       - mcp
-      summary: Get MCP server details
-      operationId: getMcpServer
-      security:
-      - CookieAuth: []
+      summary: Get Mcp Server
+      operationId: get_mcp_server_api_mcp_servers__server_id__get
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '200':
-          description: MCP server details and latest tool snapshot.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpServerDetail'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
     patch:
       tags:
       - mcp
-      summary: Update an MCP server configuration
-      operationId: updateMcpServer
-      security:
-      - CookieAuth: []
+      summary: Update Mcp Server
+      operationId: update_mcp_server_api_mcp_servers__server_id__patch
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       requestBody:
         required: true
         content:
@@ -391,236 +138,227 @@ paths:
               $ref: '#/components/schemas/McpServerUpdate'
       responses:
         '200':
-          description: Updated MCP server with redacted config values.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpServerDetail'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Running MCP servers must be stopped before config updates.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
       - mcp
-      summary: Delete an MCP server configuration
-      operationId: deleteMcpServer
-      security:
-      - CookieAuth: []
+      summary: Delete Mcp Server
+      operationId: delete_mcp_server_api_mcp_servers__server_id__delete
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '204':
-          description: MCP server deleted.
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          description: Successful Response
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/mcp/servers/{server_id}/start:
     post:
       tags:
       - mcp
-      summary: Start an MCP server
-      operationId: startMcpServer
-      security:
-      - CookieAuth: []
+      summary: Start Mcp Server
+      operationId: start_mcp_server_api_mcp_servers__server_id__start_post
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '200':
-          description: Runtime status after start attempt.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpLifecycleResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/mcp/servers/{server_id}/stop:
     post:
       tags:
       - mcp
-      summary: Stop an MCP server
-      operationId: stopMcpServer
-      security:
-      - CookieAuth: []
+      summary: Stop Mcp Server
+      operationId: stop_mcp_server_api_mcp_servers__server_id__stop_post
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '200':
-          description: Runtime status after stop attempt.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpLifecycleResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/mcp/servers/{server_id}/restart:
     post:
       tags:
       - mcp
-      summary: Restart an MCP server
-      operationId: restartMcpServer
-      security:
-      - CookieAuth: []
+      summary: Restart Mcp Server
+      operationId: restart_mcp_server_api_mcp_servers__server_id__restart_post
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '200':
-          description: Runtime status after restart attempt.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpLifecycleResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/mcp/servers/{server_id}/check:
     post:
       tags:
       - mcp
-      summary: Check an MCP server and refresh tools
-      operationId: checkMcpServer
-      security:
-      - CookieAuth: []
+      summary: Check Mcp Server
+      operationId: check_mcp_server_api_mcp_servers__server_id__check_post
       parameters:
-      - $ref: '#/components/parameters/McpServerId'
+      - name: server_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Server Id
       responses:
         '200':
-          description: Runtime status after check attempt.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpLifecycleResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '502':
-          $ref: '#/components/responses/BadGateway'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/llm-providers:
     get:
       tags:
       - llm-providers
-      summary: List LLM providers
-      operationId: listLlmProviders
+      summary: List Llm Providers
+      operationId: list_llm_providers_api_v1_llm_providers_get
       responses:
         '200':
-          description: LLM provider summaries with masked secret-like config values.
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: array
                 items:
                   $ref: '#/components/schemas/LlmProviderSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                type: array
+                title: Response List Llm Providers Api V1 Llm Providers Get
     post:
       tags:
       - llm-providers
-      summary: Create an LLM provider
-      operationId: createLlmProvider
+      summary: Create Llm Provider
+      operationId: create_llm_provider_api_v1_llm_providers_post
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/LlmProviderCreate'
+        required: true
       responses:
         '201':
-          description: Created LLM provider with masked secret-like config values.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LlmProviderDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/llm-providers/{provider_id}:
     get:
       tags:
       - llm-providers
-      summary: Get an LLM provider
-      operationId: getLlmProvider
+      summary: Get Llm Provider
+      operationId: get_llm_provider_api_v1_llm_providers__provider_id__get
       parameters:
-      - $ref: '#/components/parameters/LlmProviderId'
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Id
       responses:
         '200':
-          description: LLM provider detail with masked secret-like config values.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LlmProviderDetail'
-        '404':
-          description: LLM provider not found.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
     patch:
       tags:
       - llm-providers
-      summary: Update an LLM provider
-      operationId: updateLlmProvider
+      summary: Update Llm Provider
+      operationId: update_llm_provider_api_v1_llm_providers__provider_id__patch
       parameters:
-      - $ref: '#/components/parameters/LlmProviderId'
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Id
       requestBody:
         required: true
         content:
@@ -629,49 +367,53 @@ paths:
               $ref: '#/components/schemas/LlmProviderUpdate'
       responses:
         '200':
-          description: Updated LLM provider with masked secret-like config values.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LlmProviderDetail'
-        '404':
-          description: LLM provider not found.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
       - llm-providers
-      summary: Delete an LLM provider
-      operationId: deleteLlmProvider
+      summary: Delete Llm Provider
+      operationId: delete_llm_provider_api_v1_llm_providers__provider_id__delete
       parameters:
-      - $ref: '#/components/parameters/LlmProviderId'
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Id
       responses:
         '204':
-          description: LLM provider deleted.
-        '404':
-          description: LLM provider not found.
+          description: Successful Response
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/llm-providers/{provider_id}/test:
     post:
       tags:
       - llm-providers
-      summary: Test an LLM provider model
-      operationId: testLlmProviderModel
+      summary: Test Llm Provider Model
+      operationId: test_llm_provider_model_api_v1_llm_providers__provider_id__test_post
       parameters:
-      - $ref: '#/components/parameters/LlmProviderId'
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Id
       requestBody:
         required: true
         content:
@@ -680,64 +422,23 @@ paths:
               $ref: '#/components/schemas/LlmProviderModelTestRequest'
       responses:
         '200':
-          description: Provider model responded successfully.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/LlmProviderModelTestResponse'
-        '400':
-          description: Requested model is not configured for this provider.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: LLM provider not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '502':
-          description: Provider model connectivity test failed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LlmProviderModelTestResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents:
-    get:
-      tags:
-      - agents
-      summary: List ReAct agents
-      operationId: listAgents
-      parameters:
-      - name: include_deleted
-        in: query
-        required: false
-        schema:
-          type: boolean
-          default: false
-      responses:
-        '200':
-          description: Agent summaries, newest first according to repository ordering.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AgentSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
     post:
       tags:
       - agents
-      summary: Create a ReAct agent draft
-      operationId: createAgent
+      summary: Create Agent
+      operationId: create_agent_api_agents_post
       requestBody:
         required: true
         content:
@@ -746,68 +447,109 @@ paths:
               $ref: '#/components/schemas/AgentCreate'
       responses:
         '201':
-          description: Agent created with its initial draft configuration.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - agents
+      summary: List Agents
+      operationId: list_agents_api_agents_get
+      parameters:
+      - name: include_deleted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Include Deleted
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentSummary'
+                title: Response List Agents Api Agents Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents/{agent_id}:
     get:
       tags:
       - agents
-      summary: Get a ReAct agent
-      operationId: getAgent
+      summary: Get Agent
+      operationId: get_agent_api_agents__agent_id__get
       parameters:
-      - $ref: '#/components/parameters/AgentId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
       responses:
         '200':
-          description: Agent detail including the current draft, when present.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
-        '404':
-          description: Agent not found.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
     delete:
       tags:
       - agents
-      summary: Delete a ReAct agent
-      operationId: deleteAgent
+      summary: Delete Agent
+      operationId: delete_agent_api_agents__agent_id__delete
       parameters:
-      - $ref: '#/components/parameters/AgentId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
       responses:
         '204':
-          description: Agent deleted.
-        '404':
-          description: Agent not found.
+          description: Successful Response
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents/{agent_id}/draft:
     patch:
       tags:
       - agents
-      summary: Update a ReAct agent draft
-      operationId: updateAgentDraft
+      summary: Update Agent Draft
+      operationId: update_agent_draft_api_agents__agent_id__draft_patch
       parameters:
-      - $ref: '#/components/parameters/AgentId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
       requestBody:
         required: true
         content:
@@ -816,1078 +558,566 @@ paths:
               $ref: '#/components/schemas/AgentDraftUpdate'
       responses:
         '200':
-          description: Updated agent detail.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
-        '404':
-          description: Agent not found.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents/{agent_id}/publish:
     post:
       tags:
       - agents
-      summary: Publish a ReAct agent draft
-      operationId: publishAgent
+      summary: Publish Agent
+      operationId: publish_agent_api_agents__agent_id__publish_post
       parameters:
-      - $ref: '#/components/parameters/AgentId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
       responses:
         '201':
-          description: Published agent version.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentVersionDetail'
-        '400':
-          description: Agent draft is invalid and cannot be published.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Agent not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents/{agent_id}/versions:
     get:
       tags:
       - agents
-      summary: List published ReAct agent versions
-      operationId: listAgentVersions
+      summary: List Agent Versions
+      operationId: list_agent_versions_api_agents__agent_id__versions_get
       parameters:
-      - $ref: '#/components/parameters/AgentId'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
       responses:
         '200':
-          description: Published versions for the agent.
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/AgentVersionSummary'
-        '404':
-          description: Agent not found.
+                title: Response List Agent Versions Api Agents  Agent Id  Versions
+                  Get
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/ValidationError'
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/agents/{agent_id}/versions/{version_number}:
     get:
       tags:
       - agents
-      summary: Get a published ReAct agent version
-      operationId: getAgentVersion
+      summary: Get Agent Version
+      operationId: get_agent_version_api_agents__agent_id__versions__version_number__get
       parameters:
-      - $ref: '#/components/parameters/AgentId'
-      - $ref: '#/components/parameters/AgentVersionNumber'
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Agent Id
+      - name: version_number
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Version Number
       responses:
         '200':
-          description: Published agent version detail.
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentVersionDetail'
-        '404':
-          description: Agent or version not found.
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sop/environments:
+    get:
+      tags:
+      - sop
+      summary: List Environments
+      operationId: list_environments_api_sop_environments_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/EnvironmentPublic'
+                type: array
+                title: Response List Environments Api Sop Environments Get
+  /api/sop/{sop_id}:
+    get:
+      tags:
+      - sop
+      summary: Get Sop Preview
+      operationId: get_sop_preview_api_sop__sop_id__get
+      parameters:
+      - name: sop_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sop Id
+      - name: env
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Env
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SopSnapshot'
         '422':
-          $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_id}/test-runs:
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sop-quality-checks:
     post:
       tags:
-      - agents
-      summary: Start a ReAct agent test run
-      operationId: startAgentTestRun
+      - sop-quality-checks
+      summary: Start Sop Quality Check
+      operationId: start_sop_quality_check_api_sop_quality_checks_post
       parameters:
-      - $ref: '#/components/parameters/AgentId'
-      requestBody:
+      - name: sop_id
+        in: query
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AgentTestRunCreate'
+        schema:
+          type: string
+          minLength: 1
+          title: Sop Id
+      - name: env
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          title: Env
       responses:
-        '202':
-          description: Agent test run accepted and scheduled.
+        '200':
+          description: Successful Response
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/RunStartResponse'
-        '400':
-          description: Agent is disabled or requested agent version was not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Agent not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+              schema: {}
         '422':
-          $ref: '#/components/responses/ValidationError'
-components:
-  securitySchemes:
-    CookieAuth:
-      type: apiKey
-      in: cookie
-      name: cqa_user
-  parameters:
-    SopId:
-      name: sop_id
-      in: path
-      required: true
-      schema:
-        type: string
-      example: release-checklist
-    RunId:
-      name: run_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    McpServerId:
-      name: server_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    EnvironmentKey:
-      name: env
-      in: query
-      required: true
-      schema:
-        type: string
-      example: dev
-    AgentId:
-      name: agent_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-    AgentVersionNumber:
-      name: version_number
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
-      example: 1
-    LlmProviderId:
-      name: provider_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
-  responses:
-    Unauthorized:
-      description: Authentication is required or the session cookie is invalid.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    NotFound:
-      description: Unknown environment, SOP, or run.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    BadGateway:
-      description: Upstream dependency or lifecycle failure before completion.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    Forbidden:
-      description: Authenticated user does not have admin access.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    ServiceUnavailable:
-      description: MCP runtime is not configured or not enabled.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    ValidationError:
-      description: Request validation error.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ValidationErrorResponse'
-  schemas:
-    UserPublic:
-      type: object
-      required:
-      - id
-      - account
-      - is_admin
-      - meta
-      properties:
-        id:
-          type: string
-          format: uuid
-        account:
-          type: string
-          example: common
-        is_admin:
-          type: boolean
-        meta:
-          type: object
-          additionalProperties: true
-          default: {}
-    DevLoginRequest:
-      type: object
-      required:
-      - account
-      properties:
-        account:
-          type: string
-          example: common
-    EnvironmentPublic:
-      type: object
-      required:
-      - key
-      - name_zh
-      - name_en
-      properties:
-        key:
-          type: string
-          example: dev
-        name_zh:
-          type: string
-          example: "\u5F00\u53D1"
-        name_en:
-          type: string
-          example: Development
-    SopSnapshot:
-      type: object
-      required:
-      - sop_id
-      - env_key
-      - payload
-      properties:
-        sop_id:
-          type: string
-        env_key:
-          type: string
-        source_version:
-          type: string
-          nullable: true
-          example: mock-v1
-        updated_at:
-          type: string
-          format: date-time
-          nullable: true
-        payload:
-          type: object
-          additionalProperties: true
-    RunStatus:
-      type: string
-      enum:
-      - pending
-      - running
-      - success
-      - error
-      - timeout
-      - interrupted
-    RunStartResponse:
-      type: object
-      required:
-      - run_id
-      - status
-      - status_url
-      - events_url
-      properties:
-        run_id:
-          type: string
-          format: uuid
-        status:
-          $ref: '#/components/schemas/RunStatus'
-        status_url:
-          type: string
-        events_url:
-          type: string
-    ActiveRunConflict:
-      type: object
-      required:
-      - message
-      - active_run_id
-      - status_url
-      - events_url
-      properties:
-        message:
-          type: string
-        active_run_id:
-          type: string
-          format: uuid
-        status_url:
-          type: string
-        events_url:
-          type: string
-    RunSummary:
-      type: object
-      required:
-      - run_id
-      - subject_type
-      - subject_id
-      - status
-      - completed_nodes
-      - latest_sequence
-      properties:
-        run_id:
-          type: string
-          format: uuid
-        subject_type:
-          type: string
-          example: sop
-        subject_id:
-          type: string
-          example: release-checklist
-        status:
-          $ref: '#/components/schemas/RunStatus'
-        current_node:
-          type: string
-          nullable: true
-        completed_nodes:
-          type: array
-          items:
-            type: string
-        latest_sequence:
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    get:
+      tags:
+      - sop-quality-checks
+      summary: List Sop Quality Checks
+      operationId: list_sop_quality_checks_api_sop_quality_checks_get
+      parameters:
+      - name: sop_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Sop Id
+      - name: env
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Env
+      - name: limit
+        in: query
+        required: false
+        schema:
           type: integer
-          minimum: 0
-        started_at:
-          type: string
-          format: date-time
-          nullable: true
-        finished_at:
-          type: string
-          format: date-time
-          nullable: true
-        result_status:
-          type: string
-          nullable: true
-        error_summary:
-          type: string
-          nullable: true
-    RunDebug:
-      type: object
-      required:
-      - thread_id
-      properties:
-        thread_id:
-          type: string
-        current_checkpoint_id:
-          type: string
-          nullable: true
-        langgraph_state_snapshot:
-          type: object
-          nullable: true
-          additionalProperties: true
-        raw_graph_output:
-          type: object
-          nullable: true
-          additionalProperties: true
-        raw_last_event:
-          allOf:
-          - $ref: '#/components/schemas/RunEvent'
-          nullable: true
-    RunDetail:
-      allOf:
-      - $ref: '#/components/schemas/RunSummary'
-      - type: object
-        required:
-        - debug
-        properties:
-          debug:
-            allOf:
-            - $ref: '#/components/schemas/RunDebug'
-            nullable: true
-    RunEventType:
-      type: string
-      enum:
-      - tasks
-      - messages
-      - updates
-      - custom
-      - checkpoints
-      - error
-      - done
-    RunEvent:
-      type: object
-      required:
-      - run_id
-      - sequence
-      - type
-      - thread_id
-      - payload
-      - created_at
-      properties:
-        run_id:
-          type: string
-          format: uuid
-        sequence:
-          type: integer
+          maximum: 100
           minimum: 1
-        type:
-          $ref: '#/components/schemas/RunEventType'
-        node:
-          type: string
-          nullable: true
-        thread_id:
-          type: string
-        checkpoint_id:
-          type: string
-          nullable: true
-        task_id:
-          type: string
-          nullable: true
-        payload:
-          type: object
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
-    McpTransport:
-      type: string
-      enum:
-      - stdio
-      - http
-    McpDesiredState:
-      type: string
-      enum:
-      - running
-      - stopped
-    McpRuntimeStatus:
-      type: string
-      enum:
-      - unknown
-      - starting
-      - running
-      - stopping
-      - stopped
-      - error
-    McpServerCreate:
-      type: object
-      required:
-      - name
-      - transport
-      properties:
-        name:
-          type: string
-          example: filesystem
-        transport:
-          $ref: '#/components/schemas/McpTransport'
-        command:
-          type: string
-          nullable: true
-          example: uvx
-        args:
-          type: array
-          items:
-            type: string
-          default: []
-          example:
-          - mcp-server-filesystem
-        env:
-          type: object
-          additionalProperties:
-            type: string
-          default: {}
-          example:
-            TOKEN: secret
-        url:
-          type: string
-          nullable: true
-          example: https://example.com/mcp
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-          default: {}
-        enabled:
-          type: boolean
-          default: false
-        desired_state:
-          allOf:
-          - $ref: '#/components/schemas/McpDesiredState'
-          default: stopped
-    McpServerUpdate:
-      type: object
-      properties:
-        name:
-          type: string
-        command:
-          type: string
-          nullable: true
-        args:
-          type: array
-          items:
-            type: string
-        env:
-          type: object
-          additionalProperties:
-            type: string
-        url:
-          type: string
-          nullable: true
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-        enabled:
-          type: boolean
-        desired_state:
-          $ref: '#/components/schemas/McpDesiredState'
-    McpServerTool:
-      type: object
-      required:
-      - name
-      - input_schema
-      properties:
-        name:
-          type: string
-          example: search
-        description:
-          type: string
-          nullable: true
-        input_schema:
-          type: object
-          additionalProperties: true
-          default: {}
-        discovered_at:
-          type: string
-          format: date-time
-          nullable: true
-    McpServerSummary:
-      type: object
-      required:
-      - id
-      - name
-      - transport
-      - args
-      - env
-      - headers
-      - enabled
-      - desired_state
-      - runtime_status
-      - tool_count
-      properties:
-        id:
+          default: 20
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SopQualityCheckSummary'
+                title: Response List Sop Quality Checks Api Sop Quality Checks Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sop-quality-checks/{check_id}:
+    get:
+      tags:
+      - sop-quality-checks
+      summary: Get Sop Quality Check
+      operationId: get_sop_quality_check_api_sop_quality_checks__check_id__get
+      parameters:
+      - name: check_id
+        in: path
+        required: true
+        schema:
           type: string
           format: uuid
-        name:
+          title: Check Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SopQualityCheckDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sop-quality-checks/{check_id}/events:
+    get:
+      tags:
+      - sop-quality-checks
+      summary: Get Sop Quality Check Events
+      operationId: get_sop_quality_check_events_api_sop_quality_checks__check_id__events_get
+      parameters:
+      - name: check_id
+        in: path
+        required: true
+        schema:
           type: string
-        transport:
-          $ref: '#/components/schemas/McpTransport'
-        command:
-          type: string
-          nullable: true
-        args:
-          type: array
-          items:
-            type: string
-        env:
-          type: object
-          additionalProperties:
-            type: string
-          example:
-            TOKEN: '********'
-        url:
-          type: string
-          nullable: true
-        headers:
-          type: object
-          additionalProperties:
-            type: string
-          example:
-            Authorization: '********'
-        enabled:
-          type: boolean
-        desired_state:
-          $ref: '#/components/schemas/McpDesiredState'
-        runtime_status:
-          $ref: '#/components/schemas/McpRuntimeStatus'
-        last_checked_at:
-          type: string
-          format: date-time
-          nullable: true
-        last_error:
-          type: string
-          nullable: true
-        tool_count:
+          format: uuid
+          title: Check Id
+      - name: after
+        in: query
+        required: false
+        schema:
           type: integer
           minimum: 0
-    McpServerDetail:
-      allOf:
-      - $ref: '#/components/schemas/McpServerSummary'
-      - type: object
-        required:
-        - tools
-        properties:
-          tools:
-            type: array
-            items:
-              $ref: '#/components/schemas/McpServerTool'
-    McpLifecycleResponse:
-      type: object
-      required:
-      - server_id
-      - desired_state
-      - runtime_status
-      - tool_count
-      properties:
-        server_id:
+          default: 0
+          title: After
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SopQualityCheckEvent'
+                title: Response Get Sop Quality Check Events Api Sop Quality Checks  Check
+                  Id  Events Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/sop-quality-checks/{check_id}/stream:
+    get:
+      tags:
+      - sop-quality-checks
+      summary: Stream Sop Quality Check
+      operationId: stream_sop_quality_check_api_sop_quality_checks__check_id__stream_get
+      parameters:
+      - name: check_id
+        in: path
+        required: true
+        schema:
           type: string
           format: uuid
-        desired_state:
-          $ref: '#/components/schemas/McpDesiredState'
-        runtime_status:
-          $ref: '#/components/schemas/McpRuntimeStatus'
-        last_checked_at:
-          type: string
-          format: date-time
-          nullable: true
-        last_error:
-          type: string
-          nullable: true
-        tool_count:
+          title: Check Id
+      - name: after
+        in: query
+        required: false
+        schema:
           type: integer
           minimum: 0
-    ErrorResponse:
-      type: object
-      required:
-      - detail
-      properties:
-        detail:
-          type: string
-    ValidationErrorResponse:
-      type: object
-      required:
-      - detail
-      properties:
-        detail:
-          type: array
-          items:
-            type: object
-            additionalProperties: true
-    LlmProviderCreate:
-      type: object
-      required:
-      - display_name
-      - provider_type
-      properties:
-        display_name:
-          type: string
-          example: OpenAI Main
-        description:
-          type: string
-          nullable: true
-        provider_type:
-          type: string
-          enum:
-          - openai
-          - anthropic
-          - azure_openai
-          - azure_ai
-          - google_vertexai
-          - google_genai
-          - anthropic_bedrock
-          - bedrock
-          - bedrock_converse
-          - cohere
-          - fireworks
-          - together
-          - mistralai
-          - huggingface
-          - groq
-          - ollama
-          - google_anthropic_vertex
-          - deepseek
-          - ibm
-          - nvidia
-          - xai
-          - openrouter
-          - perplexity
-          - upstage
-          - baseten
-          - litellm
-          example: openai
-        base_url:
-          type: string
-          nullable: true
-          example: https://api.openai.com/v1
-        api_key:
-          type: string
-          nullable: true
-          writeOnly: true
-        default_headers:
-          type: object
-          additionalProperties:
-            type: string
-        default_query:
-          type: object
-          additionalProperties:
-            type: string
-        models:
-          type: array
-          items:
-            type: string
-          default: []
-          description: Model names this provider can serve.
-        enabled:
-          type: boolean
-          default: true
-    LlmProviderUpdate:
-      type: object
-      properties:
-        display_name:
-          type: string
-          nullable: true
-        description:
-          type: string
-          nullable: true
-        provider_type:
-          type: string
-          enum:
-          - openai
-          - anthropic
-          - azure_openai
-          - azure_ai
-          - google_vertexai
-          - google_genai
-          - anthropic_bedrock
-          - bedrock
-          - bedrock_converse
-          - cohere
-          - fireworks
-          - together
-          - mistralai
-          - huggingface
-          - groq
-          - ollama
-          - google_anthropic_vertex
-          - deepseek
-          - ibm
-          - nvidia
-          - xai
-          - openrouter
-          - perplexity
-          - upstage
-          - baseten
-          - litellm
-          nullable: true
-        base_url:
-          type: string
-          nullable: true
-        api_key:
-          type: string
-          nullable: true
-          writeOnly: true
-          description: Omit to preserve the current API key. Send null to clear it.
-        default_headers:
-          type: object
-          nullable: true
-          additionalProperties:
-            type: string
-        default_query:
-          type: object
-          nullable: true
-          additionalProperties:
-            type: string
-        models:
-          type: array
-          nullable: true
-          items:
-            type: string
-          description: Model names this provider can serve.
-        enabled:
-          type: boolean
-          nullable: true
-    LlmProviderSummary:
-      type: object
-      required:
-      - id
-      - display_name
-      - provider_type
-      - default_headers
-      - default_query
-      - models
-      - enabled
-      - created_at
-      - updated_at
-      - api_key_configured
-      properties:
-        id:
-          type: string
-          format: uuid
-        display_name:
-          type: string
-          example: OpenAI Main
-        description:
-          type: string
-          nullable: true
-        provider_type:
-          type: string
-          example: openai
-        base_url:
-          type: string
-          nullable: true
-          example: https://api.openai.com/v1
-        default_headers:
-          type: object
-          additionalProperties:
-            type: string
-          description: Secret-like keys are masked in responses.
-        default_query:
-          type: object
-          additionalProperties:
-            type: string
-          description: Secret-like keys are masked in responses.
-        models:
-          type: array
-          items:
-            type: string
-          description: Model names this provider can serve.
-        enabled:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        api_key_configured:
-          type: boolean
-    LlmProviderDetail:
-      type: object
-      allOf:
-      - $ref: '#/components/schemas/LlmProviderSummary'
-      properties: {}
-    LlmProviderModelTestRequest:
-      type: object
-      required:
-      - model
-      properties:
-        model:
-          type: string
-          minLength: 1
-    LlmProviderModelTestResponse:
-      type: object
-      required:
-      - status
-      - latency_ms
-      properties:
-        status:
-          type: string
-          enum:
-          - ok
-          - failed
-        latency_ms:
-          type: number
-          format: float
-        message:
-          type: string
-          nullable: true
-        error:
-          type: string
-          nullable: true
-        request:
-          type: object
-          additionalProperties: true
-          nullable: true
-        response:
-          type: object
-          additionalProperties: true
-          nullable: true
-    AgentDraftConfig:
-      type: object
-      required:
-      - system_prompt
-      - model
-      properties:
-        system_prompt:
-          type: string
-          minLength: 1
-        model:
-          type: string
-          minLength: 1
-        provider_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: Stored provider id. When set, model must be a bare model name without a provider prefix.
-        model_config:
-          type: object
-          additionalProperties: true
-        tool_allowlist:
-          type: array
-          items:
-            type: string
-        mcp_server_ids:
-          type: array
-          items:
-            type: string
+          default: 0
+          title: After
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      summary: Health Check
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Health Check Health Get
+components:
+  schemas:
     AgentCreate:
+      properties:
+        display_name:
+          type: string
+          minLength: 1
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        draft:
+          $ref: '#/components/schemas/AgentDraftConfig'
       type: object
       required:
       - display_name
       - draft
-      properties:
-        display_name:
-          type: string
-          minLength: 1
-          example: Release Reviewer
-        description:
-          type: string
-          nullable: true
-          example: Checks release quality.
-        draft:
-          $ref: '#/components/schemas/AgentDraftConfig'
-    AgentDraftUpdate:
-      type: object
-      properties:
-        display_name:
-          type: string
-          minLength: 1
-          nullable: true
-          example: Release Reviewer
-        description:
-          type: string
-          nullable: true
-        enabled:
-          type: boolean
-          nullable: true
-        draft:
-          allOf:
-          - $ref: '#/components/schemas/AgentDraftConfig'
-          nullable: true
-    AgentVersionSummary:
-      type: object
-      required:
-      - id
-      - version_number
-      - model
-      - published_at
+      title: AgentCreate
+    AgentDetail:
       properties:
         id:
           type: string
           format: uuid
-        version_number:
-          type: integer
-          minimum: 1
+          title: Id
+        display_name:
+          type: string
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        enabled:
+          type: boolean
+          title: Enabled
+        has_draft:
+          type: boolean
+          title: Has Draft
+        latest_version:
+          anyOf:
+          - $ref: '#/components/schemas/AgentVersionSummary'
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        draft:
+          anyOf:
+          - $ref: '#/components/schemas/AgentDraftConfig'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - display_name
+      - enabled
+      - has_draft
+      - created_at
+      - updated_at
+      title: AgentDetail
+    AgentDraftConfig:
+      properties:
+        system_prompt:
+          type: string
+          minLength: 1
+          title: System Prompt
         model:
           type: string
-          example: codeagent:codeagent-v4-pro
+          minLength: 1
+          title: Model
         provider_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Provider Id
+        model_config:
+          additionalProperties: true
+          type: object
+          title: Model Config
+        tool_allowlist:
+          items:
+            type: string
+          type: array
+          title: Tool Allowlist
+        mcp_server_ids:
+          items:
+            type: string
+          type: array
+          title: Mcp Server Ids
+      type: object
+      required:
+      - system_prompt
+      - model
+      title: AgentDraftConfig
+    AgentDraftUpdate:
+      properties:
+        display_name:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        draft:
+          anyOf:
+          - $ref: '#/components/schemas/AgentDraftConfig'
+          - type: 'null'
+      type: object
+      title: AgentDraftUpdate
+    AgentSummary:
+      properties:
+        id:
           type: string
           format: uuid
-          nullable: true
+          title: Id
+        display_name:
+          type: string
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        enabled:
+          type: boolean
+          title: Enabled
+        has_draft:
+          type: boolean
+          title: Has Draft
+        latest_version:
+          anyOf:
+          - $ref: '#/components/schemas/AgentVersionSummary'
+          - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+      - id
+      - display_name
+      - enabled
+      - has_draft
+      - created_at
+      - updated_at
+      title: AgentSummary
+    AgentVersionDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        version_number:
+          type: integer
+          title: Version Number
+        model:
+          type: string
+          title: Model
+        provider_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Provider Id
         published_at:
           type: string
           format: date-time
-    AgentSummary:
-      type: object
-      required:
-      - id
-      - display_name
-      - enabled
-      - has_draft
-      - created_at
-      - updated_at
-      properties:
-        id:
+          title: Published At
+        agent_id:
           type: string
           format: uuid
-        display_name:
+          title: Agent Id
+        system_prompt:
           type: string
-          example: Release Reviewer
-        description:
-          type: string
-          nullable: true
-        enabled:
-          type: boolean
-        has_draft:
-          type: boolean
-        latest_version:
-          allOf:
-          - $ref: '#/components/schemas/AgentVersionSummary'
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-    AgentDetail:
-      type: object
-      required:
-      - id
-      - display_name
-      - enabled
-      - has_draft
-      - created_at
-      - updated_at
-      properties:
-        id:
-          type: string
-          format: uuid
-        display_name:
-          type: string
-          example: Release Reviewer
-        description:
-          type: string
-          nullable: true
-        enabled:
-          type: boolean
-        has_draft:
-          type: boolean
-        latest_version:
-          allOf:
-          - $ref: '#/components/schemas/AgentVersionSummary'
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        draft:
-          allOf:
-          - $ref: '#/components/schemas/AgentDraftConfig'
-          nullable: true
-    AgentVersionDetail:
+          title: System Prompt
+        model_config:
+          additionalProperties: true
+          type: object
+          title: Model Config
+        tool_allowlist:
+          items:
+            type: string
+          type: array
+          title: Tool Allowlist
+        mcp_server_ids:
+          items:
+            type: string
+          type: array
+          title: Mcp Server Ids
+        published_by:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Published By
       type: object
       required:
       - id
@@ -1896,71 +1126,1019 @@ components:
       - published_at
       - agent_id
       - system_prompt
+      title: AgentVersionDetail
+    AgentVersionSummary:
       properties:
         id:
           type: string
           format: uuid
+          title: Id
         version_number:
           type: integer
-          minimum: 1
+          title: Version Number
         model:
           type: string
-          example: codeagent:codeagent-v4-pro
+          title: Model
         provider_id:
-          type: string
-          format: uuid
-          nullable: true
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Provider Id
         published_at:
           type: string
           format: date-time
-        agent_id:
-          type: string
-          format: uuid
-        system_prompt:
-          type: string
-        model_config:
-          type: object
-          additionalProperties: true
-        tool_allowlist:
-          type: array
-          items:
-            type: string
-        mcp_server_ids:
-          type: array
-          items:
-            type: string
-        published_by:
-          type: string
-          nullable: true
-    AgentMessage:
+          title: Published At
       type: object
       required:
-      - role
-      - content
+      - id
+      - version_number
+      - model
+      - published_at
+      title: AgentVersionSummary
+    DevLoginRequest:
       properties:
-        role:
+        account:
           type: string
-          pattern: ^(user|assistant|system)$
-          example: user
-        content:
+          title: Account
+      type: object
+      required:
+      - account
+      title: DevLoginRequest
+    EnvironmentPublic:
+      properties:
+        key:
+          type: string
+          title: Key
+        name_zh:
+          type: string
+          title: Name Zh
+        name_en:
+          type: string
+          title: Name En
+      type: object
+      required:
+      - key
+      - name_zh
+      - name_en
+      title: EnvironmentPublic
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    LlmProviderCreate:
+      properties:
+        display_name:
+          type: string
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        provider_type:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - azure_openai
+          - azure_ai
+          - google_vertexai
+          - google_genai
+          - anthropic_bedrock
+          - bedrock
+          - bedrock_converse
+          - cohere
+          - fireworks
+          - together
+          - mistralai
+          - huggingface
+          - groq
+          - ollama
+          - google_anthropic_vertex
+          - deepseek
+          - ibm
+          - nvidia
+          - xai
+          - openrouter
+          - perplexity
+          - upstage
+          - baseten
+          - litellm
+          title: Provider Type
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Url
+        api_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Api Key
+        default_headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Headers
+        default_query:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Query
+        models:
+          items:
+            type: string
+          type: array
+          title: Models
+          description: Model names this provider can serve.
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      type: object
+      required:
+      - display_name
+      - provider_type
+      title: LlmProviderCreate
+    LlmProviderDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        display_name:
+          type: string
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        provider_type:
+          type: string
+          title: Provider Type
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Url
+        default_headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Headers
+        default_query:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Query
+        models:
+          items:
+            type: string
+          type: array
+          title: Models
+        enabled:
+          type: boolean
+          title: Enabled
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        api_key_configured:
+          type: boolean
+          title: Api Key Configured
+          default: false
+      type: object
+      required:
+      - id
+      - display_name
+      - description
+      - provider_type
+      - base_url
+      - default_headers
+      - default_query
+      - enabled
+      - created_at
+      - updated_at
+      title: LlmProviderDetail
+    LlmProviderModelTestRequest:
+      properties:
+        model:
           type: string
           minLength: 1
-          example: Can this deploy?
-    AgentTestRunCreate:
+          title: Model
       type: object
       required:
-      - messages
+      - model
+      title: LlmProviderModelTestRequest
+    LlmProviderModelTestResponse:
       properties:
-        version_id:
+        status:
+          type: string
+          enum:
+          - ok
+          - failed
+          title: Status
+        latency_ms:
+          type: number
+          title: Latency Ms
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error
+        request:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Request
+        response:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Response
+      type: object
+      required:
+      - status
+      - latency_ms
+      title: LlmProviderModelTestResponse
+    LlmProviderSummary:
+      properties:
+        id:
           type: string
           format: uuid
-          nullable: true
-        version_number:
-          type: integer
-          minimum: 1
-          nullable: true
-        messages:
-          type: array
-          minItems: 1
+          title: Id
+        display_name:
+          type: string
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        provider_type:
+          type: string
+          title: Provider Type
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Url
+        default_headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Headers
+        default_query:
+          additionalProperties:
+            type: string
+          type: object
+          title: Default Query
+        models:
           items:
-            $ref: '#/components/schemas/AgentMessage'
+            type: string
+          type: array
+          title: Models
+        enabled:
+          type: boolean
+          title: Enabled
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        api_key_configured:
+          type: boolean
+          title: Api Key Configured
+          default: false
+      type: object
+      required:
+      - id
+      - display_name
+      - description
+      - provider_type
+      - base_url
+      - default_headers
+      - default_query
+      - enabled
+      - created_at
+      - updated_at
+      title: LlmProviderSummary
+    LlmProviderUpdate:
+      properties:
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        provider_type:
+          anyOf:
+          - type: string
+            enum:
+            - openai
+            - anthropic
+            - azure_openai
+            - azure_ai
+            - google_vertexai
+            - google_genai
+            - anthropic_bedrock
+            - bedrock
+            - bedrock_converse
+            - cohere
+            - fireworks
+            - together
+            - mistralai
+            - huggingface
+            - groq
+            - ollama
+            - google_anthropic_vertex
+            - deepseek
+            - ibm
+            - nvidia
+            - xai
+            - openrouter
+            - perplexity
+            - upstage
+            - baseten
+            - litellm
+          - type: 'null'
+          title: Provider Type
+        base_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Base Url
+        api_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Api Key
+        default_headers:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Default Headers
+        default_query:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Default Query
+        models:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Models
+          description: Model names this provider can serve.
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+      type: object
+      title: LlmProviderUpdate
+    McpDesiredState:
+      type: string
+      enum:
+      - running
+      - stopped
+      title: McpDesiredState
+    McpLifecycleResponse:
+      properties:
+        server_id:
+          type: string
+          format: uuid
+          title: Server Id
+        desired_state:
+          $ref: '#/components/schemas/McpDesiredState'
+        runtime_status:
+          $ref: '#/components/schemas/McpServerRuntimeStatus'
+        last_checked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Checked At
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        tool_count:
+          type: integer
+          title: Tool Count
+      type: object
+      required:
+      - server_id
+      - desired_state
+      - runtime_status
+      - last_checked_at
+      - last_error
+      - tool_count
+      title: McpLifecycleResponse
+    McpServerCreate:
+      properties:
+        name:
+          type: string
+          title: Name
+        transport:
+          $ref: '#/components/schemas/McpTransport'
+        command:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Command
+        args:
+          items:
+            type: string
+          type: array
+          title: Args
+        env:
+          additionalProperties:
+            type: string
+          type: object
+          title: Env
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Headers
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        desired_state:
+          $ref: '#/components/schemas/McpDesiredState'
+          default: stopped
+      type: object
+      required:
+      - name
+      - transport
+      title: McpServerCreate
+    McpServerDetail:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        transport:
+          $ref: '#/components/schemas/McpTransport'
+        command:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Command
+        args:
+          items:
+            type: string
+          type: array
+          title: Args
+        env:
+          additionalProperties:
+            type: string
+          type: object
+          title: Env
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Headers
+        enabled:
+          type: boolean
+          title: Enabled
+        desired_state:
+          $ref: '#/components/schemas/McpDesiredState'
+        runtime_status:
+          $ref: '#/components/schemas/McpServerRuntimeStatus'
+        last_checked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Checked At
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        tool_count:
+          type: integer
+          title: Tool Count
+          default: 0
+        tools:
+          items:
+            $ref: '#/components/schemas/McpServerTool'
+          type: array
+          title: Tools
+      type: object
+      required:
+      - id
+      - name
+      - transport
+      - command
+      - args
+      - env
+      - url
+      - headers
+      - enabled
+      - desired_state
+      - runtime_status
+      - last_checked_at
+      - last_error
+      title: McpServerDetail
+    McpServerRuntimeStatus:
+      type: string
+      enum:
+      - unknown
+      - starting
+      - running
+      - stopping
+      - stopped
+      - error
+      title: McpServerRuntimeStatus
+    McpServerSummary:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        transport:
+          $ref: '#/components/schemas/McpTransport'
+        command:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Command
+        args:
+          items:
+            type: string
+          type: array
+          title: Args
+        env:
+          additionalProperties:
+            type: string
+          type: object
+          title: Env
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        headers:
+          additionalProperties:
+            type: string
+          type: object
+          title: Headers
+        enabled:
+          type: boolean
+          title: Enabled
+        desired_state:
+          $ref: '#/components/schemas/McpDesiredState'
+        runtime_status:
+          $ref: '#/components/schemas/McpServerRuntimeStatus'
+        last_checked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Checked At
+        last_error:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error
+        tool_count:
+          type: integer
+          title: Tool Count
+          default: 0
+      type: object
+      required:
+      - id
+      - name
+      - transport
+      - command
+      - args
+      - env
+      - url
+      - headers
+      - enabled
+      - desired_state
+      - runtime_status
+      - last_checked_at
+      - last_error
+      title: McpServerSummary
+    McpServerTool:
+      properties:
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        input_schema:
+          additionalProperties: true
+          type: object
+          title: Input Schema
+        discovered_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Discovered At
+      type: object
+      required:
+      - name
+      title: McpServerTool
+    McpServerUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        command:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Command
+        args:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Args
+        env:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Env
+        url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Url
+        headers:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Headers
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        desired_state:
+          anyOf:
+          - $ref: '#/components/schemas/McpDesiredState'
+          - type: 'null'
+      type: object
+      title: McpServerUpdate
+    McpTransport:
+      type: string
+      enum:
+      - stdio
+      - http
+      title: McpTransport
+    SopQualityCheckDetail:
+      properties:
+        check_id:
+          type: string
+          format: uuid
+          title: Check Id
+        sop_id:
+          type: string
+          title: Sop Id
+        env_key:
+          type: string
+          title: Env Key
+        status:
+          $ref: '#/components/schemas/SopQualityCheckStatus'
+        quality_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quality Result
+        latest_sequence:
+          type: integer
+          title: Latest Sequence
+          default: 0
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        error_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Summary
+        graph_name:
+          type: string
+          title: Graph Name
+        graph_version:
+          type: string
+          title: Graph Version
+        thread_id:
+          type: string
+          title: Thread Id
+        checkpoint_ns:
+          type: string
+          title: Checkpoint Ns
+        current_checkpoint_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Current Checkpoint Id
+        result:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Result
+        error:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Error
+        display_state:
+          $ref: '#/components/schemas/SopQualityDisplayState'
+      type: object
+      required:
+      - check_id
+      - sop_id
+      - env_key
+      - status
+      - graph_name
+      - graph_version
+      - thread_id
+      - checkpoint_ns
+      - display_state
+      title: SopQualityCheckDetail
+    SopQualityCheckEvent:
+      properties:
+        check_id:
+          type: string
+          format: uuid
+          title: Check Id
+        sequence:
+          type: integer
+          title: Sequence
+        type:
+          type: string
+          title: Type
+        node:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Node
+        checkpoint_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Checkpoint Id
+        task_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Task Id
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+      type: object
+      required:
+      - check_id
+      - sequence
+      - type
+      title: SopQualityCheckEvent
+    SopQualityCheckStatus:
+      type: string
+      enum:
+      - pending
+      - running
+      - succeeded
+      - failed
+      - cancelled
+      - interrupted
+      title: SopQualityCheckStatus
+    SopQualityCheckSummary:
+      properties:
+        check_id:
+          type: string
+          format: uuid
+          title: Check Id
+        sop_id:
+          type: string
+          title: Sop Id
+        env_key:
+          type: string
+          title: Env Key
+        status:
+          $ref: '#/components/schemas/SopQualityCheckStatus'
+        quality_result:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Quality Result
+        latest_sequence:
+          type: integer
+          title: Latest Sequence
+          default: 0
+        created_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Created At
+        started_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Started At
+        finished_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Finished At
+        error_summary:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Summary
+      type: object
+      required:
+      - check_id
+      - sop_id
+      - env_key
+      - status
+      title: SopQualityCheckSummary
+    SopQualityDisplayState:
+      properties:
+        latest_sequence:
+          type: integer
+          title: Latest Sequence
+          default: 0
+        nodes:
+          additionalProperties: true
+          type: object
+          title: Nodes
+        is_running:
+          type: boolean
+          title: Is Running
+          default: false
+      additionalProperties: true
+      type: object
+      title: SopQualityDisplayState
+    SopSnapshot:
+      properties:
+        sop_id:
+          type: string
+          title: Sop Id
+        env_key:
+          type: string
+          title: Env Key
+        source_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Source Version
+        updated_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Updated At
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+      type: object
+      required:
+      - sop_id
+      - env_key
+      - payload
+      title: SopSnapshot
+    UserPublic:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        account:
+          type: string
+          title: Account
+        is_admin:
+          type: boolean
+          title: Is Admin
+        meta:
+          additionalProperties: true
+          type: object
+          title: Meta
+      type: object
+      required:
+      - id
+      - account
+      - is_admin
+      title: UserPublic
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
