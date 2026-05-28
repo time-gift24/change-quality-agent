@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { AgentForm } from "../components/AgentForm";
+import { AgentForm, buildAgentDraftPayload } from "../components/AgentForm";
 import type { AgentDetail } from "../types";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 
@@ -13,6 +13,42 @@ afterEach(() => {
 });
 
 describe("AgentForm", () => {
+  it("trims draft model and provider identifiers when building payload", () => {
+    expect(
+      buildAgentDraftPayload({
+        codeAgentModel: " codeagent:deepseek-v4-pro ",
+        modelSource: "codeagent",
+        selectedProviderId: " ignored-provider ",
+        selectedProviderModel: " ignored-model ",
+        systemPrompt: " Prompt ",
+      }),
+    ).toEqual({
+      mcp_server_ids: [],
+      model: "codeagent:deepseek-v4-pro",
+      model_config: {},
+      provider_id: null,
+      system_prompt: "Prompt",
+      tool_allowlist: [],
+    });
+
+    expect(
+      buildAgentDraftPayload({
+        codeAgentModel: " ignored-codeagent ",
+        modelSource: "provider",
+        selectedProviderId: " provider-2 ",
+        selectedProviderModel: " claude-sonnet-5 ",
+        systemPrompt: " Provider prompt ",
+      }),
+    ).toEqual({
+      mcp_server_ids: [],
+      model: "claude-sonnet-5",
+      model_config: {},
+      provider_id: "provider-2",
+      system_prompt: "Provider prompt",
+      tool_allowlist: [],
+    });
+  });
+
   it("creates a CodeAgent-backed draft from hard-coded model dropdown", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(

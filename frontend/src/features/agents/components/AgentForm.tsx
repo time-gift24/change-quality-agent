@@ -13,7 +13,12 @@ import {
 
 import { Button } from "../../../components/ui/button";
 import type { LlmProviderSummary } from "../../llmProviders/types";
-import type { AgentCreate, AgentDetail, AgentDraftUpdate } from "../types";
+import type {
+  AgentCreate,
+  AgentDetail,
+  AgentDraftConfig,
+  AgentDraftUpdate,
+} from "../types";
 import { CODEAGENT_MODEL_OPTIONS } from "../types";
 
 type AgentFormMode = "create" | "edit";
@@ -138,16 +143,13 @@ export function AgentForm({
 
     if (providerSaveBlocked) return;
 
-    const selectedModel =
-      modelSource === "provider" ? selectedProviderModel : codeAgentModel;
-    const draft = {
-      mcp_server_ids: [],
-      model: selectedModel,
-      model_config: {},
-      provider_id: modelSource === "provider" ? selectedProviderId : null,
-      system_prompt: systemPrompt.trim(),
-      tool_allowlist: [],
-    };
+    const draft = buildAgentDraftPayload({
+      codeAgentModel,
+      modelSource,
+      selectedProviderId,
+      selectedProviderModel,
+      systemPrompt,
+    });
 
     if (mode === "create") {
       await onCreate?.({
@@ -359,6 +361,32 @@ function Field({
       </div>
     </div>
   );
+}
+
+export function buildAgentDraftPayload({
+  codeAgentModel,
+  modelSource,
+  selectedProviderId,
+  selectedProviderModel,
+  systemPrompt,
+}: {
+  codeAgentModel: string;
+  modelSource: ModelSource;
+  selectedProviderId: string;
+  selectedProviderModel: string;
+  systemPrompt: string;
+}): AgentDraftConfig {
+  const selectedModel =
+    modelSource === "provider" ? selectedProviderModel : codeAgentModel;
+
+  return {
+    mcp_server_ids: [],
+    model: selectedModel.trim(),
+    model_config: {},
+    provider_id: modelSource === "provider" ? selectedProviderId.trim() : null,
+    system_prompt: systemPrompt.trim(),
+    tool_allowlist: [],
+  };
 }
 
 function cloneWithId(children: ReactNode, id: string) {
