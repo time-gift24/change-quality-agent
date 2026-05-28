@@ -105,6 +105,49 @@ async def test_sop_quality_graph_returns_agent_result() -> None:
 
 
 @pytest.mark.asyncio
+async def test_sop_quality_graph_creates_fresh_deep_agent_for_each_invocation() -> None:
+    repository = FakeLlmProviderRepository()
+    sop_client = FakeSopClient()
+    agents = [
+        FakeAgent("First review."),
+        FakeAgent("Second review."),
+    ]
+    factory_calls = 0
+
+    async def fake_create_deep_agent_by_provider(llm_provider_repository, **kwargs):
+        nonlocal factory_calls
+        agent = agents[factory_calls]
+        factory_calls += 1
+        return agent
+
+    graph = build_sop_quality_graph(
+        sop_client=sop_client,
+        llm_provider_repository=repository,
+        create_deep_agent_by_provider=fake_create_deep_agent_by_provider,
+        submit_quality_result=fake_submit_quality_result,
+    )
+
+    await graph.ainvoke(
+        {
+            "check_id": "check-1",
+            "sop_id": "release-checklist",
+            "env_key": "dev",
+        }
+    )
+    await graph.ainvoke(
+        {
+            "check_id": "check-2",
+            "sop_id": "release-checklist",
+            "env_key": "dev",
+        }
+    )
+
+    assert factory_calls == 2
+    assert agents[0].inputs[0]["messages"][0]["content"].find("check-1") > -1
+    assert agents[1].inputs[0]["messages"][0]["content"].find("check-2") > -1
+
+
+@pytest.mark.asyncio
 async def test_sop_quality_graph_wraps_unstructured_agent_output() -> None:
     repository = FakeLlmProviderRepository()
     sop_client = FakeSopClient()

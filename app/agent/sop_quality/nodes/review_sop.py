@@ -45,16 +45,12 @@ def make_review_sop(
     create_deep_agent_by_provider: AgentFactory = create_deepagents_by_llm_provider,
     on_live_event: LiveEventCallback | None = None,
 ) -> Callable[[SopQualityState], Awaitable[SopQualityState]]:
-    agent: Any | None = None
-
     async def review_sop(state: SopQualityState) -> SopQualityState:
-        nonlocal agent
-        if agent is None:
-            agent = await create_deep_agent_by_provider(
-                llm_provider_repository,
-                system_prompt=SYSTEM_PROMPT,
-                model_config={"temperature": 0},
-            )
+        agent = await create_deep_agent_by_provider(
+            llm_provider_repository,
+            system_prompt=SYSTEM_PROMPT,
+            model_config={"temperature": 0},
+        )
 
         output = await _run_agent(
             agent,
