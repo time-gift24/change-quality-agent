@@ -114,24 +114,38 @@ export function useAgentDetail(
 export function useAgentMutations() {
   const [pendingCount, setPendingCount] = useState(0);
   const [error, setError] = useState<Error | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const runMutation = useCallback(
     async <TResult,>(
       action: () => Promise<TResult>,
       options?: MutationOptions<TResult>,
     ): Promise<TResult> => {
-      setPendingCount((current) => current + 1);
-      setError(null);
+      if (mountedRef.current) {
+        setPendingCount((current) => current + 1);
+        setError(null);
+      }
       try {
         const result = await action();
         await options?.onSuccess?.(result);
         return result;
       } catch (mutationError) {
         const nextError = asError(mutationError);
-        setError(nextError);
+        if (mountedRef.current) {
+          setError(nextError);
+        }
         throw nextError;
       } finally {
-        setPendingCount((current) => Math.max(0, current - 1));
+        if (mountedRef.current) {
+          setPendingCount((current) => Math.max(0, current - 1));
+        }
       }
     },
     [],
