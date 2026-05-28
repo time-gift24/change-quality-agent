@@ -29,7 +29,7 @@ def test_alembic_revision_graph_has_single_head() -> None:
         down_revisions.update(_down_revisions(module))
 
     heads = revisions - down_revisions
-    assert heads == {"20260526_0003"}
+    assert heads == {"20260527_0004"}
 
 
 def _string_assignment(module: ast.Module, name: str) -> str | None:

@@ -4,10 +4,54 @@ import yaml
 
 
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / "api" / "openapi.yml"
+HTTP_METHODS = {"delete", "get", "patch", "post", "put"}
 
 
 def load_contract() -> dict:
     return yaml.safe_load(CONTRACT_PATH.read_text())
+
+
+def iter_path_operations(paths: dict):
+    for path, path_item in paths.items():
+        for method, operation in path_item.items():
+            if method in HTTP_METHODS:
+                yield path, method, operation
+
+
+def test_auth_paths_are_documented() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+
+    assert contract["security"] == [{"CookieAuth": []}]
+    assert "/api/auth/me" in paths
+    assert "/api/auth/dev-login" in paths
+    assert "/api/auth/logout" in paths
+    assert {
+        "name": "auth",
+        "description": "Cookie-backed user authentication APIs for local development.",
+    } in contract["tags"]
+    assert contract["components"]["securitySchemes"]["CookieAuth"] == {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "cqa_user",
+    }
+    assert "UserPublic" in contract["components"]["schemas"]
+    assert "DevLoginRequest" in contract["components"]["schemas"]
+    assert "401" in paths["/api/auth/me"]["get"]["responses"]
+    assert paths["/api/auth/dev-login"]["post"]["security"] == []
+    assert paths["/api/auth/logout"]["post"]["security"] == []
+
+
+def test_protected_non_auth_operations_document_401() -> None:
+    contract = load_contract()
+
+    for path, method, operation in iter_path_operations(contract["paths"]):
+        if path.startswith("/api/auth/"):
+            continue
+
+        assert "401" in operation["responses"], (
+            f"{method.upper()} {path} is protected but does not document 401"
+        )
 
 
 def test_openapi_includes_mcp_server_routes() -> None:
@@ -27,9 +71,11 @@ def test_openapi_includes_mcp_server_routes() -> None:
         assert path in paths
         assert methods <= set(paths[path])
         for method in methods:
-            responses = paths[path][method]["responses"]
+            operation = paths[path][method]
+            responses = operation["responses"]
+            assert operation["security"] == [{"CookieAuth": []}]
+            assert "401" in responses
             assert "403" in responses
-            assert "503" in responses
 
     schemas = spec["components"]["schemas"]
     assert {
@@ -39,13 +85,7 @@ def test_openapi_includes_mcp_server_routes() -> None:
         "McpServerDetail",
         "McpLifecycleResponse",
     } <= set(schemas)
-    assert spec["components"]["securitySchemes"]["McpAdminToken"] == {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-MCP-Admin-Token",
-    }
-    assert paths["/api/mcp/servers"]["get"]["security"] == [{"McpAdminToken": []}]
-
+    assert set(spec["components"]["securitySchemes"]) == {"CookieAuth"}
     lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
         "responses"
     ]

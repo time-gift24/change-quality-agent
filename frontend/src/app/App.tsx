@@ -9,6 +9,9 @@ import {
   useNavigate,
 } from "react-router-dom";
 
+import { AuthProvider, useAuth } from "../features/auth/AuthContext";
+import { DevUserPicker } from "../features/auth/DevUserPicker";
+import { DevUserSwitcher } from "../features/auth/DevUserSwitcher";
 import { McpDetailPage } from "../features/mcp/pages/McpDetailPage";
 import { McpListPage } from "../features/mcp/pages/McpListPage";
 import { McpCreatePage, McpEditPage } from "../features/mcp/pages/McpServerFormPage";
@@ -17,24 +20,61 @@ import { RecentSopSidebarPanel } from "./RecentSopSidebarPanel";
 import { WorkspaceLayoutProvider } from "./WorkspaceLayoutContext";
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
 import { ProtectedRoute } from "./routing/ProtectedRoute";
+import { useAuthz } from "./routing/useAuthz";
+import {
+  getVisibleWorkspaceSidebarRoutes,
+  getWorkspaceRouteKey,
+  workspaceRoutes,
+  type WorkspaceRouteKey,
+} from "./routing/workspaceRoutes";
 
 export function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<WorkspaceFrame />} path="/">
-          <Route element={<Navigate replace to="/sop" />} index />
-          <Route element={<ChatPage />} path="sop" />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<McpListPage />} path="mcp" />
-            <Route element={<McpCreatePage />} path="mcp/new" />
-            <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
-            <Route element={<McpDetailPage />} path="mcp/:serverId" />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<AuthenticatedWorkspace />} path="/">
+            <Route element={<Navigate replace to="/sop" />} index />
+            <Route element={<ChatPage />} path="sop" />
+            <Route element={<ProtectedRoute route={workspaceRoutes.mcp} />}>
+              <Route element={<McpListPage />} path="mcp" />
+              <Route element={<McpCreatePage />} path="mcp/new" />
+              <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
+              <Route element={<McpDetailPage />} path="mcp/:serverId" />
+            </Route>
+            <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>
-          <Route element={<Navigate replace to="/sop" />} path="*" />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+function AuthenticatedWorkspace() {
+  const { status } = useAuth();
+
+  if (status === "loading") {
+    return <AuthStatus busy message="Loading…" />;
+  }
+
+  if (status === "anonymous") {
+    if (import.meta.env.DEV) {
+      return <DevUserPicker />;
+    }
+
+    return <AuthStatus message="Authentication required." />;
+  }
+
+  return <WorkspaceFrame />;
+}
+
+function AuthStatus({ busy = false, message }: { busy?: boolean; message: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-aurora px-4 text-sm text-body">
+      <p aria-busy={busy} role={busy ? "status" : undefined}>
+        {message}
+      </p>
+    </main>
   );
 }
 
@@ -45,7 +85,12 @@ function WorkspaceFrame() {
   const [recentRefreshKey, setRecentRefreshKey] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const activeKey = location.pathname.startsWith("/mcp") ? "mcp" : "sop";
+  const authz = useAuthz();
+  const activeKey = getWorkspaceRouteKey(location.pathname);
+  const navRoutes = useMemo(
+    () => getVisibleWorkspaceSidebarRoutes(authz),
+    [authz],
+  );
   const registerNewConversationHandler = useCallback((handler: (() => void) | null) => {
     setNewConversationHandler(() => handler);
   }, []);
@@ -68,18 +113,25 @@ function WorkspaceFrame() {
     navigate("/sop");
   }
 
+  function handleNavigate(routeKey: WorkspaceRouteKey) {
+    navigate(workspaceRoutes[routeKey].path);
+  }
+
   return (
     <WorkspaceLayoutProvider value={layoutContext}>
       <div className="flex h-screen overflow-hidden bg-canvas text-ink bg-aurora">
         <WorkspaceSidebar
           activeKey={activeKey}
-          onNavigateMcp={() => navigate("/mcp")}
-          onNavigateSop={() => navigate("/sop")}
+          navRoutes={navRoutes}
+          onNavigate={handleNavigate}
           onNewConversation={handleNewConversation}
           onToggle={() => setSidebarOpen((value) => !value)}
           open={sidebarOpen}
+          topContent={import.meta.env.DEV ? <DevUserSwitcher /> : null}
         >
-          {sidebarContent ?? <RecentSopSidebarPanel refreshKey={recentRefreshKey} />}
+          {sidebarContent ?? (
+            <RecentSopSidebarPanel refreshKey={recentRefreshKey} />
+          )}
         </WorkspaceSidebar>
 
         <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">

@@ -6,7 +6,6 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -282,18 +281,6 @@ describe("McpListPage", () => {
     fireEvent.click(triggers[1]);
     fireEvent.click(screen.getByRole("menuitem", { name: "删除" }));
     expect(confirmSpy).toHaveBeenCalledWith("确认删除 Beta Server？");
-  });
-
-  it("stores the MCP admin token and refetches servers", async () => {
-    renderListPage();
-
-    fireEvent.change(screen.getByLabelText("MCP Admin Token"), {
-      target: { value: "token-from-ui" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "保存 Token" }));
-
-    await waitFor(() => expect(refetchServers).toHaveBeenCalledTimes(1));
-    expect(window.sessionStorage.getItem("mcp-admin-token")).toBe("token-from-ui");
   });
 
   it("shows status badge for running and stopped servers", () => {

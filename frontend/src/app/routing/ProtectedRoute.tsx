@@ -1,12 +1,46 @@
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
 import { useAuthz } from "./useAuthz";
+import {
+  canAccessWorkspaceRoute,
+  type WorkspaceRouteDefinition,
+} from "./workspaceRoutes";
 
-export function ProtectedRoute() {
-  const { isAdmin } = useAuthz();
+type ProtectedRouteProps = {
+  route: WorkspaceRouteDefinition;
+};
 
-  if (!isAdmin) {
-    return <div>403 Forbidden</div>;
+export function ProtectedRoute({ route }: ProtectedRouteProps) {
+  const authz = useAuthz();
+
+  if (!canAccessWorkspaceRoute(route, authz)) {
+    return (
+      <main
+        aria-labelledby="forbidden-title"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-auto px-4 py-6"
+      >
+        <section className="min-w-0 w-full max-w-sm rounded-2xl border border-hairline-soft bg-canvas/95 p-4 text-center shadow-sm shadow-primary/5">
+          <p className="text-2xs font-semibold uppercase tracking-normal text-primary-deep">
+            权限不足
+          </p>
+          <h1
+            className="mt-1 text-base font-semibold tracking-tight text-ink"
+            id="forbidden-title"
+          >
+            403 Forbidden
+          </h1>
+          <p className="mt-2 text-xs leading-relaxed text-body">
+            需要管理权限才能访问该功能。
+          </p>
+          <Link
+            className="mt-4 inline-flex h-9 items-center justify-center rounded-full bg-primary px-4 text-xs font-semibold text-on-primary transition-colors hover:bg-primary-deep"
+            to="/sop"
+          >
+            返回 SOP
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   return <Outlet />;

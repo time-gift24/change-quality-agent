@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
@@ -9,11 +10,11 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import get_mcp_repository, get_mcp_runtime_manager
 from app.core.config import settings
-from app.main import app
+from app import main as main_module
 from app.schemas.mcp import McpLifecycleResponse
 from app.services.mcp_runtime import McpRuntimeNotEnabledError
 
-ADMIN_HEADERS = {"x-mcp-admin-token": "test-token"}
+app = main_module.app
 
 
 class FakeTool:
@@ -143,8 +144,6 @@ def _lifecycle_response(
 
 @pytest.fixture(autouse=True)
 def overrides():
-    old_admin_token = settings.mcp_admin_token
-    settings.mcp_admin_token = "test-token"
     server = FakeServer()
     repository = FakeRepository(server)
     runtime = FakeRuntimeManager(repository)
@@ -152,11 +151,16 @@ def overrides():
     app.dependency_overrides[get_mcp_runtime_manager] = lambda: runtime
     yield server, repository, runtime
     app.dependency_overrides.clear()
-    settings.mcp_admin_token = old_admin_token
 
 
 @pytest.mark.asyncio
-async def test_mcp_admin_routes_require_admin_token(overrides) -> None:
+async def test_mcp_routes_reject_normal_user(monkeypatch, overrides) -> None:
+    async def resolve_common_user(_request):
+        return SimpleNamespace(account="common", is_admin=False)
+
+    monkeypatch.setattr(settings, "auth_enabled", True)
+    monkeypatch.setattr(main_module, "resolve_current_user", resolve_common_user)
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
@@ -164,6 +168,27 @@ async def test_mcp_admin_routes_require_admin_token(overrides) -> None:
         response = await client.get("/api/mcp/servers")
 
     assert response.status_code == 403
+    assert response.json() == {"detail": "Admin access required."}
+
+
+@pytest.mark.asyncio
+async def test_mcp_routes_allow_admin_user_without_token(
+    monkeypatch,
+    overrides,
+) -> None:
+    async def resolve_admin_user(_request):
+        return SimpleNamespace(account="admin", is_admin=True)
+
+    monkeypatch.setattr(settings, "auth_enabled", True)
+    monkeypatch.setattr(main_module, "resolve_current_user", resolve_admin_user)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/mcp/servers")
+
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -172,7 +197,7 @@ async def test_list_mcp_servers_redacts_env_and_counts_tools(overrides) -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.get("/api/mcp/servers", headers=ADMIN_HEADERS)
+        response = await client.get("/api/mcp/servers")
 
     assert response.status_code == 200
     body = response.json()
@@ -190,7 +215,6 @@ async def test_get_mcp_server_returns_tools(overrides) -> None:
     ) as client:
         response = await client.get(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 200
@@ -208,7 +232,6 @@ async def test_create_mcp_server_persists_and_redacts_response(overrides) -> Non
     ) as client:
         response = await client.post(
             "/api/mcp/servers",
-            headers=ADMIN_HEADERS,
             json={
                 "name": "github",
                 "transport": "stdio",
@@ -238,7 +261,6 @@ async def test_create_running_mcp_server_starts_and_returns_tools(overrides) -> 
     ) as client:
         response = await client.post(
             "/api/mcp/servers",
-            headers=ADMIN_HEADERS,
             json={
                 "name": "github",
                 "transport": "stdio",
@@ -269,7 +291,6 @@ async def test_create_duplicate_mcp_server_name_returns_conflict(overrides) -> N
     ) as client:
         response = await client.post(
             "/api/mcp/servers",
-            headers=ADMIN_HEADERS,
             json={
                 "name": "filesystem",
                 "transport": "stdio",
@@ -289,7 +310,6 @@ async def test_update_running_mcp_server_returns_conflict(overrides) -> None:
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
             json={"command": "node"},
         )
 
@@ -309,7 +329,6 @@ async def test_update_live_handle_returns_conflict_even_when_status_is_error(
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
             json={"command": "node"},
         )
 
@@ -326,7 +345,6 @@ async def test_update_stopped_mcp_server_validates_merged_config(overrides) -> N
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
             json={"command": "   "},
         )
 
@@ -343,7 +361,6 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
             json={"command": " node "},
         )
 
@@ -367,7 +384,6 @@ async def test_update_waits_for_mcp_lifecycle_lock(overrides) -> None:
         request_task = asyncio.create_task(
             client.patch(
                 f"/api/mcp/servers/{server.id}",
-                headers=ADMIN_HEADERS,
                 json={"command": "node"},
             )
         )
@@ -394,7 +410,6 @@ async def test_update_stopped_mcp_server_can_clear_nullable_config(
     ) as client:
         response = await client.patch(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
             json={"url": None},
         )
 
@@ -413,7 +428,6 @@ async def test_start_mcp_server_returns_runtime_status(overrides) -> None:
     ) as client:
         response = await client.post(
             f"/api/mcp/servers/{server.id}/start",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 200
@@ -431,7 +445,6 @@ async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
     ) as client:
         response = await client.post(
             f"/api/mcp/servers/{server.id}/start",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 502
@@ -451,7 +464,6 @@ async def test_start_mcp_server_without_runtime_confirmation_returns_unavailable
     ) as client:
         response = await client.post(
             f"/api/mcp/servers/{server.id}/start",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 503
@@ -466,7 +478,6 @@ async def test_delete_running_mcp_server_stops_then_deletes(overrides) -> None:
     ) as client:
         response = await client.delete(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 204
@@ -485,7 +496,6 @@ async def test_delete_live_handle_stops_even_when_status_is_error(overrides) -> 
     ) as client:
         response = await client.delete(
             f"/api/mcp/servers/{server.id}",
-            headers=ADMIN_HEADERS,
         )
 
     assert response.status_code == 204
@@ -506,7 +516,6 @@ async def test_delete_waits_for_mcp_lifecycle_lock(overrides) -> None:
         request_task = asyncio.create_task(
             client.delete(
                 f"/api/mcp/servers/{server.id}",
-                headers=ADMIN_HEADERS,
             )
         )
         await asyncio.sleep(0)

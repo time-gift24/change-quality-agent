@@ -6,12 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 import { WorkspaceSidebar } from "./WorkspaceSidebar";
+import { workspaceSidebarRoutes } from "./routing/workspaceRoutes";
 
 function renderSidebar(overrides: Partial<React.ComponentProps<typeof WorkspaceSidebar>> = {}) {
   const props = {
     activeKey: "sop" as const,
-    onNavigateMcp: vi.fn(),
-    onNavigateSop: vi.fn(),
+    navRoutes: [...workspaceSidebarRoutes],
+    onNavigate: vi.fn(),
     onNewConversation: vi.fn(),
     onToggle: vi.fn(),
     open: true,
@@ -63,6 +64,17 @@ describe("WorkspaceSidebar", () => {
     expect(mcpButton.querySelector("svg")).not.toBeNull();
   });
 
+  it("hides MCP 管理 when routing does not expose that nav route", () => {
+    renderSidebar({ navRoutes: [workspaceSidebarRoutes[0]] });
+
+    expect(
+      screen.getByRole("button", { name: "发起新SOP质检" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "MCP 管理" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("hides the 质量检查 brand text when collapsed but keeps the toggle", () => {
     renderSidebar({ open: false });
 
@@ -91,12 +103,12 @@ describe("WorkspaceSidebar", () => {
     expect(openAside?.className).toContain("w-64");
   });
 
-  it("invokes onNavigateMcp when MCP 管理 is clicked from a non-mcp page", () => {
+  it("invokes onNavigate when MCP 管理 is clicked from a non-mcp page", () => {
     const { props } = renderSidebar({ activeKey: "sop" });
 
     fireEvent.click(screen.getByRole("button", { name: "MCP 管理" }));
 
-    expect(props.onNavigateMcp).toHaveBeenCalledTimes(1);
+    expect(props.onNavigate).toHaveBeenCalledWith("mcp");
   });
 
   it("invokes onNewConversation when on sop and 发起新SOP质检 is clicked", () => {
@@ -105,7 +117,7 @@ describe("WorkspaceSidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "发起新SOP质检" }));
 
     expect(props.onNewConversation).toHaveBeenCalledTimes(1);
-    expect(props.onNavigateSop).not.toHaveBeenCalled();
+    expect(props.onNavigate).not.toHaveBeenCalled();
   });
 
   it("invokes onNavigateSop when on mcp and 发起新SOP质检 is clicked", () => {
@@ -116,7 +128,7 @@ describe("WorkspaceSidebar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "发起新SOP质检" }));
 
-    expect(props.onNavigateSop).toHaveBeenCalledTimes(1);
+    expect(props.onNavigate).toHaveBeenCalledWith("sop");
     expect(props.onNewConversation).not.toHaveBeenCalled();
   });
 

@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     )
     log_level: str = "INFO"
     access_log_enabled: bool = True
+    auth_enabled: bool = True
+    auth_dev_mode: bool = False
+    auth_session_cookie_name: str = "cqa_user"
     environments: list[EnvironmentConfig] = Field(
         default_factory=lambda: [
             EnvironmentConfig(
@@ -42,7 +45,6 @@ class Settings(BaseSettings):
             )
         ]
     )
-    mcp_admin_token: str | None = None
     mcp_allowed_stdio_commands: list[str] = Field(default_factory=list)
     mcp_allowed_stdio_specs: list[str] = Field(default_factory=list)
     mcp_operation_timeout_seconds: float = 10.0

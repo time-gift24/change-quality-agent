@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.deps import (
     McpRepositoryDep,
     McpRuntimeManagerDep,
-    require_mcp_admin,
+    require_admin_user,
 )
 from app.schemas.mcp import (
     McpLifecycleResponse,
@@ -27,7 +27,7 @@ from app.services.mcp_runtime import (
 router = APIRouter(
     prefix="/api/mcp",
     tags=["mcp"],
-    dependencies=[Depends(require_mcp_admin)],
+    dependencies=[Depends(require_admin_user)],
 )
 
 

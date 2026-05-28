@@ -61,6 +61,14 @@ def test_logging_settings_have_defaults() -> None:
     assert settings.access_log_enabled is True
 
 
+def test_auth_settings_have_defaults() -> None:
+    settings = Settings()
+
+    assert settings.auth_enabled is True
+    assert settings.auth_dev_mode is False
+    assert settings.auth_session_cookie_name == "cqa_user"
+
+
 def test_logging_settings_can_be_overridden_by_environment(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,

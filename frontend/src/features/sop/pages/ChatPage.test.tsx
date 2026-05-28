@@ -185,6 +185,17 @@ function fetchByRequest() {
   return vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
 
+    if (url === "/api/auth/me") {
+      return Promise.resolve(
+        jsonResponse({
+          id: "user-admin",
+          account: "admin",
+          is_admin: true,
+          meta: {},
+        }),
+      );
+    }
+
     if (url === "/api/sop/environments") {
       return Promise.resolve(
         jsonResponse([

@@ -6,14 +6,19 @@ import {
   SidebarMenu,
   SidebarMenuButton,
 } from "../components/ui/sidebar";
+import type {
+  WorkspaceRouteDefinition,
+  WorkspaceRouteKey,
+} from "./routing/workspaceRoutes";
 
 type WorkspaceSidebarProps = {
   open: boolean;
   onToggle: () => void;
-  activeKey: "sop" | "mcp";
-  onNavigateSop: () => void;
-  onNavigateMcp: () => void;
+  activeKey: WorkspaceRouteKey;
+  navRoutes: WorkspaceRouteDefinition[];
+  onNavigate: (routeKey: WorkspaceRouteKey) => void;
   onNewConversation?: () => void;
+  topContent?: ReactNode;
   children?: ReactNode;
 };
 
@@ -21,9 +26,10 @@ export function WorkspaceSidebar({
   open,
   onToggle,
   activeKey,
-  onNavigateSop,
-  onNavigateMcp,
+  navRoutes,
+  onNavigate,
   onNewConversation,
+  topContent,
   children,
 }: WorkspaceSidebarProps) {
   function handleNewConversation() {
@@ -31,14 +37,18 @@ export function WorkspaceSidebar({
       onNewConversation?.();
       return;
     }
-    onNavigateSop();
+    onNavigate("sop");
   }
 
-  function handleMcpClick() {
-    if (activeKey === "mcp") {
+  function handleRouteClick(routeKey: WorkspaceRouteKey) {
+    if (routeKey === "sop") {
+      handleNewConversation();
       return;
     }
-    onNavigateMcp();
+    if (routeKey === activeKey) {
+      return;
+    }
+    onNavigate(routeKey);
   }
 
   return (
@@ -64,23 +74,20 @@ export function WorkspaceSidebar({
         ) : null}
       </SidebarHeader>
 
+      {open && topContent ? topContent : null}
+
       <SidebarMenu aria-label="工作台导航">
-        <SidebarNavButton
-          active={activeKey === "sop"}
-          aria-label="发起新SOP质检"
-          icon={<PencilIcon />}
-          label="发起新SOP质检"
-          onClick={handleNewConversation}
-          open={open}
-        />
-        <SidebarNavButton
-          active={activeKey === "mcp"}
-          aria-label="MCP 管理"
-          icon={<ServerIcon />}
-          label="MCP 管理"
-          onClick={handleMcpClick}
-          open={open}
-        />
+        {navRoutes.map((route) => (
+          <SidebarNavButton
+            active={activeKey === route.key}
+            aria-label={route.label}
+            icon={route.key === "sop" ? <PencilIcon /> : <ServerIcon />}
+            key={route.key}
+            label={route.label}
+            onClick={() => handleRouteClick(route.key)}
+            open={open}
+          />
+        ))}
       </SidebarMenu>
 
       {open ? (
