@@ -67,6 +67,11 @@ class FakeLlmProviderRepository:
     pass
 
 
+class FakeAgentFactory:
+    def __init__(self, repository) -> None:
+        self.repository = repository
+
+
 class FakeSopClient:
     pass
 
@@ -202,7 +207,7 @@ async def test_runner_reads_latest_top_level_checkpoint(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_passes_llm_provider_repository_to_graph(monkeypatch) -> None:
+async def test_runner_passes_agent_factory_to_graph(monkeypatch) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
@@ -217,6 +222,7 @@ async def test_runner_passes_llm_provider_repository_to_graph(monkeypatch) -> No
         "build_sop_quality_graph",
         fake_build_sop_quality_graph,
     )
+    monkeypatch.setattr(sop_quality_runner, "AgentFactory", FakeAgentFactory)
 
     result = await run_sop_quality_check(
         check.id,
@@ -228,7 +234,8 @@ async def test_runner_passes_llm_provider_repository_to_graph(monkeypatch) -> No
     )
 
     assert result["status"] == "succeeded"
-    assert build_calls[0]["llm_provider_repository"] is llm_provider_repository
+    assert isinstance(build_calls[0]["agent_factory"], FakeAgentFactory)
+    assert build_calls[0]["agent_factory"].repository is llm_provider_repository
     assert isinstance(build_calls[0]["sop_client"], FakeSopClient)
     assert build_calls[0]["submit_quality_result"] is fake_submit_quality_result
 
@@ -293,7 +300,7 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
     def fail_build(
         *,
         checkpointer,
-        llm_provider_repository,
+        agent_factory,
         sop_client,
         submit_quality_result,
         on_live_event,

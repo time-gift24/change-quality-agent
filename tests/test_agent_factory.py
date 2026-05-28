@@ -2,9 +2,9 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.create_agent_by_llm_provider import (
+from app.agents.manager.agent_factory import (
+    AgentFactory,
     LlmProviderAgentConfigurationError,
-    create_agent_by_llm_provider,
 )
 from app.core.llm_models import LlmProviderRuntimeConfig
 
@@ -30,10 +30,9 @@ class FakeRepository:
 
 
 @pytest.mark.asyncio
-async def test_create_agent_by_llm_provider_uses_first_provider_and_model() -> None:
+async def test_agent_factory_create_agent_uses_first_provider_and_model() -> None:
     first_provider = FakeProvider(models=["deepseek-v4-pro", "deepseek-chat"])
-    second_provider = FakeProvider(models=["gpt-5-mini"])
-    repository = FakeRepository([first_provider, second_provider])
+    repository = FakeRepository([first_provider, FakeProvider(models=["gpt-5-mini"])])
     created_agent = object()
     configured_model = object()
     provider_model_calls: list[tuple[str, LlmProviderRuntimeConfig, dict]] = []
@@ -54,13 +53,16 @@ async def test_create_agent_by_llm_provider_uses_first_provider_and_model() -> N
         )
         return created_agent
 
-    agent = await create_agent_by_llm_provider(
+    factory = AgentFactory(
         repository,
+        provider_model_factory=fake_provider_model_factory,
+        create_agent_factory=fake_create_agent,
+    )
+
+    agent = await factory.create_agent(
         system_prompt="Review the SOP carefully.",
         tools=tools,
         model_config={"temperature": 0},
-        provider_model_factory=fake_provider_model_factory,
-        create_agent=fake_create_agent,
     )
 
     assert agent is created_agent
@@ -85,14 +87,57 @@ async def test_create_agent_by_llm_provider_uses_first_provider_and_model() -> N
 
 
 @pytest.mark.asyncio
-async def test_create_agent_by_llm_provider_fails_without_provider() -> None:
-    with pytest.raises(LlmProviderAgentConfigurationError, match="No LLM provider"):
-        await create_agent_by_llm_provider(FakeRepository([]))
+async def test_agent_factory_create_deepagents_returns_fresh_agent_each_call() -> None:
+    repository = FakeRepository([FakeProvider(models=["deepseek-v4-pro"])])
+    created_agents = [object(), object()]
+    create_deep_agent_calls: list[dict] = []
+
+    def fake_provider_model_factory(model: str, provider, **model_config):
+        return {"model": model, "temperature": model_config.get("temperature")}
+
+    def fake_create_deep_agent(*, model, tools, system_prompt):
+        create_deep_agent_calls.append(
+            {
+                "model": model,
+                "tools": tools,
+                "system_prompt": system_prompt,
+            }
+        )
+        return created_agents[len(create_deep_agent_calls) - 1]
+
+    factory = AgentFactory(
+        repository,
+        provider_model_factory=fake_provider_model_factory,
+        create_deep_agent_factory=fake_create_deep_agent,
+    )
+
+    first = await factory.create_deepagents(
+        system_prompt="Review one.",
+        model_config={"temperature": 0},
+    )
+    second = await factory.create_deepagents(
+        system_prompt="Review two.",
+        model_config={"temperature": 0},
+    )
+
+    assert first is created_agents[0]
+    assert second is created_agents[1]
+    assert len(create_deep_agent_calls) == 2
+    assert create_deep_agent_calls[0]["system_prompt"] == "Review one."
+    assert create_deep_agent_calls[1]["system_prompt"] == "Review two."
 
 
 @pytest.mark.asyncio
-async def test_create_agent_by_llm_provider_fails_without_provider_model() -> None:
-    provider = FakeProvider(models=[])
+async def test_agent_factory_fails_without_provider() -> None:
+    factory = AgentFactory(FakeRepository([]))
+
+    with pytest.raises(LlmProviderAgentConfigurationError, match="No LLM provider"):
+        await factory.create_agent()
+
+
+@pytest.mark.asyncio
+async def test_agent_factory_fails_without_provider_model() -> None:
+    factory = AgentFactory(FakeRepository([FakeProvider(models=[])]))
 
     with pytest.raises(LlmProviderAgentConfigurationError, match="does not list models"):
-        await create_agent_by_llm_provider(FakeRepository([provider]))
+        await factory.create_deepagents()

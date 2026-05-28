@@ -4,10 +4,9 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.agent.sop_quality.state import SopQualityState
-from app.core.create_deepagents_by_llm_provider import create_deepagents_by_llm_provider
 from app.core.stream_events import runtime_stream_event
 
-AgentFactory = Callable[..., Awaitable[Any]]
+CreateDeepagents = Callable[..., Awaitable[Any]]
 LiveEventCallback = Callable[[dict[str, Any]], Any]
 
 SYSTEM_PROMPT = """You are a strict SOP quality reviewer.
@@ -40,14 +39,12 @@ SEVERITY_ALIASES = {
 
 
 def make_review_sop(
-    llm_provider_repository: Any,
+    create_deepagents: CreateDeepagents,
     *,
-    create_deep_agent_by_provider: AgentFactory = create_deepagents_by_llm_provider,
     on_live_event: LiveEventCallback | None = None,
 ) -> Callable[[SopQualityState], Awaitable[SopQualityState]]:
     async def review_sop(state: SopQualityState) -> SopQualityState:
-        agent = await create_deep_agent_by_provider(
-            llm_provider_repository,
+        agent = await create_deepagents(
             system_prompt=SYSTEM_PROMPT,
             model_config={"temperature": 0},
         )

@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from app.agent.sop_quality.graph import build_sop_quality_graph
+from app.agents.manager.agent_factory import AgentFactory
 from app.core.checkpoints import open_postgres_checkpointer
 from app.core.database import async_session
 from app.repositories.llm_providers import LlmProviderRepository
@@ -35,7 +36,7 @@ async def run_sop_quality_check(
 
         graph = build_sop_quality_graph(
             checkpointer=checkpointer,
-            llm_provider_repository=llm_provider_repository,
+            agent_factory=AgentFactory(llm_provider_repository),
             sop_client=sop_client,
             submit_quality_result=submit_quality_result,
             on_live_event=_live_event_publisher(

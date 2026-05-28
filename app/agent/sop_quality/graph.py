@@ -10,7 +10,6 @@ from app.agent.sop_quality.nodes.submit_result import (
     make_submit_result,
 )
 from app.agent.sop_quality.state import SopQualityState
-from app.core.create_deepagents_by_llm_provider import create_deepagents_by_llm_provider
 from app.services.sop_client import MockSopClient
 
 
@@ -18,8 +17,7 @@ def build_sop_quality_graph(
     checkpointer: Any | None = None,
     *,
     sop_client: Any | None = None,
-    llm_provider_repository: Any,
-    create_deep_agent_by_provider=create_deepagents_by_llm_provider,
+    agent_factory: Any,
     submit_quality_result=mock_submit_quality_result,
     on_live_event=None,
 ):
@@ -28,8 +26,7 @@ def build_sop_quality_graph(
     builder.add_node(
         "review_sop",
         make_review_sop(
-            llm_provider_repository,
-            create_deep_agent_by_provider=create_deep_agent_by_provider,
+            agent_factory.create_deepagents,
             on_live_event=on_live_event,
         ),
     )
