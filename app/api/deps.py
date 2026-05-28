@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
+from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.runs import RunRepository
 from app.repositories.users import UserRepository
@@ -35,6 +36,16 @@ def get_agent_repository(session: SessionDep) -> AgentRepository:
 
 
 AgentRepositoryDep = Annotated[AgentRepository, Depends(get_agent_repository)]
+
+
+def get_llm_provider_repository(session: SessionDep) -> LlmProviderRepository:
+    return LlmProviderRepository(session)
+
+
+LlmProviderRepositoryDep = Annotated[
+    LlmProviderRepository,
+    Depends(get_llm_provider_repository),
+]
 
 
 def get_mcp_repository(session: SessionDep) -> McpServerRepository:

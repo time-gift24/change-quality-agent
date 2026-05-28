@@ -5,6 +5,7 @@ from uuid import UUID
 from app.agent.sop_quality.prompts.system_prompts import build_sop_quality_user_message
 from app.core.agent_runtime import AgentRuntime
 from app.core.agent_streaming import consume_runtime_stream
+from app.core.config import settings
 from app.core.database import async_session
 from app.repositories.agents import AgentRepository
 from app.repositories.runs import RunRepository
@@ -30,21 +31,24 @@ async def run_sop_quality_graph(
     *,
     agent_repository: AgentRepository | None = None,
     runtime: AgentRuntime | None = None,
-    agent_key: str = SOP_QUALITY_AGENT_KEY,
+    agent_id: UUID | None = None,
 ) -> dict[str, Any]:
     run = await repository.mark_running(run_id)
     runtime = runtime or AgentRuntime()
     try:
         if agent_repository is None:
             raise RuntimeError("SOP quality agent repository is not configured.")
-        agent = await agent_repository.get_agent(agent_key)
+        resolved_agent_id = agent_id or _configured_sop_quality_agent_id()
+        agent = await agent_repository.get_agent(resolved_agent_id)
         if agent is None:
-            raise RuntimeError(f"SOP quality agent not found: {agent_key}")
+            raise RuntimeError(f"SOP quality agent not found: {resolved_agent_id}")
         if not agent.enabled:
-            raise RuntimeError(f"SOP quality agent is disabled: {agent_key}")
+            raise RuntimeError(f"SOP quality agent is disabled: {resolved_agent_id}")
         version = agent.latest_version
         if version is None:
-            raise RuntimeError(f"SOP quality agent has no published version: {agent_key}")
+            raise RuntimeError(
+                f"SOP quality agent has no published version: {resolved_agent_id}"
+            )
 
         await repository.append_event(
             run_id,
@@ -52,7 +56,7 @@ async def run_sop_quality_graph(
             thread_id=run.thread_id,
             payload={
                 "message": "Started SOP quality agent.",
-                "agent_key": agent_key,
+                "agent_id": str(resolved_agent_id),
                 "agent_version_number": version.version_number,
             },
             node="start",
@@ -130,3 +134,9 @@ async def _commit_if_available(repository: RunRepository) -> None:
     commit = getattr(repository, "commit", None)
     if commit is not None:
         await commit()
+
+
+def _configured_sop_quality_agent_id() -> UUID:
+    if not settings.sop_quality_agent_id:
+        raise RuntimeError("SOP_QUALITY_AGENT_ID is required.")
+    return UUID(settings.sop_quality_agent_id)

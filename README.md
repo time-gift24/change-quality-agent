@@ -18,6 +18,10 @@ checks, managing ReAct agent definitions, and observing long-running work.
   command/first-arg pairs with `mcp_allowed_stdio_specs` such as
   `uvx:mcp-server-filesystem`, and only set `mcp_runtime_single_instance=true`
   when the API is deployed as a single process owning MCP child processes.
+- Runs `codeagent:<model>` agent versions through the internal CodeAgent-compatible
+  model factory. Configure `CODEAGENT_BASE_URL` and
+  `CODEAGENT_TOKEN_PROVIDER=codeagent` on the API process; token headers are
+  refreshed before each model HTTP request by the CodeAgent token provider.
 - Uses in-process v1 runners while worker leases, checkpoint resume, tool/MCP
   resolution, LLM provider UI, and the real SOP client remain future integration
   points.

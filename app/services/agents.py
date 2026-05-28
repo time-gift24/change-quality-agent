@@ -7,12 +7,17 @@ from uuid import UUID
 from app.core.agent_runtime import AgentRuntime, to_jsonable
 from app.core.agent_streaming import consume_runtime_stream
 from app.core.database import async_session
+from app.core.llm_models import LlmProviderRuntimeConfig
 from app.models.agents import Agent, AgentVersion
 from app.repositories.agents import (
     AgentDisabledError,
     AgentNotFoundError,
     AgentRepository,
     AgentVersionNotFoundError,
+)
+from app.repositories.llm_providers import (
+    LlmProviderNotFoundError,
+    LlmProviderRepository,
 )
 from app.repositories.runs import RunRepository
 from app.schemas.agents import AgentCreate, AgentDraftUpdate, AgentTestRunCreate
@@ -32,6 +37,27 @@ class AgentRunStartResult:
     status: RunStatus
 
 
+class DatabaseLlmProviderResolver:
+    def __init__(self, repository: LlmProviderRepository) -> None:
+        self._repository = repository
+
+    async def resolve(self, provider_id: UUID) -> LlmProviderRuntimeConfig:
+        provider = await self._repository.get_by_id(provider_id)
+        if provider is None:
+            raise LlmProviderNotFoundError(f"LLM provider not found: {provider_id}")
+        if not provider.enabled:
+            raise RuntimeError(f"LLM provider is disabled: {provider_id}")
+        return LlmProviderRuntimeConfig(
+            id=provider.id,
+            provider_type=provider.provider_type,
+            base_url=provider.base_url,
+            api_key=provider.api_key,
+            default_headers=dict(provider.default_headers or {}),
+            default_query=dict(provider.default_query or {}),
+            enabled=provider.enabled,
+        )
+
+
 class AgentService:
     def __init__(
         self,
@@ -47,7 +73,6 @@ class AgentService:
 
     async def create_agent(self, request: AgentCreate) -> Agent:
         agent = await self._repository.create_agent(
-            key=request.key,
             display_name=request.display_name,
             description=request.description,
             draft=request.draft,
@@ -57,44 +82,44 @@ class AgentService:
 
     async def update_draft(
         self,
-        agent_key: str,
+        agent_id: UUID,
         request: AgentDraftUpdate,
     ) -> Agent:
         agent = await self._repository.update_draft(
-            agent_key,
+            agent_id,
             **self._draft_update_kwargs(request),
         )
         await self._commit_if_configured()
         return agent
 
-    async def publish_agent(self, agent_key: str) -> AgentVersion:
-        version = await self._repository.publish_agent(agent_key)
+    async def publish_agent(self, agent_id: UUID) -> AgentVersion:
+        version = await self._repository.publish_agent(agent_id)
         await self._commit_if_configured()
         return version
 
-    async def delete_agent(self, agent_key: str) -> Agent:
-        agent = await self._repository.soft_delete(agent_key)
+    async def delete_agent(self, agent_id: UUID) -> Agent:
+        agent = await self._repository.soft_delete(agent_id)
         await self._commit_if_configured()
         return agent
 
     async def start_test_run(
         self,
-        agent_key: str,
+        agent_id: UUID,
         request: AgentTestRunCreate,
     ) -> AgentRunStartResult:
         if self._run_repository is None:
             raise RuntimeError("Agent test run repository is not configured.")
 
-        agent = await self._repository.get_agent(agent_key)
+        agent = await self._repository.get_agent(agent_id)
         if agent is None:
-            raise AgentNotFoundError(agent_key)
+            raise AgentNotFoundError(agent_id)
         if not agent.enabled:
-            raise AgentDisabledError(agent_key)
+            raise AgentDisabledError(agent_id)
 
         version = await self._resolve_test_run_version(agent, request)
         messages = [message.model_dump(mode="json") for message in request.messages]
         run = await self._run_repository.create_agent_test_run(
-            agent_key=agent_key,
+            agent_id=agent.id,
             agent_version=version,
             messages=messages,
             input_preview=_input_preview(messages),
@@ -135,7 +160,7 @@ class AgentService:
 
         if request.version_number is not None:
             version = await self._repository.get_version_by_number(
-                agent.key,
+                agent.id,
                 request.version_number,
             )
             if version is None or version.agent_id != agent.id:
@@ -194,7 +219,7 @@ async def run_agent_test(
             thread_id=run.thread_id,
             payload={
                 "message": "Started agent test run.",
-                "agent_key": _agent_key(run),
+                "agent_id": _agent_id(run),
                 "agent_version_number": version.version_number,
             },
             node="start",
@@ -269,7 +294,11 @@ async def run_agent_test_with_new_session(run_id: UUID) -> dict[str, Any]:
     async with async_session() as session:
         run_repository = RunRepository(session)
         agent_repository = AgentRepository(session)
-        return await run_agent_test(run_id, run_repository, agent_repository)
+        provider_repository = LlmProviderRepository(session)
+        runtime = AgentRuntime(
+            provider_resolver=DatabaseLlmProviderResolver(provider_repository)
+        )
+        return await run_agent_test(run_id, run_repository, agent_repository, runtime)
 
 
 def _input_preview(messages: list[dict[str, str]]) -> str:
@@ -286,8 +315,8 @@ def _agent_version_id(run: Any) -> UUID:
     return UUID(str(run.metadata_["agent_version_id"]))
 
 
-def _agent_key(run: Any) -> str:
-    return str(run.metadata_.get("agent_key") or run.subject_id)
+def _agent_id(run: Any) -> str:
+    return str(run.metadata_.get("agent_id") or run.subject_id)
 
 
 async def _append_error_event(

@@ -19,6 +19,8 @@ tags:
   description: MCP server configuration and runtime management APIs.
 - name: agents
   description: ReAct agent definitions, versions, and test runs.
+- name: llm-providers
+  description: Stored LangChain chat model provider configuration.
 security:
 - CookieAuth: []
 paths:
@@ -548,6 +550,163 @@ paths:
           $ref: '#/components/responses/ServiceUnavailable'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers:
+    get:
+      tags:
+      - llm-providers
+      summary: List LLM providers
+      operationId: listLlmProviders
+      responses:
+        '200':
+          description: LLM provider summaries with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmProviderSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags:
+      - llm-providers
+      summary: Create an LLM provider
+      operationId: createLlmProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderCreate'
+      responses:
+        '201':
+          description: Created LLM provider with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers/{provider_id}:
+    get:
+      tags:
+      - llm-providers
+      summary: Get an LLM provider
+      operationId: getLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderId'
+      responses:
+        '200':
+          description: LLM provider detail with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    patch:
+      tags:
+      - llm-providers
+      summary: Update an LLM provider
+      operationId: updateLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderUpdate'
+      responses:
+        '200':
+          description: Updated LLM provider with masked secret-like config values.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderDetail'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - llm-providers
+      summary: Delete an LLM provider
+      operationId: deleteLlmProvider
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderId'
+      responses:
+        '204':
+          description: LLM provider deleted.
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/llm-providers/{provider_id}/test:
+    post:
+      tags:
+      - llm-providers
+      summary: Test an LLM provider model
+      operationId: testLlmProviderModel
+      parameters:
+      - $ref: '#/components/parameters/LlmProviderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmProviderModelTestRequest'
+      responses:
+        '200':
+          description: Provider model responded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderModelTestResponse'
+        '400':
+          description: Requested model is not configured for this provider.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: LLM provider not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Provider model connectivity test failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmProviderModelTestResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/agents:
     get:
       tags:
@@ -592,24 +751,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
-        '409':
-          description: Agent key already exists.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}:
+  /api/agents/{agent_id}:
     get:
       tags:
       - agents
       summary: Get a ReAct agent
       operationId: getAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
           description: Agent detail including the current draft, when present.
@@ -633,7 +786,7 @@ paths:
       summary: Delete a ReAct agent
       operationId: deleteAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '204':
           description: Agent deleted.
@@ -647,14 +800,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/draft:
+  /api/agents/{agent_id}/draft:
     patch:
       tags:
       - agents
       summary: Update a ReAct agent draft
       operationId: updateAgentDraft
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       requestBody:
         required: true
         content:
@@ -678,14 +831,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/publish:
+  /api/agents/{agent_id}/publish:
     post:
       tags:
       - agents
       summary: Publish a ReAct agent draft
       operationId: publishAgent
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '201':
           description: Published agent version.
@@ -709,14 +862,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/versions:
+  /api/agents/{agent_id}/versions:
     get:
       tags:
       - agents
       summary: List published ReAct agent versions
       operationId: listAgentVersions
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
           description: Published versions for the agent.
@@ -736,14 +889,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/versions/{version_number}:
+  /api/agents/{agent_id}/versions/{version_number}:
     get:
       tags:
       - agents
       summary: Get a published ReAct agent version
       operationId: getAgentVersion
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       - $ref: '#/components/parameters/AgentVersionNumber'
       responses:
         '200':
@@ -762,14 +915,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/agents/{agent_key}/test-runs:
+  /api/agents/{agent_id}/test-runs:
     post:
       tags:
       - agents
       summary: Start a ReAct agent test run
       operationId: startAgentTestRun
       parameters:
-      - $ref: '#/components/parameters/AgentKey'
+      - $ref: '#/components/parameters/AgentId'
       requestBody:
         required: true
         content:
@@ -834,13 +987,13 @@ components:
       schema:
         type: string
       example: dev
-    AgentKey:
-      name: agent_key
+    AgentId:
+      name: agent_id
       in: path
       required: true
       schema:
         type: string
-      example: release-reviewer
+        format: uuid
     AgentVersionNumber:
       name: version_number
       in: path
@@ -849,6 +1002,13 @@ components:
         type: integer
         minimum: 1
       example: 1
+    LlmProviderId:
+      name: provider_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     Unauthorized:
       description: Authentication is required or the session cookie is invalid.
@@ -1342,6 +1502,235 @@ components:
           items:
             type: object
             additionalProperties: true
+    LlmProviderCreate:
+      type: object
+      required:
+      - display_name
+      - provider_type
+      properties:
+        display_name:
+          type: string
+          example: OpenAI Main
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - azure_openai
+          - azure_ai
+          - google_vertexai
+          - google_genai
+          - anthropic_bedrock
+          - bedrock
+          - bedrock_converse
+          - cohere
+          - fireworks
+          - together
+          - mistralai
+          - huggingface
+          - groq
+          - ollama
+          - google_anthropic_vertex
+          - deepseek
+          - ibm
+          - nvidia
+          - xai
+          - openrouter
+          - perplexity
+          - upstage
+          - baseten
+          - litellm
+          example: openai
+        base_url:
+          type: string
+          nullable: true
+          example: https://api.openai.com/v1
+        api_key:
+          type: string
+          nullable: true
+          writeOnly: true
+        default_headers:
+          type: object
+          additionalProperties:
+            type: string
+        default_query:
+          type: object
+          additionalProperties:
+            type: string
+        models:
+          type: array
+          items:
+            type: string
+          default: []
+          description: Model names this provider can serve.
+        enabled:
+          type: boolean
+          default: true
+    LlmProviderUpdate:
+      type: object
+      properties:
+        display_name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          enum:
+          - openai
+          - anthropic
+          - azure_openai
+          - azure_ai
+          - google_vertexai
+          - google_genai
+          - anthropic_bedrock
+          - bedrock
+          - bedrock_converse
+          - cohere
+          - fireworks
+          - together
+          - mistralai
+          - huggingface
+          - groq
+          - ollama
+          - google_anthropic_vertex
+          - deepseek
+          - ibm
+          - nvidia
+          - xai
+          - openrouter
+          - perplexity
+          - upstage
+          - baseten
+          - litellm
+          nullable: true
+        base_url:
+          type: string
+          nullable: true
+        api_key:
+          type: string
+          nullable: true
+          writeOnly: true
+          description: Omit to preserve the current API key. Send null to clear it.
+        default_headers:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        default_query:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        models:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Model names this provider can serve.
+        enabled:
+          type: boolean
+          nullable: true
+    LlmProviderSummary:
+      type: object
+      required:
+      - id
+      - display_name
+      - provider_type
+      - default_headers
+      - default_query
+      - models
+      - enabled
+      - created_at
+      - updated_at
+      - api_key_configured
+      properties:
+        id:
+          type: string
+          format: uuid
+        display_name:
+          type: string
+          example: OpenAI Main
+        description:
+          type: string
+          nullable: true
+        provider_type:
+          type: string
+          example: openai
+        base_url:
+          type: string
+          nullable: true
+          example: https://api.openai.com/v1
+        default_headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: Secret-like keys are masked in responses.
+        default_query:
+          type: object
+          additionalProperties:
+            type: string
+          description: Secret-like keys are masked in responses.
+        models:
+          type: array
+          items:
+            type: string
+          description: Model names this provider can serve.
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        api_key_configured:
+          type: boolean
+    LlmProviderDetail:
+      type: object
+      allOf:
+      - $ref: '#/components/schemas/LlmProviderSummary'
+      properties: {}
+    LlmProviderModelTestRequest:
+      type: object
+      required:
+      - model
+      properties:
+        model:
+          type: string
+          minLength: 1
+    LlmProviderModelTestResponse:
+      type: object
+      required:
+      - status
+      - latency_ms
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - failed
+        latency_ms:
+          type: number
+          format: float
+        message:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        request:
+          type: object
+          additionalProperties: true
+          nullable: true
+        response:
+          type: object
+          additionalProperties: true
+          nullable: true
     AgentDraftConfig:
       type: object
       required:
@@ -1354,6 +1743,11 @@ components:
         model:
           type: string
           minLength: 1
+        provider_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Stored provider id. When set, model must be a bare model name without a provider prefix.
         model_config:
           type: object
           additionalProperties: true
@@ -1368,14 +1762,9 @@ components:
     AgentCreate:
       type: object
       required:
-      - key
       - display_name
       - draft
       properties:
-        key:
-          type: string
-          pattern: ^[a-z0-9][a-z0-9_-]*$
-          example: release-reviewer
         display_name:
           type: string
           minLength: 1
@@ -1420,7 +1809,11 @@ components:
           minimum: 1
         model:
           type: string
-          example: openai:gpt-5-mini
+          example: codeagent:codeagent-v4-pro
+        provider_id:
+          type: string
+          format: uuid
+          nullable: true
         published_at:
           type: string
           format: date-time
@@ -1428,7 +1821,6 @@ components:
       type: object
       required:
       - id
-      - key
       - display_name
       - enabled
       - has_draft
@@ -1438,9 +1830,6 @@ components:
         id:
           type: string
           format: uuid
-        key:
-          type: string
-          example: release-reviewer
         display_name:
           type: string
           example: Release Reviewer
@@ -1465,7 +1854,6 @@ components:
       type: object
       required:
       - id
-      - key
       - display_name
       - enabled
       - has_draft
@@ -1475,9 +1863,6 @@ components:
         id:
           type: string
           format: uuid
-        key:
-          type: string
-          example: release-reviewer
         display_name:
           type: string
           example: Release Reviewer
@@ -1520,7 +1905,11 @@ components:
           minimum: 1
         model:
           type: string
-          example: openai:gpt-5-mini
+          example: codeagent:codeagent-v4-pro
+        provider_id:
+          type: string
+          format: uuid
+          nullable: true
         published_at:
           type: string
           format: date-time

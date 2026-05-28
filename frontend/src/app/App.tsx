@@ -12,6 +12,12 @@ import {
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import { DevUserPicker } from "../features/auth/DevUserPicker";
 import { DevUserSwitcher } from "../features/auth/DevUserSwitcher";
+import { LlmProviderDetailPage } from "../features/llmProviders/pages/LlmProviderDetailPage";
+import {
+  LlmProviderCreatePage,
+  LlmProviderEditPage,
+} from "../features/llmProviders/pages/LlmProviderFormPage";
+import { LlmProviderListPage } from "../features/llmProviders/pages/LlmProviderListPage";
 import { McpDetailPage } from "../features/mcp/pages/McpDetailPage";
 import { McpListPage } from "../features/mcp/pages/McpListPage";
 import { McpCreatePage, McpEditPage } from "../features/mcp/pages/McpServerFormPage";
@@ -41,6 +47,12 @@ export function App() {
               <Route element={<McpCreatePage />} path="mcp/new" />
               <Route element={<McpEditPage />} path="mcp/:serverId/edit" />
               <Route element={<McpDetailPage />} path="mcp/:serverId" />
+            </Route>
+            <Route element={<ProtectedRoute route={workspaceRoutes["llm-providers"]} />}>
+              <Route element={<LlmProviderListPage />} path="llm-providers" />
+              <Route element={<LlmProviderCreatePage />} path="llm-providers/new" />
+              <Route element={<LlmProviderEditPage />} path="llm-providers/:providerId/edit" />
+              <Route element={<LlmProviderDetailPage />} path="llm-providers/:providerId" />
             </Route>
             <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>

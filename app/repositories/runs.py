@@ -73,36 +73,35 @@ class RunRepository:
     async def create_agent_test_run(
         self,
         *,
-        agent_key: str,
+        agent_id: UUID,
         agent_version: Any,
         messages: list[dict[str, Any]],
         input_preview: str,
         created_by: str | None = None,
         assistant_id: str = "react-agent-test-v1",
     ) -> Run:
-        agent_id = str(agent_version.agent_id)
+        agent_id_text = str(agent_id)
         agent_version_id = str(agent_version.id)
         version_number = agent_version.version_number
         run = Run(
             thread_id=str(uuid4()),
             assistant_id=assistant_id,
             subject_type="agent_test",
-            subject_id=agent_key,
+            subject_id=agent_id_text,
             env_key=None,
             status=RunStatus.pending.value,
             active_conflict_key=None,
             metadata_={
                 "subject_type": "agent_test",
-                "subject_id": agent_key,
-                "agent_id": agent_id,
-                "agent_key": agent_key,
+                "subject_id": agent_id_text,
+                "agent_id": agent_id_text,
                 "agent_version_id": agent_version_id,
                 "agent_version_number": version_number,
                 "run_kind": "agent_test",
                 "input_preview": input_preview,
             },
             kwargs={
-                "agent_key": agent_key,
+                "agent_id": agent_id_text,
                 "agent_version_id": agent_version_id,
                 "agent_version_number": version_number,
             },

@@ -10,6 +10,7 @@ class AgentDraftConfig(BaseModel):
 
     system_prompt: str = Field(min_length=1)
     model: str = Field(min_length=1)
+    provider_id: UUID | None = None
     model_parameters: dict[str, Any] = Field(
         default_factory=dict,
         validation_alias=AliasChoices("model_config", "model_parameters"),
@@ -18,9 +19,14 @@ class AgentDraftConfig(BaseModel):
     tool_allowlist: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_provider_model_pair(self) -> "AgentDraftConfig":
+        if self.provider_id is not None and ":" in self.model:
+            raise ValueError("provider_id requires bare model name")
+        return self
+
 
 class AgentCreate(BaseModel):
-    key: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]*$")
     display_name: str = Field(min_length=1)
     description: str | None = None
     draft: AgentDraftConfig
@@ -39,6 +45,7 @@ class AgentVersionSummary(BaseModel):
     id: UUID
     version_number: int
     model: str
+    provider_id: UUID | None = None
     published_at: datetime
 
 
@@ -46,7 +53,6 @@ class AgentSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    key: str
     display_name: str
     description: str | None = None
     enabled: bool

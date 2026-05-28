@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     mcp_allowed_stdio_specs: list[str] = Field(default_factory=list)
     mcp_operation_timeout_seconds: float = 10.0
     mcp_runtime_single_instance: bool = False
+    codeagent_base_url: str | None = None
+    codeagent_token_provider: str = "codeagent"
+    sop_quality_agent_id: str | None = None
 
     @classmethod
     def settings_customise_sources(

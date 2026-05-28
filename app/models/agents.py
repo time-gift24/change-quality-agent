@@ -20,16 +20,12 @@ from app.core.database import Base
 
 class Agent(Base):
     __tablename__ = "agents"
-    __table_args__ = (
-        Index("uq_agents_key", "key", unique=True),
-    )
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         primary_key=True,
         default=uuid4,
     )
-    key: Mapped[str] = mapped_column(Text, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(
@@ -91,6 +87,10 @@ class AgentVersion(Base):
     version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     model: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("llm_providers.id"),
+    )
     model_config: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,

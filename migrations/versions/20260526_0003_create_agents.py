@@ -22,7 +22,6 @@ def upgrade() -> None:
     op.create_table(
         "agents",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("key", sa.Text(), nullable=False),
         sa.Column("display_name", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column(
@@ -54,7 +53,6 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_agents_key", "agents", ["key"], unique=True)
 
     op.create_table(
         "agent_versions",
@@ -126,5 +124,4 @@ def downgrade() -> None:
     op.drop_index("ix_agent_versions_agent_published", table_name="agent_versions")
     op.drop_index("uq_agent_versions_agent_version", table_name="agent_versions")
     op.drop_table("agent_versions")
-    op.drop_index("uq_agents_key", table_name="agents")
     op.drop_table("agents")

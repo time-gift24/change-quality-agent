@@ -5,8 +5,11 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.core.agent_runtime import AgentRuntimeResult
+from app.core.llm_models import LlmProviderRuntimeConfig
+from app.services import agents as agent_services
+from app.repositories.llm_providers import LlmProviderNotFoundError
 from app.schemas.runs import RunStatus
-from app.services.agents import run_agent_test
+from app.services.agents import run_agent_test, run_agent_test_with_new_session
 
 
 class FakeVersion:
@@ -15,6 +18,8 @@ class FakeVersion:
         self.agent_id = uuid4()
         self.version_number = version_number
         self.model = "openai:gpt-5-mini"
+        self.provider_id = None
+        self.model_config = {}
         self.system_prompt = "Review carefully."
         self.tool_allowlist = []
         self.mcp_server_ids = []
@@ -27,7 +32,7 @@ class FakeRun:
         self.status = RunStatus.pending.value
         self.subject_id = "release-reviewer"
         self.metadata_ = {
-            "agent_key": "release-reviewer",
+            "agent_id": "release-reviewer",
             "agent_version_id": str(version.id),
             "agent_version_number": version.version_number,
         }
@@ -160,6 +165,28 @@ class FakeEventStreamingRuntime:
             yield event
 
 
+class FakeProviderRecord:
+    provider_type = "openai"
+    base_url = "https://api.openai.com/v1"
+    api_key = "sk-test"
+    default_headers = {"X-Tenant": "quality"}
+    default_query = {"api-version": "2026-01-01"}
+
+    def __init__(self, *, enabled: bool = True) -> None:
+        self.id = uuid4()
+        self.enabled = enabled
+
+
+class FakeProviderRepository:
+    def __init__(self, provider: FakeProviderRecord | None) -> None:
+        self.provider = provider
+        self.lookups: list[object] = []
+
+    async def get_by_id(self, provider_id):
+        self.lookups.append(provider_id)
+        return self.provider
+
+
 @pytest.mark.asyncio
 async def test_run_agent_test_appends_messages_and_marks_success() -> None:
     version = FakeVersion(version_number=7)
@@ -193,7 +220,7 @@ async def test_run_agent_test_appends_messages_and_marks_success() -> None:
     ]
     assert run_repository.events[0]["payload"] == {
         "message": "Started agent test run.",
-        "agent_key": "release-reviewer",
+        "agent_id": "release-reviewer",
         "agent_version_number": 7,
     }
     assert run_repository.events[1]["payload"] == {"messages": result.messages}
@@ -596,3 +623,112 @@ async def test_run_agent_test_marks_error_when_version_is_missing() -> None:
     assert terminal_kwargs["result_status"] == "error"
     assert runtime.calls == []
     assert run_repository.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_database_provider_resolver_returns_runtime_config() -> None:
+    provider_record = FakeProviderRecord()
+    repository = FakeProviderRepository(provider_record)
+    resolver = agent_services.DatabaseLlmProviderResolver(repository)
+
+    provider = await resolver.resolve(provider_record.id)
+
+    assert provider == LlmProviderRuntimeConfig(
+        id=provider_record.id,
+        provider_type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        default_headers={"X-Tenant": "quality"},
+        default_query={"api-version": "2026-01-01"},
+        enabled=True,
+    )
+    assert repository.lookups == [provider_record.id]
+
+
+@pytest.mark.asyncio
+async def test_database_provider_resolver_rejects_missing_provider() -> None:
+    resolver = agent_services.DatabaseLlmProviderResolver(FakeProviderRepository(None))
+    provider_id = uuid4()
+
+    with pytest.raises(LlmProviderNotFoundError, match=str(provider_id)):
+        await resolver.resolve(provider_id)
+
+
+@pytest.mark.asyncio
+async def test_database_provider_resolver_rejects_disabled_provider() -> None:
+    provider_record = FakeProviderRecord(enabled=False)
+    resolver = agent_services.DatabaseLlmProviderResolver(FakeProviderRepository(provider_record))
+
+    with pytest.raises(RuntimeError, match=f"LLM provider is disabled: {provider_record.id}"):
+        await resolver.resolve(provider_record.id)
+
+
+@pytest.mark.asyncio
+async def test_run_agent_test_with_new_session_wires_provider_resolver(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_id = uuid4()
+    captured: dict[str, object] = {}
+
+    class FakeSessionContext:
+        async def __aenter__(self):
+            return "db-session"
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return None
+
+    class FakeRunRepositoryFromSession:
+        def __init__(self, session) -> None:
+            self.session = session
+
+    class FakeAgentRepositoryFromSession:
+        def __init__(self, session) -> None:
+            self.session = session
+
+    class FakeProviderRepositoryFromSession:
+        def __init__(self, session) -> None:
+            self.session = session
+            self.provider = FakeProviderRecord()
+
+        async def get_by_id(self, provider_id):
+            return self.provider
+
+    async def fake_run_agent_test(run_id_arg, run_repository, agent_repository, runtime):
+        provider = await runtime._provider_resolver.resolve(
+            runtime._provider_resolver._repository.provider.id
+        )
+        captured["run_id"] = run_id_arg
+        captured["run_repository_session"] = run_repository.session
+        captured["agent_repository_session"] = agent_repository.session
+        captured["provider"] = provider
+        return {"status": "success"}
+
+    monkeypatch.setattr(agent_services, "async_session", lambda: FakeSessionContext())
+    monkeypatch.setattr(agent_services, "RunRepository", FakeRunRepositoryFromSession)
+    monkeypatch.setattr(
+        agent_services,
+        "AgentRepository",
+        FakeAgentRepositoryFromSession,
+    )
+    monkeypatch.setattr(
+        agent_services,
+        "LlmProviderRepository",
+        FakeProviderRepositoryFromSession,
+    )
+    monkeypatch.setattr(agent_services, "run_agent_test", fake_run_agent_test)
+
+    result = await run_agent_test_with_new_session(run_id)
+
+    assert result == {"status": "success"}
+    assert captured["run_id"] == run_id
+    assert captured["run_repository_session"] == "db-session"
+    assert captured["agent_repository_session"] == "db-session"
+    assert captured["provider"] == LlmProviderRuntimeConfig(
+        id=captured["provider"].id,
+        provider_type="openai",
+        base_url="https://api.openai.com/v1",
+        api_key="sk-test",
+        default_headers={"X-Tenant": "quality"},
+        default_query={"api-version": "2026-01-01"},
+        enabled=True,
+    )
