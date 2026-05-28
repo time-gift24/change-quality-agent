@@ -30,8 +30,8 @@ export function AgentListPage() {
   return (
     <AgentPageLayout
       description="管理 ReAct Agent 的启停状态、发布模型和待发布草稿。"
-      items={[{ label: "Agents" }]}
-      title="Agents"
+      items={[{ label: "Agent 配置" }]}
+      title="Agent 配置"
     >
       <AgentTable
         agents={filteredAgents}
