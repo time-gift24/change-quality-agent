@@ -79,9 +79,10 @@ dev session cookie while `auth_dev_mode=true`. If the user is missing or not
 found, it returns 401. If found, it stores the user on `request.state.current_user`
 for route dependencies and services.
 
-MCP keeps its existing `X-MCP-Admin-Token` check for server configuration
-operations. User auth and MCP admin token are separate gates: a request must be
-authenticated first, then pass the MCP-specific admin dependency.
+MCP server configuration operations are restricted to authenticated admin users.
+The previous separate MCP credential gate is intentionally removed, so frontend
+and backend authorization both depend on the same user session and `is_admin`
+flag.
 
 ## Frontend Design
 
@@ -102,7 +103,7 @@ user model:
 | User | SOP | MCP pages |
 | --- | --- | --- |
 | `common` | Allowed | Blocked by frontend route guard |
-| `admin` | Allowed | Allowed, still needs MCP admin token for MCP API calls |
+| `admin` | Allowed | Allowed |
 
 SOP run event streaming continues to use native `EventSource`; no custom header
 support is required because the browser sends the auth cookie.
@@ -130,7 +131,7 @@ Backend tests should cover:
 | Middleware | authenticated cookie allows protected API |
 | Dev auth | `common` and `admin` are seeded in dev mode |
 | Dev auth | `/api/auth/me`, `/api/auth/dev-login`, `/api/auth/logout` behavior |
-| MCP interaction | authenticated request still needs MCP admin token |
+| MCP interaction | non-admin requests are rejected by MCP API dependencies |
 
 Frontend tests should cover:
 

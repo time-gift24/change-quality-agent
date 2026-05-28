@@ -213,15 +213,11 @@ Form rules:
 - HTTP forms use the configured URL and headers; secrets remain redacted in API
   responses.
 
-## Admin Token Handling
+## MCP Authorization
 
-The MCP frontend sends `X-MCP-Admin-Token` for MCP API calls. The token control
-stores the value in browser local state for local testing. Backend enforcement is
-configured through `MCP_ADMIN_TOKEN`.
-
-This admin token is an MCP-specific API access gate. It is separate from the
-cookie user session, so MCP management requires both an authenticated admin user
-and the configured MCP admin token when backend enforcement is enabled.
+The MCP frontend relies on the authenticated `cqa_user` cookie for API calls.
+MCP pages and backend MCP APIs are restricted to admin users; there is no
+separate MCP credential or custom request header.
 
 ## Local MCP HTTP Echo Server
 

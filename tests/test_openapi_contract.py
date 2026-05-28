@@ -85,7 +85,7 @@ def test_openapi_includes_mcp_server_routes() -> None:
         "McpServerDetail",
         "McpLifecycleResponse",
     } <= set(schemas)
-    assert "McpAdminToken" not in spec["components"]["securitySchemes"]
+    assert set(spec["components"]["securitySchemes"]) == {"CookieAuth"}
     lifecycle_responses = paths["/api/mcp/servers/{server_id}/start"]["post"][
         "responses"
     ]

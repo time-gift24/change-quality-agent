@@ -49,7 +49,7 @@ Backend terminal:
 
 ```bash
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/change_quality_agent \
-  uv run fastapi dev --host 127.0.0.1 --port 8000
+  make dev
 ```
 
 Frontend terminal:

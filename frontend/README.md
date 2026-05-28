@@ -25,7 +25,7 @@ Implementation notes:
   - `/sop` renders the SOP quality page.
   - `/mcp` renders the route-guarded MCP management page for server CRUD,
     lifecycle actions, and tool snapshots. Access requires an authenticated
-    admin user; MCP API calls also use the MCP admin token gate.
+    admin user.
 - In Vite dev mode, an unauthenticated browser session shows a `common` /
   `admin` user picker backed by `POST /api/auth/dev-login`. Choosing a user
   creates the `cqa_user` dev session cookie and reloads the auth bootstrap.

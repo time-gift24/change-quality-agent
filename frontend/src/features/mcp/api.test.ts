@@ -31,20 +31,12 @@ describe("MCP API", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/mcp/servers",
-      expect.objectContaining({ headers: expect.any(Headers) }),
+      expect.objectContaining({
+        credentials: "same-origin",
+        headers: expect.any(Headers),
+      }),
     );
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).method).toBeUndefined();
-  });
-
-  it("does not send legacy MCP admin token header from session storage", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
-    vi.stubGlobal("fetch", fetchMock);
-    window.sessionStorage.setItem("mcp-admin-token", "session-token-1");
-
-    await listMcpServers();
-
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
-    expect(headers.get("X-MCP-Admin-Token")).toBeNull();
   });
 
   it("calls get endpoint with GET", async () => {

@@ -730,9 +730,9 @@ Add:
 - `UserPublic` and `DevLoginRequest` schemas.
 - `/api/auth/me`, `/api/auth/dev-login`, `/api/auth/logout` paths.
 - 401 responses for protected API paths.
-- MCP operations should still document `McpAdminToken`; if operation-level
-  security overrides global security, include both `CookieAuth` and
-  `McpAdminToken` for MCP paths.
+- MCP operations should document `CookieAuth`; backend route dependencies enforce
+  that the authenticated user is an admin. Do not document or send a separate
+  MCP credential gate.
 
 **Step 4: Update dev scripts and docs**
 

@@ -283,15 +283,6 @@ describe("McpListPage", () => {
     expect(confirmSpy).toHaveBeenCalledWith("确认删除 Beta Server？");
   });
 
-  it("does not render legacy MCP admin token controls", () => {
-    renderListPage();
-
-    expect(screen.queryByLabelText("MCP Admin Token")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "保存 Token" }),
-    ).not.toBeInTheDocument();
-  });
-
   it("shows status badge for running and stopped servers", () => {
     renderListPage();
 
