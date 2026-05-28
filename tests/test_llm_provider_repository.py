@@ -10,6 +10,7 @@ from app.repositories.llm_providers import (
     LlmProviderNotFoundError,
     LlmProviderRepository,
 )
+from app.schemas.llm_providers import LlmProviderDetail
 
 pytestmark = [
     pytest.mark.asyncio,
@@ -136,3 +137,19 @@ async def test_update_api_key_preserve_clear_and_replace(session) -> None:
     assert preserved.api_key == "sk-original"
     assert cleared.api_key is None
     assert replaced.api_key == "sk-replaced"
+
+
+async def test_update_returns_serializable_provider_after_commit(session) -> None:
+    repository = LlmProviderRepository(session)
+    provider = await repository.create(
+        display_name="OpenAI",
+        provider_type="openai",
+        api_key="sk-original",
+    )
+
+    updated = await repository.update(provider.id, display_name="OpenAI Renamed")
+    await session.commit()
+    detail = LlmProviderDetail.model_validate(updated)
+
+    assert detail.display_name == "OpenAI Renamed"
+    assert detail.api_key_configured is True
