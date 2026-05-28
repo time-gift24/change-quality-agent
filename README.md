@@ -27,6 +27,24 @@ checks, managing agent definitions, and observing SOP quality check progress.
   resolution, LLM provider UI, and the real SOP client remain future integration
   points.
 
+## SOP Quality Check API
+
+`POST /api/sop-quality-checks?sop_id=<sop_id>&env=<env_key>` starts a new
+check or joins the active check for the same SOP and environment. New checks
+return `202` with `created: true`; joined active checks return `200` with
+`created: false`.
+
+Clients observe progress through the stream endpoint:
+`GET /api/sop-quality-checks/{check_id}/stream?after=<sequence>`. The API also
+exposes `GET /api/sop-quality-checks/{check_id}` for the current business
+snapshot and `GET /api/sop-quality-checks/{check_id}/events?after=<sequence>`
+for lightweight reconnect replay.
+
+LangGraph Postgres checkpoints are the durable source for graph state,
+messages, and resume data. The `sop_quality_events` table intentionally stores
+only lightweight SSE cursors: sequence, event type, node, checkpoint id, task
+id, message, and timestamp.
+
 ## Full-Stack SOP Debugging
 
 Use Postgres 13 for local end-to-end SOP quality check debugging.

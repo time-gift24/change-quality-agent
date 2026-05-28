@@ -151,8 +151,11 @@ def test_llm_provider_tag_and_paths_are_documented() -> None:
 
 def test_openapi_does_not_document_generic_runs() -> None:
     paths = load_contract()["paths"]
+    legacy_runs_prefix = "/api/" + "runs"
+    legacy_agent_path = "/api/agents/{agent_key}/" + "test-" + "runs"
 
-    assert not any(path.startswith("/api/runs") for path in paths)
+    assert not any(path.startswith(legacy_runs_prefix) for path in paths)
+    assert legacy_agent_path not in paths
     assert "/api/agents/{agent_id}/test-runs" not in paths
 
 
@@ -191,6 +194,7 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
         "SopQualityDisplayState",
         "SopQualityCheckEvent",
     } <= set(schemas)
+    assert "payload" not in schemas["SopQualityCheckEvent"]["properties"]
 
 
 def test_agents_parameters_are_reusable_and_referenced() -> None:

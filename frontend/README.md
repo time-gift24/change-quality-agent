@@ -35,10 +35,12 @@ Implementation notes:
 - Tailwind scans frontend-local Streamdown classes via
   `@source "../../node_modules/streamdown/dist/*.js"` in
   `src/styles/globals.css`.
-- Streamed markdown output must be rendered with `streamdown`. Run message
-  events flow through `RunEventStream` and `StreamMarkdown`.
-- Generic run UI must stay SOP-agnostic and must not expose SOP `env_key`.
-- The SOP quality page is a thin wrapper over the generic `RunObserver`.
+- Streamed markdown output must be rendered with `streamdown`.
+- SOP quality check state lives in `src/features/sop-quality-checks`, observes
+  checks by `checkId`, and connects to
+  `/api/sop-quality-checks/{check_id}/stream?after=<sequence>`.
+- The recent SOP sidebar reads `/api/sop-quality-checks?env=<env_key>&limit=50`
+  and navigates to `/sop?checkId=<check_id>`.
 - MCP management is isolated in `src/features/mcp` and calls only the
   `/api/mcp/servers` API family defined in `../api/openapi.yml`.
 - LLM provider management is isolated in `src/features/llmProviders` and calls

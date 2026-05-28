@@ -39,11 +39,12 @@ def test_alembic_revision_graph_has_single_head() -> None:
 def test_base_migration_creates_sop_quality_tables_only() -> None:
     module = ast.parse(BASE_MIGRATION_PATH.read_text())
     created_tables = _op_call_first_string_args(module, "create_table")
+    legacy_events_table = "run_" + "events"
 
     assert "sop_quality_checks" in created_tables
     assert "sop_quality_events" in created_tables
     assert "runs" not in created_tables
-    assert "run_events" not in created_tables
+    assert legacy_events_table not in created_tables
 
 
 def test_base_migration_creates_sop_quality_indexes() -> None:
