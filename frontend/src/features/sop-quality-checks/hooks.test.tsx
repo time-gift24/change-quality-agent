@@ -3,7 +3,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useSopQualityCheck } from "./hooks";
+import { CHECK_EVENT_NAMES, useSopQualityCheck } from "./hooks";
 import type { SopQualityCheckDetail, SopQualityCheckEvent } from "./types";
 
 describe("sop quality check hooks", () => {
@@ -58,6 +58,10 @@ describe("sop quality check hooks", () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
     expect(result.current.state.latestSequence).toBe(2);
+  });
+
+  it("subscribes to streamed message events", () => {
+    expect(CHECK_EVENT_NAMES).toContain("messages");
   });
 
   it("ignores stale detail after check id changes", async () => {

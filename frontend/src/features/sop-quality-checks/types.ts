@@ -9,6 +9,7 @@ export type SopQualityCheckStatus =
 export type SopQualityNodeState = {
   status: "idle" | "running" | "done" | "error" | "interrupted";
   streamText: string;
+  thinkingText?: string;
   error?: string;
   firstSequence?: number;
 };
@@ -38,11 +39,14 @@ export type SopQualityCheckEvent = {
   type:
     | "created"
     | "started"
+    | "messages"
+    | "updates"
     | "checkpoint"
     | "completed"
     | "failed"
     | "interrupted";
   node?: string | null;
+  channel?: "thinking" | "summary" | "result" | null;
   checkpoint_id?: string | null;
   task_id?: string | null;
   message?: string | null;

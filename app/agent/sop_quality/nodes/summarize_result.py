@@ -2,6 +2,16 @@ from app.agent.sop_quality.state import SopQualityState
 
 
 async def summarize_result(state: SopQualityState) -> SopQualityState:
+    existing_result = state.get("result")
+    if isinstance(existing_result, dict):
+        return {
+            "summary": existing_result.get("summary", ""),
+            "report_markdown": existing_result.get("report_markdown", ""),
+            "quality_result": existing_result.get("quality_result", "pass"),
+            "findings": existing_result.get("findings", []),
+            "result": existing_result,
+        }
+
     findings = state.get("findings", [])
     quality_result = state.get("quality_result", "pass")
     summary = (

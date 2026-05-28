@@ -234,7 +234,7 @@ LLM Provider 组件：
 
 复用的质检渲染模块：
 
-- `frontend/src/features/runs/components/StreamMarkdown.tsx`: 被 provider 连通性测试复用，用于渲染模型响应 Markdown。
+- `frontend/src/features/sop-quality-checks/components/StreamMarkdown.tsx`: 被 provider 连通性测试复用，用于渲染模型响应 Markdown。
 
 前端测试：
 

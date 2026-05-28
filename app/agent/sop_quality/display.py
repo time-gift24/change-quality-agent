@@ -7,7 +7,8 @@ def display_state_from_graph_values(
     latest_sequence: int = 0,
     is_running: bool = False,
 ) -> dict[str, Any]:
-    findings = values.get("findings") if isinstance(values.get("findings"), list) else []
+    raw_findings = values.get("findings")
+    findings = raw_findings if isinstance(raw_findings, list) else None
     result = values.get("result") if isinstance(values.get("result"), dict) else None
     nodes: dict[str, Any] = {}
     if values.get("sop_snapshot"):

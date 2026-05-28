@@ -21,9 +21,11 @@ const TERMINAL_CHECK_STATUSES: SopQualityCheckStatus[] = [
   "cancelled",
   "interrupted",
 ];
-const CHECK_EVENT_NAMES: SopQualityCheckEvent["type"][] = [
+export const CHECK_EVENT_NAMES: SopQualityCheckEvent["type"][] = [
   "created",
   "started",
+  "messages",
+  "updates",
   "checkpoint",
   "completed",
   "failed",

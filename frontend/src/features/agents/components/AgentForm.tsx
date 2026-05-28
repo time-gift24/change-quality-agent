@@ -12,7 +12,7 @@ import {
 } from "react";
 
 import { Button } from "../../../components/ui/button";
-import { StreamMarkdown } from "../../runs/components/StreamMarkdown";
+import { StreamMarkdown } from "../../sop-quality-checks/components/StreamMarkdown";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 import type {
   AgentCreate,

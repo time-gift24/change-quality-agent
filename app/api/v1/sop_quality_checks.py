@@ -139,7 +139,12 @@ async def stream_sop_quality_check(
                     )
                 except TimeoutError:
                     continue
+                sequence = live_event.get("sequence")
+                if isinstance(sequence, int):
+                    cursor = max(cursor, sequence)
                 yield format_live_sse(live_event)
+                if live_event.get("type") in TERMINAL_EVENT_TYPES:
+                    return
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -152,6 +157,9 @@ def format_sse(event: dict[str, object]) -> str:
 def format_live_sse(event: dict[str, object]) -> str:
     data = json.dumps(event, ensure_ascii=False, default=str)
     event_type = event.get("type", "live")
+    sequence = event.get("sequence")
+    if isinstance(sequence, int):
+        return f"id: {sequence}\nevent: {event_type}\ndata: {data}\n\n"
     return f"event: {event_type}\ndata: {data}\n\n"
 
 

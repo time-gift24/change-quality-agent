@@ -19,6 +19,12 @@ const DEFAULT_REGISTERED_NODE_IDS = [
   "summarize_result",
 ];
 
+const NODE_LABELS: Record<string, string> = {
+  load_sop: "读取 SOP",
+  check_steps: "检查步骤",
+  summarize_result: "生成总结",
+};
+
 export function SopQualityCheckObserver({
   checkId,
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
@@ -109,7 +115,9 @@ export function SopQualityCheckObserverView({
           <AssistantTurn
             key={nodeId}
             nodeId={nodeId}
+            label={nodeLabel(nodeId)}
             text={node.streamText}
+            thinkingText={node.thinkingText}
             status={node.status}
             error={node.error}
             isRunning={state.isRunning && node.status === "running"}
@@ -140,18 +148,23 @@ function HumanTurn({ detail }: { detail: SopQualityCheckDetail }) {
 
 function AssistantTurn({
   nodeId,
+  label,
   text,
+  thinkingText,
   status,
   error,
   isRunning,
 }: {
   nodeId: string;
+  label: string;
   text: string;
+  thinkingText?: string;
   status: string;
   error?: string;
   isRunning: boolean;
 }) {
   const hasText = text.trim().length > 0;
+  const hasThinkingText = Boolean(thinkingText?.trim());
 
   return (
     <article
@@ -159,10 +172,11 @@ function AssistantTurn({
       className="mr-auto flex w-full max-w-full flex-col gap-1"
     >
       <header className="flex items-center gap-2 text-xs text-mute">
-        <span className="font-mono">{nodeId}</span>
+        <span>{label}</span>
         <NodeStatusChip status={status} isRunning={isRunning} />
       </header>
       <div className="text-sm text-ink">
+        {hasThinkingText ? <ThinkingBlock text={thinkingText ?? ""} /> : null}
         {hasText ? (
           <StreamMarkdown isStreaming={isRunning}>{text}</StreamMarkdown>
         ) : isRunning ? (
@@ -176,6 +190,19 @@ function AssistantTurn({
       </div>
     </article>
   );
+}
+
+function ThinkingBlock({ text }: { text: string }) {
+  return (
+    <div className="mb-2 border-l-2 border-primary/30 pl-3 text-xs text-mute">
+      <div className="font-medium text-body">思考</div>
+      <p className="mt-1 whitespace-pre-wrap">{text}</p>
+    </div>
+  );
+}
+
+function nodeLabel(nodeId: string): string {
+  return NODE_LABELS[nodeId] ?? nodeId;
 }
 
 function AssistantPlaceholder() {

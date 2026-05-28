@@ -54,6 +54,14 @@ class SopQualityService:
         created_by: str | None = None,
     ) -> CheckStartResult:
         self._settings.get_environment(env_key)
+        active = await self._repository.get_active_check(sop_id=sop_id, env_key=env_key)
+        if active is not None:
+            return self._result(
+                active.id,
+                status=_status_from_check(active),
+                created=False,
+            )
+
         sop_snapshot = await self._sop_client.get_sop(sop_id, env_key)
 
         try:

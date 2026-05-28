@@ -56,6 +56,9 @@ class FakeRepository:
     async def create_check(self, **kwargs):
         return self.check
 
+    async def get_active_check(self, *, sop_id, env_key):
+        return None
+
     async def get_check(self, check_id):
         return self.check if check_id == self.check.id else None
 

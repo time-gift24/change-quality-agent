@@ -23,6 +23,15 @@ class FakeSopClient:
         )
 
 
+class FailingSopClient:
+    def __init__(self, order: list[str]) -> None:
+        self._order = order
+
+    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
+        self._order.append("fetch_sop")
+        raise AssertionError("active checks should be joined before fetching SOP")
+
+
 class FakeRepository:
     def __init__(
         self,
@@ -34,6 +43,15 @@ class FakeRepository:
         self.created_kwargs = {}
         self.id = uuid4()
         self.status = "pending"
+
+    async def get_active_check(self, *, sop_id: str, env_key: str):
+        self.order.append("get_active_check")
+        if self.active_check_id is None:
+            return None
+        active = FakeRepository([])
+        active.id = self.active_check_id
+        active.status = "running"
+        return active
 
     async def create_check(self, **kwargs):
         self.order.append("create_check")
@@ -69,7 +87,7 @@ def settings() -> Settings:
 
 
 @pytest.mark.asyncio
-async def test_start_check_fetches_sop_before_creating_check(
+async def test_start_check_checks_active_before_fetching_sop(
     settings: Settings,
 ) -> None:
     order: list[str] = []
@@ -81,7 +99,7 @@ async def test_start_check_fetches_sop_before_creating_check(
 
     await service.start_check("release-checklist", "dev")
 
-    assert order[:2] == ["fetch_sop", "create_check"]
+    assert order[:3] == ["get_active_check", "fetch_sop", "create_check"]
 
 
 @pytest.mark.asyncio
@@ -90,7 +108,7 @@ async def test_start_check_returns_existing_active_check(settings: Settings) -> 
     active_check_id = uuid4()
     service = SopQualityService(
         settings=settings,
-        sop_client=FakeSopClient(order),
+        sop_client=FailingSopClient(order),
         repository=FakeRepository(order, active_check_id=active_check_id),
         schedule_check=lambda check_id: order.append(f"schedule:{check_id}"),
         commit=lambda: order.append("commit"),
@@ -101,7 +119,7 @@ async def test_start_check_returns_existing_active_check(settings: Settings) -> 
     assert result.created is False
     assert result.check_id == active_check_id
     assert result.status_url == f"/api/sop-quality-checks/{active_check_id}"
-    assert order == ["fetch_sop", "create_check"]
+    assert order == ["get_active_check"]
 
 
 @pytest.mark.asyncio
@@ -121,7 +139,7 @@ async def test_start_check_uses_graph_constants_and_writes_created_event(
     assert result.created is True
     assert repository.created_kwargs["graph_name"] == "sop_quality"
     assert repository.created_kwargs["graph_version"] == "sop-quality@1"
-    assert order == ["fetch_sop", "create_check", "created"]
+    assert order == ["get_active_check", "fetch_sop", "create_check", "created"]
 
 
 @pytest.mark.asyncio
@@ -141,6 +159,7 @@ async def test_start_check_commits_before_scheduling_new_check(
     result = await service.start_check("release-checklist", "dev")
 
     assert order == [
+        "get_active_check",
         "fetch_sop",
         "create_check",
         "created",

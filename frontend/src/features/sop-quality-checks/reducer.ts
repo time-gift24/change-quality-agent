@@ -59,6 +59,14 @@ export function reduceSopQualityCheckEvent(
     };
   }
 
+  if (event.type === "messages") {
+    return appendEventNodeMessage(nextState, event);
+  }
+
+  if (event.type === "updates") {
+    return updateEventNode(nextState, event, "running");
+  }
+
   if (event.type === "completed") {
     return {
       ...nextState,
@@ -99,6 +107,63 @@ export function getOrderedNodeIds(
     .map(([nodeId]) => nodeId);
 
   return [...registered, ...unknown];
+}
+
+function appendEventNodeMessage(
+  state: SopQualityCheckViewState,
+  event: SopQualityCheckEvent,
+): SopQualityCheckViewState {
+  if (!event.node) {
+    return state;
+  }
+
+  const currentNode = state.nodes[event.node] ?? createNodeState();
+  if (event.channel === "thinking") {
+    return {
+      ...state,
+      nodes: {
+        ...state.nodes,
+        [event.node]: {
+          ...currentNode,
+          status: "running",
+          thinkingText: event.message ?? currentNode.thinkingText,
+          firstSequence: currentNode.firstSequence ?? event.sequence,
+        },
+      },
+    };
+  }
+
+  if (event.channel === "summary") {
+    return {
+      ...state,
+      nodes: {
+        ...state.nodes,
+        [event.node]: {
+          ...currentNode,
+          status: "running",
+          streamText: event.message ?? currentNode.streamText,
+          firstSequence: currentNode.firstSequence ?? event.sequence,
+        },
+      },
+    };
+  }
+
+  if (event.channel === "result") {
+    return state;
+  }
+
+  return {
+    ...state,
+    nodes: {
+      ...state.nodes,
+      [event.node]: {
+        ...currentNode,
+        status: "running",
+        streamText: `${currentNode.streamText}${event.message ?? ""}`,
+        firstSequence: currentNode.firstSequence ?? event.sequence,
+      },
+    },
+  };
 }
 
 function updateEventNode(
