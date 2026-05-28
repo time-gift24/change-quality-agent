@@ -7,7 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { useAgentDetail, useAgentMutations, useAgents } from "../hooks";
 import { AgentListPage } from "../pages/AgentListPage";
-import type { AgentDetail } from "../types";
+import type { AgentDetail, AgentSummary } from "../types";
 import { useLlmProviders } from "../../llmProviders/hooks";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 
@@ -21,8 +21,26 @@ vi.mock("../../llmProviders/hooks", () => ({
   useLlmProviders: vi.fn(),
 }));
 
-const agent = buildAgent();
+const agent = buildAgentSummary();
+const detail = buildAgentDetail();
+const disabledProviderAgent = buildAgentSummary({
+  display_name: "Disabled Provider Reviewer",
+  id: "agent-disabled-provider",
+  latest_version: {
+    id: "agent-version-disabled-provider",
+    model: "gpt-5-mini",
+    provider_id: "provider-disabled",
+    published_at: "2026-05-28T01:30:00Z",
+    version_number: 2,
+  },
+  updated_at: "2026-05-28T03:00:00Z",
+});
 const provider = buildProvider();
+const disabledProvider = buildProvider({
+  display_name: "Disabled Main",
+  enabled: false,
+  id: "provider-disabled",
+});
 const refetchAgents = vi.fn();
 const refetchAgentDetail = vi.fn();
 const refetchProviders = vi.fn();
@@ -37,13 +55,13 @@ beforeEach(() => {
   updateAgentDraft.mockReset();
 
   vi.mocked(useAgents).mockReturnValue({
-    data: [agent],
+    data: [agent, disabledProviderAgent],
     error: null,
     loading: false,
     refetch: refetchAgents,
   });
   vi.mocked(useAgentDetail).mockReturnValue({
-    data: agent,
+    data: detail,
     error: null,
     loading: false,
     refetch: refetchAgentDetail,
@@ -55,7 +73,7 @@ beforeEach(() => {
     updateAgentDraft,
   });
   vi.mocked(useLlmProviders).mockReturnValue({
-    data: [provider],
+    data: [provider, disabledProvider],
     error: null,
     loading: false,
     refetch: refetchProviders,
@@ -81,7 +99,16 @@ describe("Agent pages", () => {
     expect(screen.getByRole("main", { name: "Agent 配置主内容" })).toBeInTheDocument();
     expect(screen.getByText("Release Reviewer")).toBeInTheDocument();
     expect(screen.getByText("codeagent:deepseek-v4-pro")).toBeInTheDocument();
+    expect(screen.getAllByText("有 Draft")).toHaveLength(2);
     expect(screen.getByLabelText("搜索 Agent")).toBeInTheDocument();
+    expect(screen.getByText("Disabled Main")).toBeInTheDocument();
+    expect(screen.getByText("Provider 已停用")).toBeInTheDocument();
+    expect(screen.queryByText("2026-05-28 02:00")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("搜索 Agent"), {
+      target: { value: "codeagent:deepseek-v4-pro" },
+    });
+    expect(screen.getByText("Release Reviewer")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("搜索 Agent"), {
       target: { value: "missing" },
@@ -97,11 +124,29 @@ describe("Agent pages", () => {
   });
 });
 
-function buildAgent(): AgentDetail {
+function buildAgentSummary(overrides: Partial<AgentSummary> = {}): AgentSummary {
   return {
     created_at: "2026-05-28T00:00:00Z",
     description: "Checks release quality before publishing.",
     display_name: "Release Reviewer",
+    enabled: true,
+    has_draft: true,
+    id: "agent-1",
+    latest_version: {
+      id: "agent-version-1",
+      model: "codeagent:deepseek-v4-pro",
+      provider_id: null,
+      published_at: "2026-05-28T01:00:00Z",
+      version_number: 1,
+    },
+    updated_at: "2026-05-28T02:00:00Z",
+    ...overrides,
+  };
+}
+
+function buildAgentDetail(overrides: Partial<AgentDetail> = {}): AgentDetail {
+  return {
+    ...buildAgentSummary(overrides),
     draft: {
       mcp_server_ids: [],
       model: "codeagent:deepseek-v4-pro",
@@ -110,21 +155,11 @@ function buildAgent(): AgentDetail {
       system_prompt: "You are careful.",
       tool_allowlist: [],
     },
-    enabled: true,
-    has_draft: true,
-    id: "agent-1",
-    latest_version: {
-      id: "agent-version-1",
-      model: "gpt-5-mini",
-      provider_id: "provider-1",
-      published_at: "2026-05-28T01:00:00Z",
-      version_number: 1,
-    },
-    updated_at: "2026-05-28T02:00:00Z",
+    ...overrides,
   };
 }
 
-function buildProvider(): LlmProviderSummary {
+function buildProvider(overrides: Partial<LlmProviderSummary> = {}): LlmProviderSummary {
   return {
     api_key_configured: true,
     base_url: "https://api.openai.com/v1",
@@ -138,5 +173,6 @@ function buildProvider(): LlmProviderSummary {
     models: ["gpt-5-mini"],
     provider_type: "openai",
     updated_at: "2026-05-27T00:00:00Z",
+    ...overrides,
   };
 }

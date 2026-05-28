@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "../../../components/ui/table";
 import type { LlmProviderSummary } from "../../llmProviders/types";
-import type { AgentDraftConfig, AgentSummary } from "../types";
+import type { AgentSummary } from "../types";
 
 type AgentTableProps = {
   agents: AgentSummary[];
@@ -23,18 +23,6 @@ type AgentTableProps = {
   onRefresh: () => void;
   onCreateAgent: () => void;
 };
-
-type AgentWithOptionalDraft = AgentSummary & {
-  draft?: AgentDraftConfig | null;
-};
-
-export function getAgentDraft(agent: AgentSummary): AgentDraftConfig | null {
-  return (agent as AgentWithOptionalDraft).draft ?? null;
-}
-
-export function getAgentDraftModel(agent: AgentSummary): string | null {
-  return getAgentDraft(agent)?.model ?? null;
-}
 
 export function AgentTable({
   agents,
@@ -140,13 +128,12 @@ function AgentRow({
   agent: AgentSummary;
   providers: LlmProviderSummary[];
 }) {
-  const draft = getAgentDraft(agent);
   const modelLabel = agent.latest_version?.model ?? "未发布";
-  const providerLabel = resolveProviderLabel(
-    agent.latest_version?.provider_id ?? draft?.provider_id ?? null,
+  const provider = resolveProviderDisplay(
+    agent.latest_version?.provider_id ?? null,
     providers,
   );
-  const draftLabel = draft?.model ?? (agent.has_draft ? "有 Draft" : "无 Draft");
+  const draftLabel = agent.has_draft ? "有 Draft" : "无 Draft";
 
   return (
     <TableRow className="group border-0">
@@ -176,18 +163,19 @@ function AgentRow({
         </span>
       </MetricCell>
       <MetricCell>
-        <span className="block truncate text-xs text-body">
-          {providerLabel}
-        </span>
+        <span className="block truncate text-xs text-body">{provider.label}</span>
+        {provider.disabled ? (
+          <span className="mt-1 block text-2xs text-mute">Provider 已停用</span>
+        ) : null}
       </MetricCell>
       <MetricCell>
-        <span className={draft ? "block truncate font-mono text-xs text-ink" : "text-mute"}>
+        <span className={agent.has_draft ? "text-ink" : "text-mute"}>
           {draftLabel}
         </span>
       </MetricCell>
       <MetricCell>
         <span className="font-mono text-xs text-body">
-          {formatDateTime(agent.updated_at)}
+          {formatAgentUpdatedAt(agent.updated_at)}
         </span>
       </MetricCell>
       <MetricCell className="rounded-r-3xl border-r">
@@ -217,17 +205,19 @@ function MetricCell({
   );
 }
 
-function resolveProviderLabel(
+function resolveProviderDisplay(
   providerId: string | null,
   providers: LlmProviderSummary[],
-): string {
-  if (!providerId) return "CodeAgent";
+): { disabled: boolean; label: string } {
+  if (!providerId) return { disabled: false, label: "CodeAgent" };
   const provider = providers.find((item) => item.id === providerId);
-  if (!provider?.enabled) return providerId;
-  return provider.display_name;
+  if (!provider) return { disabled: false, label: providerId };
+  return { disabled: !provider.enabled, label: provider.display_name };
 }
 
-function formatDateTime(value: string): string {
+export function formatAgentUpdatedAt(value: string): string {
   if (!value) return "-";
-  return value.replace("T", " ").replace("Z", "").slice(0, 16);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 }

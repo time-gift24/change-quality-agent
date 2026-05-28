@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { AgentTable, getAgentDraftModel } from "../components/AgentTable";
+import { AgentTable } from "../components/AgentTable";
 import { useLlmProviders } from "../../llmProviders/hooks";
 import { useAgents } from "../hooks";
 import { AgentPageLayout } from "./AgentPageLayout";
@@ -17,13 +17,11 @@ export function AgentListPage() {
     if (!query) return agentsState.data;
 
     return agentsState.data.filter((agent) => {
-      const draftModel = getAgentDraftModel(agent);
       const latestModel = agent.latest_version?.model ?? "";
       return (
         agent.id.toLowerCase().includes(query) ||
         agent.display_name.toLowerCase().includes(query) ||
         (agent.description ?? "").toLowerCase().includes(query) ||
-        (draftModel ?? "").toLowerCase().includes(query) ||
         latestModel.toLowerCase().includes(query)
       );
     });
