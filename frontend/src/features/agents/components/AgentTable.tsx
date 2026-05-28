@@ -129,10 +129,9 @@ function AgentRow({
   providers: LlmProviderSummary[];
 }) {
   const modelLabel = agent.latest_version?.model ?? "未发布";
-  const provider = resolveProviderDisplay(
-    agent.latest_version?.provider_id ?? null,
-    providers,
-  );
+  const provider = agent.latest_version
+    ? resolveProviderDisplay(agent.latest_version.provider_id, providers)
+    : { disabled: false, label: "未发布" };
   const draftLabel = agent.has_draft ? "有 Draft" : "无 Draft";
 
   return (

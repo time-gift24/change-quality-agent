@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { useAgentDetail, useAgentMutations, useAgents } from "../hooks";
+import { formatAgentUpdatedAt } from "../components/AgentTable";
 import { AgentListPage } from "../pages/AgentListPage";
 import type { AgentDetail, AgentSummary } from "../types";
 import { useLlmProviders } from "../../llmProviders/hooks";
@@ -23,6 +24,18 @@ vi.mock("../../llmProviders/hooks", () => ({
 
 const agent = buildAgentSummary();
 const detail = buildAgentDetail();
+const enabledProviderAgent = buildAgentSummary({
+  display_name: "Provider Reviewer",
+  id: "agent-provider",
+  latest_version: {
+    id: "agent-version-provider",
+    model: "gpt-5-mini",
+    provider_id: "provider-1",
+    published_at: "2026-05-28T01:15:00Z",
+    version_number: 2,
+  },
+  updated_at: "2026-05-28T02:30:00Z",
+});
 const disabledProviderAgent = buildAgentSummary({
   display_name: "Disabled Provider Reviewer",
   id: "agent-disabled-provider",
@@ -34,6 +47,18 @@ const disabledProviderAgent = buildAgentSummary({
     version_number: 2,
   },
   updated_at: "2026-05-28T03:00:00Z",
+});
+const missingProviderAgent = buildAgentSummary({
+  display_name: "Missing Provider Reviewer",
+  id: "agent-missing-provider",
+  latest_version: {
+    id: "agent-version-missing-provider",
+    model: "unknown-model",
+    provider_id: "provider-missing",
+    published_at: "2026-05-28T01:45:00Z",
+    version_number: 3,
+  },
+  updated_at: "2026-05-28T03:30:00Z",
 });
 const provider = buildProvider();
 const disabledProvider = buildProvider({
@@ -55,7 +80,7 @@ beforeEach(() => {
   updateAgentDraft.mockReset();
 
   vi.mocked(useAgents).mockReturnValue({
-    data: [agent, disabledProviderAgent],
+    data: [agent, enabledProviderAgent, disabledProviderAgent, missingProviderAgent],
     error: null,
     loading: false,
     refetch: refetchAgents,
@@ -99,10 +124,12 @@ describe("Agent pages", () => {
     expect(screen.getByRole("main", { name: "Agent 配置主内容" })).toBeInTheDocument();
     expect(screen.getByText("Release Reviewer")).toBeInTheDocument();
     expect(screen.getByText("codeagent:deepseek-v4-pro")).toBeInTheDocument();
-    expect(screen.getAllByText("有 Draft")).toHaveLength(2);
+    expect(screen.getAllByText("有 Draft")).toHaveLength(4);
     expect(screen.getByLabelText("搜索 Agent")).toBeInTheDocument();
+    expect(screen.getByText("OpenAI Main")).toBeInTheDocument();
     expect(screen.getByText("Disabled Main")).toBeInTheDocument();
     expect(screen.getByText("Provider 已停用")).toBeInTheDocument();
+    expect(screen.getByText("provider-missing")).toBeInTheDocument();
     expect(screen.queryByText("2026-05-28 02:00")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("搜索 Agent"), {
@@ -111,7 +138,7 @@ describe("Agent pages", () => {
     expect(screen.getByText("Release Reviewer")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("搜索 Agent"), {
-      target: { value: "missing" },
+      target: { value: "no-match-value" },
     });
     expect(screen.getByText("暂无 Agent。")).toBeInTheDocument();
 
@@ -121,6 +148,43 @@ describe("Agent pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "新增 Agent" }));
 
     expect(screen.getByText("新增 Agent 页面")).toBeInTheDocument();
+  });
+
+  it("shows unpublished provider state separately from published CodeAgent", () => {
+    vi.mocked(useAgents).mockReturnValue({
+      data: [
+        buildAgentSummary({
+          display_name: "Unpublished Reviewer",
+          has_draft: false,
+          id: "agent-unpublished",
+          latest_version: null,
+        }),
+      ],
+      error: null,
+      loading: false,
+      refetch: refetchAgents,
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/agents"]}>
+        <Routes>
+          <Route element={<AgentListPage />} path="/agents" />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Unpublished Reviewer")).toBeInTheDocument();
+    expect(screen.getAllByText("未发布")).toHaveLength(2);
+    expect(screen.queryByText("CodeAgent")).not.toBeInTheDocument();
+    expect(screen.getByText("无 Draft")).toBeInTheDocument();
+  });
+
+  it("formats update timestamps with safe fallbacks", () => {
+    expect(formatAgentUpdatedAt("")).toBe("-");
+    expect(formatAgentUpdatedAt("not-a-date")).toBe("not-a-date");
+    expect(formatAgentUpdatedAt("2026-05-28T02:00:00Z")).toBe(
+      new Date("2026-05-28T02:00:00Z").toLocaleString(),
+    );
   });
 });
 
