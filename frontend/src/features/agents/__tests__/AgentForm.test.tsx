@@ -166,6 +166,7 @@ describe("AgentForm", () => {
     );
 
     expect(screen.getByLabelText("Agent 名称")).toHaveValue("Existing Agent");
+    fireEvent.click(screen.getByRole("button", { name: "切换到编辑模式" }));
     expect(screen.getByLabelText("System Prompt")).toHaveValue("Existing prompt.");
     expect(screen.getByLabelText("模型来源")).toHaveValue("provider");
     expect(screen.getByLabelText("LLM Provider")).toHaveValue("provider-1");

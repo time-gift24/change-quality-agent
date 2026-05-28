@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { Button } from "../../../components/ui/button";
+import { StreamMarkdown } from "../../runs/components/StreamMarkdown";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 import type {
   AgentCreate,
@@ -36,6 +37,8 @@ type AgentFormProps = {
 };
 
 const DEFAULT_CODEAGENT_MODEL = CODEAGENT_MODEL_OPTIONS[0];
+
+type FieldErrorKey = "display_name" | "system_prompt";
 
 export function AgentForm({
   mode,
@@ -62,12 +65,24 @@ export function AgentForm({
   const [selectedProviderModel, setSelectedProviderModel] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<FieldErrorKey | null>(null);
+  const [systemPromptView, setSystemPromptView] = useState<"edit" | "preview">(
+    mode === "edit" ? "preview" : "edit",
+  );
   const displayNameRef = useRef<HTMLInputElement>(null);
   const systemPromptRef = useRef<HTMLTextAreaElement>(null);
   const errorId = useId();
+  const systemPromptId = useId();
+
+  useEffect(() => {
+    if (errorField === "system_prompt" && systemPromptView === "edit") {
+      systemPromptRef.current?.focus();
+    }
+  }, [errorField, systemPromptView]);
 
   useEffect(() => {
     setError(null);
+    setErrorField(null);
 
     if (mode === "edit" && agent) {
       const draft = agent.draft;
@@ -97,11 +112,10 @@ export function AgentForm({
   }, [agent, mode]);
 
   useEffect(() => {
-    if (mode !== "create") return;
     if (modelSource !== "provider" || enabledProviders.length === 0) return;
-    if (enabledProviders.some((provider) => provider.id === selectedProviderId)) return;
+    if (selectedProviderId) return;
     setSelectedProviderId(enabledProviders[0]?.id ?? "");
-  }, [enabledProviders, mode, modelSource, selectedProviderId]);
+  }, [enabledProviders, modelSource, selectedProviderId]);
 
   const selectedProvider = enabledProviders.find(
     (provider) => provider.id === selectedProviderId,
@@ -127,16 +141,11 @@ export function AgentForm({
     !selectedProviderModels.includes(selectedProviderModel);
 
   useEffect(() => {
-    if (mode !== "create") return;
     if (modelSource !== "provider" || !selectedProvider) return;
-    if (selectedProvider.models.length === 0) {
-      if (selectedProviderModel) setSelectedProviderModel("");
-      return;
-    }
-    if (!selectedProvider.models.includes(selectedProviderModel)) {
-      setSelectedProviderModel(selectedProvider.models[0] ?? "");
-    }
-  }, [mode, modelSource, selectedProvider, selectedProviderModel]);
+    if (selectedProvider.models.length === 0) return;
+    if (selectedProviderModel) return;
+    setSelectedProviderModel(selectedProvider.models[0] ?? "");
+  }, [modelSource, selectedProvider, selectedProviderModel]);
 
   const providerSaveBlocked =
     modelSource === "provider" &&
@@ -158,10 +167,12 @@ export function AgentForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setErrorField(null);
 
     if (!displayName.trim()) {
       const message = "Agent 名称必填。";
       setError(message);
+      setErrorField("display_name");
       displayNameRef.current?.focus();
       return;
     }
@@ -169,6 +180,8 @@ export function AgentForm({
     if (!systemPrompt.trim()) {
       const message = "System Prompt 必填。";
       setError(message);
+      setErrorField("system_prompt");
+      setSystemPromptView("edit");
       systemPromptRef.current?.focus();
       return;
     }
@@ -203,8 +216,10 @@ export function AgentForm({
 
   const inputClass =
     "h-10 w-full rounded-xl border border-hairline bg-canvas px-3 text-sm text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:bg-canvas-soft disabled:text-body";
+  const selectClass =
+    "h-10 w-full appearance-none rounded-xl border border-hairline bg-canvas bg-[length:1rem_1rem] bg-[right_0.75rem_center] bg-no-repeat pl-3 pr-9 text-sm text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:bg-canvas-soft disabled:text-body bg-[url('data:image/svg+xml;utf8,<svg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%20fill=%22none%22%20stroke=%22%23667085%22%20stroke-width=%221.6%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22><path%20d=%22M6%208l4%204%204-4%22/></svg>')]";
   const textAreaClass =
-    "min-h-[96px] w-full resize-y rounded-xl border border-hairline bg-canvas px-3 py-2.5 font-mono text-sm leading-relaxed text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15";
+    "field-sizing-content min-h-[320px] w-full rounded-xl border border-hairline bg-canvas px-3 py-2.5 font-mono text-sm leading-relaxed text-ink shadow-sm shadow-primary/0 placeholder:text-mute outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15";
 
   return (
     <section className="overflow-hidden rounded-3xl border border-primary/10 bg-canvas/95 shadow-[0_18px_50px_rgba(0,100,224,0.08)]">
@@ -215,6 +230,37 @@ export function AgentForm({
           void handleSubmit(event);
         }}
       >
+        <div className="flex flex-col-reverse gap-3 border-b border-hairline pb-4 sm:flex-row sm:items-center sm:justify-between">
+          {mode === "edit" ? (
+            <label className="flex items-center gap-2 text-xs text-body">
+              <input
+                checked={enabled}
+                className="h-4 w-4 rounded border-hairline text-primary"
+                onChange={(event) => setEnabled(event.target.checked)}
+                type="checkbox"
+              />
+              启用 Agent
+            </label>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <div className="flex justify-end gap-2">
+            {onCancel ? (
+              <Button onClick={onCancel} type="button" variant="secondary">
+                取消
+              </Button>
+            ) : null}
+            <Button
+              aria-busy={pending}
+              disabled={pending || saveBlocked}
+              type="submit"
+              variant="primary"
+            >
+              {pending ? "保存中..." : "保存 Agent"}
+            </Button>
+          </div>
+        </div>
+
         {error ? (
           <p
             className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep"
@@ -226,8 +272,11 @@ export function AgentForm({
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Agent 名称">
+          <Field label="Agent 名称" required>
             <input
+              aria-describedby={errorField === "display_name" ? errorId : undefined}
+              aria-invalid={errorField === "display_name" || undefined}
+              aria-required="true"
               autoComplete="off"
               className={inputClass}
               name="display_name"
@@ -247,20 +296,10 @@ export function AgentForm({
           </Field>
         </div>
 
-        <Field label="System Prompt">
-          <textarea
-            className={textAreaClass}
-            name="system_prompt"
-            onChange={(event) => setSystemPrompt(event.target.value)}
-            ref={systemPromptRef}
-            value={systemPrompt}
-          />
-        </Field>
-
         <div className="grid gap-3 lg:grid-cols-3">
           <Field label="模型来源">
             <select
-              className={inputClass}
+              className={selectClass}
               name="model_source"
               onChange={(event) => setModelSource(event.target.value as ModelSource)}
               value={modelSource}
@@ -273,13 +312,13 @@ export function AgentForm({
           {modelSource === "codeagent" ? (
             <Field label="CodeAgent 模型">
               <select
-                className={inputClass}
+                className={selectClass}
                 name="codeagent_model"
                 onChange={(event) => setCodeAgentModel(event.target.value)}
                 value={codeAgentModel}
               >
                 {unavailableCodeAgentModel ? (
-                  <option value={codeAgentModel}>
+                  <option disabled value={codeAgentModel}>
                     {codeAgentModel} (不可用)
                   </option>
                 ) : null}
@@ -294,7 +333,7 @@ export function AgentForm({
             <>
               <Field label="LLM Provider">
                 <select
-                  className={inputClass}
+                  className={selectClass}
                   disabled={providersLoading || enabledProviders.length === 0}
                   name="provider_id"
                   onChange={(event) => {
@@ -314,7 +353,7 @@ export function AgentForm({
                     <option value="">暂无可用 Provider</option>
                   ) : null}
                   {unavailableDraftProvider ? (
-                    <option value={selectedProviderId}>
+                    <option disabled value={selectedProviderId}>
                       {selectedProviderId} (不可用)
                     </option>
                   ) : null}
@@ -327,14 +366,14 @@ export function AgentForm({
               </Field>
               <Field label="Provider 模型">
                 <select
-                  className={inputClass}
+                  className={selectClass}
                   disabled={selectedProviderModels.length === 0}
                   name="provider_model"
                   onChange={(event) => setSelectedProviderModel(event.target.value)}
                   value={selectedProviderModel}
                 >
                   {unavailableProviderModel ? (
-                    <option value={selectedProviderModel}>
+                    <option disabled value={selectedProviderModel}>
                       {selectedProviderModel} (不可用)
                     </option>
                   ) : null}
@@ -378,32 +417,55 @@ export function AgentForm({
           </p>
         ) : null}
 
-        {mode === "edit" ? (
-          <label className="flex items-center gap-2 text-xs text-body">
-            <input
-              checked={enabled}
-              className="h-4 w-4 rounded border-hairline text-primary"
-              onChange={(event) => setEnabled(event.target.checked)}
-              type="checkbox"
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              <label className="text-sm font-medium text-ink" htmlFor={systemPromptId}>
+                System Prompt
+              </label>
+              <span aria-hidden="true" className="text-error-deep">
+                *
+              </span>
+            </div>
+            <button
+              aria-label={
+                systemPromptView === "edit" ? "切换到预览模式" : "切换到编辑模式"
+              }
+              aria-pressed={systemPromptView === "preview"}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline bg-canvas text-mute transition-colors hover:border-primary/40 hover:text-ink"
+              onClick={() =>
+                setSystemPromptView((view) => (view === "edit" ? "preview" : "edit"))
+              }
+              title={systemPromptView === "edit" ? "预览" : "编辑"}
+              type="button"
+            >
+              {systemPromptView === "edit" ? <EyeIcon /> : <PencilIcon />}
+            </button>
+          </div>
+          {systemPromptView === "edit" ? (
+            <textarea
+              aria-describedby={errorField === "system_prompt" ? errorId : undefined}
+              aria-invalid={errorField === "system_prompt" || undefined}
+              aria-required="true"
+              className={textAreaClass}
+              id={systemPromptId}
+              name="system_prompt"
+              onChange={(event) => setSystemPrompt(event.target.value)}
+              ref={systemPromptRef}
+              value={systemPrompt}
             />
-            启用 Agent
-          </label>
-        ) : null}
-
-        <div className="flex justify-end gap-2 border-t border-hairline pt-4">
-          {onCancel ? (
-            <Button onClick={onCancel} type="button" variant="secondary">
-              取消
-            </Button>
-          ) : null}
-          <Button
-            aria-busy={pending}
-            disabled={pending || saveBlocked}
-            type="submit"
-            variant="primary"
-          >
-            {pending ? "保存中..." : "保存 Agent"}
-          </Button>
+          ) : (
+            <div
+              aria-label="System Prompt 预览"
+              className="min-h-[320px] overflow-auto rounded-xl border border-dashed border-hairline bg-canvas-soft/60 px-3 py-2.5"
+            >
+              {systemPrompt.trim() ? (
+                <StreamMarkdown>{systemPrompt}</StreamMarkdown>
+              ) : (
+                <p className="text-xs text-mute">尚未填写 System Prompt，预览为空。</p>
+              )}
+            </div>
+          )}
         </div>
       </form>
     </section>
@@ -413,16 +475,26 @@ export function AgentForm({
 function Field({
   children,
   label,
+  required = false,
 }: {
   children: ReactNode;
   label: string;
+  required?: boolean;
 }) {
   const id = useId();
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-ink" htmlFor={id}>
-        {label}
-      </label>
+      <div className="flex h-5 items-center gap-1 leading-5">
+        <label className="text-sm font-medium text-ink" htmlFor={id}>
+          {label}
+        </label>
+        <span
+          aria-hidden="true"
+          className={`text-error-deep ${required ? "" : "invisible"}`}
+        >
+          *
+        </span>
+      </div>
       <div className="[&>input]:w-full [&>select]:w-full [&>textarea]:w-full">
         {cloneWithId(children, id)}
       </div>
@@ -459,4 +531,40 @@ export function buildAgentDraftPayload({
 function cloneWithId(children: ReactNode, id: string) {
   if (!isValidElement(children)) return children;
   return cloneElement(children as ReactElement<{ id?: string }>, { id });
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M16 3l5 5-12 12H4v-5z" />
+      <path d="M14 5l5 5" />
+    </svg>
+  );
 }
