@@ -10,7 +10,8 @@ and MCP management pages.
 The frontend has two primary workspaces:
 
 - SOP quality check chat workflow.
-- MCP server management workflow for administrator operations.
+- Admin management workflows: MCP servers, LLM providers, and ReAct Agent
+  configuration.
 
 Both workspaces share the same top-level shell. Page implementations should not
 create their own global sidebar or independent app frame.
@@ -66,10 +67,9 @@ BrowserRouter
     / -> WorkspaceFrame
       index -> /sop
       /sop -> ChatPage
-      /mcp -> ProtectedRoute -> McpListPage
-      /mcp/new -> ProtectedRoute -> McpCreatePage
-      /mcp/:serverId/edit -> ProtectedRoute -> McpEditPage
-      /mcp/:serverId -> ProtectedRoute -> McpDetailPage
+      /mcp/** -> ProtectedRoute -> MCP pages
+      /llm-providers/** -> ProtectedRoute -> LLM Provider pages
+      /agents/** -> ProtectedRoute -> Agent 配置 pages
       * -> /sop
 ```
 
@@ -218,6 +218,75 @@ Form rules:
 The MCP frontend relies on the authenticated `cqa_user` cookie for API calls.
 MCP pages and backend MCP APIs are restricted to admin users; there is no
 separate MCP credential or custom request header.
+
+## Agent 配置
+
+ReAct Agent configuration lives under `frontend/src/features/agents/` and is
+admin-only via `ProtectedRoute`.
+
+Routes:
+
+- `/agents` -> `AgentListPage`
+- `/agents/new` -> `AgentFormPage` (create)
+- `/agents/:agentId/edit` -> `AgentFormPage` (edit)
+
+List page rules:
+
+- Columns: `Agent`, `状态`, `模型`, `Provider`, `Draft`, `更新时间`, `操作`.
+- Agent column shows display name, id (monospace), and description.
+- Provider column resolves provider id to display name and marks disabled
+  providers with `Provider 已停用`.
+- Toolbar has search, refresh, and the `+ 新增 Agent` primary CTA.
+- Row action is `编辑`, linking to `/agents/:agentId/edit`. There is no inline
+  delete because Agent disablement is handled through the edit form's
+  `启用 Agent` toggle.
+
+Form rules (`AgentForm.tsx`):
+
+- Action bar (`保存 Agent` / `取消` / `启用 Agent` toggle in edit mode) sits at
+  the top of the form so it stays reachable as the System Prompt grows.
+- Page-level fields (`Agent 名称`, `Description`) and the model row sit above
+  the System Prompt block. The System Prompt area lives at the bottom and uses
+  `field-sizing-content` to auto-grow with content.
+- `Agent 名称` and `System Prompt` are required. Other fields are optional.
+- The model row has two layouts driven by `模型来源`:
+  - `CodeAgent`: pick from the hard-coded `CODEAGENT_MODEL_OPTIONS` list. The
+    payload sets `provider_id = null`.
+  - `LLM Provider`: pick an enabled provider and then one of that provider's
+    configured models. The payload sets `provider_id` to the chosen provider.
+- Selects use `appearance-none` with a custom SVG chevron and `pr-9` so they
+  share the same chrome and never have a chevron flush against the right edge.
+- Field labels render in a fixed-height row with a visible or `invisible`
+  required asterisk, so required and optional labels share the same baseline.
+- Unavailable draft references (disabled provider, removed CodeAgent model,
+  provider model no longer in the list) keep the original value as a disabled
+  `(不可用)` option, render an error banner, and block save until the user
+  picks a valid alternative.
+- Auto-pick only fills empty selections. It must not clobber an unavailable
+  draft value, because that would hide the warning state.
+
+System Prompt block:
+
+- A single icon-only toggle button switches between edit (textarea) and
+  preview (`StreamMarkdown`) modes. Edit mode shows a pencil icon; preview
+  shows an eye icon.
+- Edit mode is the default when creating; preview mode is the default when
+  opening an existing agent for editing.
+- Validation failure on System Prompt forces the view back to edit and focuses
+  the textarea so the user can fix the input.
+
+API payloads:
+
+- Create: `POST /api/agents` with
+  `{ display_name, description, draft: AgentDraftConfig }`.
+- Update: `PATCH /api/agents/{agentId}/draft` with
+  `{ display_name, description, draft, enabled }`.
+- `AgentDraftConfig` always trims `model`, `provider_id`, and `system_prompt`,
+  and currently sends empty `mcp_server_ids`, `model_config`, and
+  `tool_allowlist`.
+
+Authorization mirrors MCP: `ProtectedRoute` + `useAuthz()` gate the routes,
+and non-admin users receive the 403 state without leaving the workspace shell.
 
 ## Local MCP HTTP Echo Server
 
