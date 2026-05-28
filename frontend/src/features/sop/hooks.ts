@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
 import {
-  getRecentSopRuns,
+  getRecentSopQualityChecks,
   getSopEnvironments,
-  getSopRunHistory,
+  getSopQualityCheckHistory,
 } from "./api";
-import type { SopEnvironment, SopRunHistoryItem } from "./types";
+import type { SopEnvironment, SopQualityCheckHistoryItem } from "./types";
 
 type AsyncState<T> = {
   data: T;
@@ -44,12 +44,14 @@ export function useSopEnvironments(): AsyncState<SopEnvironment[]> {
   return state;
 }
 
-export function useSopRunHistory(
+export function useSopQualityCheckHistory(
   sopId: string,
   envKey: string,
   refreshKey = 0,
-): AsyncState<SopRunHistoryItem[]> {
-  const [state, setState] = useState<AsyncState<SopRunHistoryItem[]>>({
+): AsyncState<SopQualityCheckHistoryItem[]> {
+  const [state, setState] = useState<
+    AsyncState<SopQualityCheckHistoryItem[]>
+  >({
     data: [],
     error: null,
     loading: false,
@@ -64,10 +66,10 @@ export function useSopRunHistory(
     let cancelled = false;
 
     setState({ data: [], error: null, loading: true });
-    getSopRunHistory(sopId, envKey)
-      .then((runs) => {
+    getSopQualityCheckHistory(sopId, envKey)
+      .then((checks) => {
         if (!cancelled) {
-          setState({ data: runs, error: null, loading: false });
+          setState({ data: checks, error: null, loading: false });
         }
       })
       .catch((error: Error) => {
@@ -84,11 +86,13 @@ export function useSopRunHistory(
   return state;
 }
 
-export function useRecentSopRuns(
+export function useRecentSopQualityChecks(
   envKey: string,
   refreshKey = 0,
-): AsyncState<SopRunHistoryItem[]> {
-  const [state, setState] = useState<AsyncState<SopRunHistoryItem[]>>({
+): AsyncState<SopQualityCheckHistoryItem[]> {
+  const [state, setState] = useState<
+    AsyncState<SopQualityCheckHistoryItem[]>
+  >({
     data: [],
     error: null,
     loading: false,
@@ -103,10 +107,10 @@ export function useRecentSopRuns(
     let cancelled = false;
 
     setState({ data: [], error: null, loading: true });
-    getRecentSopRuns(envKey)
-      .then((runs) => {
+    getRecentSopQualityChecks(envKey)
+      .then((checks) => {
         if (!cancelled) {
-          setState({ data: runs, error: null, loading: false });
+          setState({ data: checks, error: null, loading: false });
         }
       })
       .catch((error: Error) => {

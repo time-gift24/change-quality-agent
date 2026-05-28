@@ -14,7 +14,7 @@ vi.mock("../../features/sop/pages/ChatPage", () => ({
 }));
 
 vi.mock("../../features/sop/hooks", () => ({
-  useRecentSopRuns: () => ({
+  useRecentSopQualityChecks: () => ({
     data: [],
     error: null,
     loading: false,

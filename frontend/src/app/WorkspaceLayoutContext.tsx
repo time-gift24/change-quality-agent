@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 type WorkspaceLayoutContextValue = {
-  refreshRecentSopRuns: () => void;
+  refreshRecentSopQualityChecks: () => void;
   setNewConversationHandler: (handler: (() => void) | null) => void;
   setSidebarContent: (content: ReactNode | null) => void;
 };
@@ -9,7 +9,7 @@ type WorkspaceLayoutContextValue = {
 const noop = () => {};
 
 const WorkspaceLayoutContext = createContext<WorkspaceLayoutContextValue>({
-  refreshRecentSopRuns: noop,
+  refreshRecentSopQualityChecks: noop,
   setNewConversationHandler: noop,
   setSidebarContent: noop,
 });

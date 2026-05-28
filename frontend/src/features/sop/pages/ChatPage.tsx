@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useWorkspaceLayout } from "../../../app/WorkspaceLayoutContext";
-import { RunObserver } from "../../runs/components/RunObserver";
-import { startSopQualityRun } from "../api";
+import { startSopQualityCheck } from "../../sop-quality-checks/api";
+import { SopQualityCheckObserver } from "../../sop-quality-checks/components/SopQualityCheckObserver";
 import { useSopEnvironments } from "../hooks";
 
 type ChatPageProps = {
@@ -21,24 +21,30 @@ export function ChatPage({
   initialSopId = "",
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
 }: ChatPageProps) {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const routeCheckId = searchParams.get("checkId");
   const [sopId, setSopId] = useState(initialSopId);
   const [pendingSopId, setPendingSopId] = useState(initialSopId);
   const [selectedEnv, setSelectedEnv] = useState("");
-  const [observedRunId, setObservedRunId] = useState<string | null>(null);
+  const [observedCheckId, setObservedCheckId] = useState<string | null>(
+    routeCheckId,
+  );
   const [startError, setStartError] = useState<string | null>(null);
   const [startMessage, setStartMessage] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
   const startRequestRef = useRef(0);
-  const observedRunIdRef = useRef(observedRunId);
-  observedRunIdRef.current = observedRunId;
+  const observedCheckIdRef = useRef(observedCheckId);
+  observedCheckIdRef.current = observedCheckId;
 
   const environments = useSopEnvironments();
 
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { refreshRecentSopRuns, setNewConversationHandler, setSidebarContent } = useWorkspaceLayout();
-  const routeRunId = searchParams.get("runId");
+  const {
+    refreshRecentSopQualityChecks,
+    setNewConversationHandler,
+    setSidebarContent,
+  } = useWorkspaceLayout();
 
   useEffect(() => {
     if (!selectedEnv && environments.data.length > 0) {
@@ -61,7 +67,7 @@ export function ChatPage({
     const requestId = startRequestRef.current + 1;
     const requestSopId = nextSopId;
     const requestEnv = selectedEnv;
-    const observedAtStart = observedRunIdRef.current;
+    const observedAtStart = observedCheckIdRef.current;
 
     startRequestRef.current = requestId;
     setStarting(true);
@@ -69,21 +75,21 @@ export function ChatPage({
     setStartMessage(null);
 
     try {
-      const result = await startSopQualityRun(requestSopId, requestEnv);
+      const result = await startSopQualityCheck(requestSopId, requestEnv);
 
       if (
         startRequestRef.current !== requestId ||
-        observedRunIdRef.current !== observedAtStart
+        observedCheckIdRef.current !== observedAtStart
       ) {
         return;
       }
 
-      setObservedRunId(result.runId);
-      refreshRecentSopRuns();
-      navigate(`/sop?runId=${result.runId}`, { replace: true });
+      setObservedCheckId(result.checkId);
+      refreshRecentSopQualityChecks();
+      navigate(`/sop?checkId=${result.checkId}`, { replace: true });
 
       if (result.kind === "active") {
-        setStartMessage(`已存在进行中的运行，已加入对话 ${result.runId}。`);
+        setStartMessage(`已存在进行中的质检，已加入检查 ${result.checkId}。`);
       }
     } catch (error) {
       if (startRequestRef.current !== requestId) {
@@ -109,7 +115,7 @@ export function ChatPage({
 
   const handleNewConversation = useCallback(() => {
     startRequestRef.current += 1;
-    setObservedRunId(null);
+    setObservedCheckId(null);
     setStartError(null);
     setStartMessage(null);
     setStarting(false);
@@ -129,20 +135,20 @@ export function ChatPage({
   }, [handleNewConversation, setNewConversationHandler, setSidebarContent]);
 
   useEffect(() => {
-    if (!routeRunId) return;
-    setObservedRunId(routeRunId);
+    if (!routeCheckId) return;
+    setObservedCheckId(routeCheckId);
     setStartError(null);
     setStartMessage(null);
-  }, [routeRunId]);
+  }, [routeCheckId]);
 
   return (
     <main
       aria-label="SOP 质检主内容"
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      {observedRunId ? (
-        <RunCanvas
-          runId={observedRunId}
+      {observedCheckId ? (
+        <CheckCanvas
+          checkId={observedCheckId}
           registeredNodeIds={registeredNodeIds}
           startError={startError}
           startMessage={startMessage}
@@ -286,13 +292,13 @@ function EmptyState({
   );
 }
 
-function RunCanvas({
-  runId,
+function CheckCanvas({
+  checkId,
   registeredNodeIds,
   startError,
   startMessage,
 }: {
-  runId: string;
+  checkId: string;
   registeredNodeIds: string[];
   startError: string | null;
   startMessage: string | null;
@@ -317,7 +323,10 @@ function RunCanvas({
           </p>
         ) : null}
 
-        <RunObserver runId={runId} registeredNodeIds={registeredNodeIds} />
+        <SopQualityCheckObserver
+          checkId={checkId}
+          registeredNodeIds={registeredNodeIds}
+        />
       </div>
     </div>
   );
@@ -338,23 +347,4 @@ function SelectChevronIcon() {
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
-}
-
-function statusLabel(status: string | null | undefined): string {
-  switch (status) {
-    case "running":
-      return "进行中";
-    case "success":
-      return "成功";
-    case "error":
-      return "失败";
-    case "timeout":
-      return "超时";
-    case "interrupted":
-      return "已中断";
-    case "pending":
-      return "等待中";
-    default:
-      return status ?? "";
-  }
 }

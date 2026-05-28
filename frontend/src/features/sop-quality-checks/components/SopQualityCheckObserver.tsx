@@ -1,18 +1,15 @@
 import { useEffect, useRef } from "react";
 
-import { useRun } from "../hooks";
-import { getOrderedNodeIds, type RunViewState } from "../reducer";
-import type { RunSummary } from "../types";
+import { useSopQualityCheck } from "../hooks";
+import {
+  getOrderedNodeIds,
+  type SopQualityCheckViewState,
+} from "../reducer";
+import type { SopQualityCheckDetail } from "../types";
 import { StreamMarkdown } from "./StreamMarkdown";
 
-type RunObserverProps = {
-  runId: string;
-  registeredNodeIds?: string[];
-};
-
-type RunObserverViewProps = {
-  summary: RunSummary;
-  state: RunViewState;
+type Props = {
+  checkId: string;
   registeredNodeIds?: string[];
 };
 
@@ -22,53 +19,57 @@ const DEFAULT_REGISTERED_NODE_IDS = [
   "summarize_result",
 ];
 
-export function RunObserver({
-  runId,
+export function SopQualityCheckObserver({
+  checkId,
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
-}: RunObserverProps) {
-  const { summary, summaryError, summaryLoading, events } = useRun(runId);
+}: Props) {
+  const { detail, error, loading, state } = useSopQualityCheck(checkId);
 
-  if (summaryError) {
+  if (error) {
     return (
       <section
-        aria-label="Run observer"
+        aria-label="SOP quality check observer"
         className="rounded-2xl border border-hairline bg-canvas px-4 py-3 text-sm text-error-deep"
         role="alert"
       >
-        {summaryError.message}
+        {error.message}
       </section>
     );
   }
 
-  if (!summary) {
+  if (!detail) {
     return (
       <section
-        aria-label="Run observer"
+        aria-label="SOP quality check observer"
         className="rounded-2xl border border-hairline bg-canvas px-4 py-3 text-sm text-body"
       >
-        {summaryLoading ? "正在加载运行..." : "运行不存在或已过期。"}
+        {loading ? "正在加载质检..." : "质检不存在或已过期。"}
       </section>
     );
   }
 
   return (
-    <RunObserverView
-      summary={summary}
-      state={events}
+    <SopQualityCheckObserverView
+      detail={detail}
+      state={state}
       registeredNodeIds={registeredNodeIds}
     />
   );
 }
 
-export function RunObserverView({
-  summary,
+export function SopQualityCheckObserverView({
+  detail,
   state,
   registeredNodeIds = DEFAULT_REGISTERED_NODE_IDS,
-}: RunObserverViewProps) {
+}: {
+  detail: SopQualityCheckDetail;
+  state: SopQualityCheckViewState;
+  registeredNodeIds?: string[];
+}) {
   const orderedNodeIds = getOrderedNodeIds(state, registeredNodeIds);
-  const runError = collectRunError(state, summary);
+  const checkError = collectCheckError(state, detail);
   const showAssistantPlaceholder =
-    orderedNodeIds.length === 0 && !runError && state.isRunning;
+    orderedNodeIds.length === 0 && !checkError && state.isRunning;
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -89,18 +90,17 @@ export function RunObserverView({
       window.cancelAnimationFrame(animationFrame);
       window.clearTimeout(timeout);
     };
-  }, [state.latestSequence, summary.run_id]);
+  }, [detail.check_id, state.latestSequence]);
 
   return (
     <section
-      aria-label="Run observer"
+      aria-label="SOP quality check observer"
       className="flex flex-col gap-4 text-ink"
     >
-      <HumanTurn summary={summary} />
+      <HumanTurn detail={detail} />
 
       {orderedNodeIds.map((nodeId) => {
         const node = state.nodes[nodeId];
-
         if (!node) {
           return null;
         }
@@ -118,17 +118,16 @@ export function RunObserverView({
       })}
 
       {showAssistantPlaceholder ? <AssistantPlaceholder /> : null}
+      {checkError ? <AssistantError message={checkError} /> : null}
 
-      {runError ? <AssistantError message={runError} /> : null}
-
-      <RunFootnote summary={summary} state={state} />
+      <ObserverFootnote detail={detail} state={state} />
       <div aria-hidden="true" className="h-px" ref={bottomRef} />
     </section>
   );
 }
 
-function HumanTurn({ summary }: { summary: RunSummary }) {
-  const text = `请对 SOP \`${summary.subject_id}\` 执行一次质量检查。`;
+function HumanTurn({ detail }: { detail: SopQualityCheckDetail }) {
+  const text = `请对 SOP \`${detail.sop_id}\` 执行一次质量检查。`;
 
   return (
     <div className="flex justify-end">
@@ -179,34 +178,6 @@ function AssistantTurn({
   );
 }
 
-function scrollToBottom(target: HTMLElement): void {
-  const scrollParent = findScrollParent(target);
-  if (scrollParent) {
-    scrollParent.scrollTop = scrollParent.scrollHeight;
-    return;
-  }
-
-  const scrollIntoView = target.scrollIntoView;
-  if (typeof scrollIntoView === "function") {
-    scrollIntoView.call(target, {
-      block: "end",
-      behavior: "smooth",
-    });
-  }
-}
-
-function findScrollParent(target: HTMLElement): HTMLElement | null {
-  let parent = target.parentElement;
-  while (parent) {
-    const overflowY = window.getComputedStyle(parent).overflowY;
-    if (overflowY === "auto" || overflowY === "scroll") {
-      return parent;
-    }
-    parent = parent.parentElement;
-  }
-  return null;
-}
-
 function AssistantPlaceholder() {
   return (
     <article
@@ -229,7 +200,7 @@ function AssistantError({ message }: { message: string }) {
       role="alert"
     >
       <header className="flex items-center gap-2 text-xs text-error-deep">
-        <span className="font-mono">运行失败</span>
+        <span className="font-mono">质检失败</span>
       </header>
       <p className="m-0 text-sm text-error-deep">{message}</p>
     </article>
@@ -283,20 +254,14 @@ function TypingIndicator() {
   );
 }
 
-function RunFootnote({
-  summary,
+function ObserverFootnote({
+  detail,
   state,
 }: {
-  summary: RunSummary;
-  state: RunViewState;
+  detail: SopQualityCheckDetail;
+  state: SopQualityCheckViewState;
 }) {
-  const parts: string[] = [statusLabel(summary.status)];
-
-  if (summary.finished_at) {
-    parts.push(new Date(summary.finished_at).toLocaleString());
-  } else if (summary.started_at) {
-    parts.push(new Date(summary.started_at).toLocaleString());
-  }
+  const parts: string[] = [statusLabel(detail.status)];
 
   if (state.isRunning && state.connectionStatus !== "open") {
     parts.push(connectionLabel(state.connectionStatus));
@@ -313,12 +278,12 @@ function statusLabel(status: string): string {
   switch (status) {
     case "running":
       return "进行中";
-    case "success":
+    case "succeeded":
       return "成功";
-    case "error":
+    case "failed":
       return "失败";
-    case "timeout":
-      return "超时";
+    case "cancelled":
+      return "已取消";
     case "interrupted":
       return "已中断";
     case "pending":
@@ -343,24 +308,48 @@ function connectionLabel(status: string): string {
   }
 }
 
-function collectRunError(
-  state: RunViewState,
-  summary: RunSummary,
+function collectCheckError(
+  state: SopQualityCheckViewState,
+  detail: SopQualityCheckDetail,
 ): string | undefined {
-  if (summary.error_summary) {
-    return summary.error_summary;
+  if (typeof detail.error?.message === "string") {
+    return detail.error.message;
   }
 
   for (let index = state.events.length - 1; index >= 0; index -= 1) {
     const event = state.events[index];
-
-    if (event.type === "error" && !event.node) {
-      const message = event.payload.error ?? event.payload.message;
-      if (typeof message === "string") {
-        return message;
-      }
+    if (event.type === "failed" && !event.node && event.message) {
+      return event.message;
     }
   }
 
   return undefined;
+}
+
+function scrollToBottom(target: HTMLElement): void {
+  const scrollParent = findScrollParent(target);
+  if (scrollParent) {
+    scrollParent.scrollTop = scrollParent.scrollHeight;
+    return;
+  }
+
+  const scrollIntoView = target.scrollIntoView;
+  if (typeof scrollIntoView === "function") {
+    scrollIntoView.call(target, {
+      block: "end",
+      behavior: "smooth",
+    });
+  }
+}
+
+function findScrollParent(target: HTMLElement): HTMLElement | null {
+  let parent = target.parentElement;
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return parent;
+    }
+    parent = parent.parentElement;
+  }
+  return null;
 }

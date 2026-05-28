@@ -20,7 +20,7 @@ vi.mock("../features/auth/api", () => ({
 }));
 
 vi.mock("../features/sop/hooks", () => ({
-  useRecentSopRuns: () => ({
+  useRecentSopQualityChecks: () => ({
     data: [],
     error: null,
     loading: false,
