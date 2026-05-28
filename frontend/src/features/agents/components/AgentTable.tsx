@@ -62,7 +62,7 @@ export function AgentTable({
         </Button>
       </div>
 
-      <p className="mb-2 text-xs text-mute md:hidden">表格可横向滑动查看更多字段。</p>
+      <p aria-hidden="true" className="mb-2 text-xs text-mute md:hidden">表格可横向滑动查看更多字段。</p>
       <div className="overflow-x-auto pb-2">
         <Table className="min-w-[1080px] border-separate border-spacing-y-2">
           <TableHeader>

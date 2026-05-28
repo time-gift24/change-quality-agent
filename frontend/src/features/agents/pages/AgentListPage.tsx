@@ -29,7 +29,7 @@ export function AgentListPage() {
 
   return (
     <AgentPageLayout
-      description="管理 ReAct Agent 的启停状态、发布模型和待发布草稿。"
+      description="管理 ReAct Agent 的启停状态、模型与 System Prompt 草稿。"
       items={[{ label: "Agent 配置" }]}
       title="Agent 配置"
     >
