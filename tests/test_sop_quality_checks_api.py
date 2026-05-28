@@ -4,9 +4,8 @@ from uuid import uuid4
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from app.api.deps import get_session, get_sop_client, get_sop_quality_check_repository
+from app.api.deps import get_session, get_sop_quality_check_repository
 from app.main import app
-from app.schemas.sop import SopSnapshot
 
 
 class FakeSession:
@@ -15,17 +14,6 @@ class FakeSession:
 
     async def commit(self) -> None:
         self.commits += 1
-
-
-class FakeSopClient:
-    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
-        return SopSnapshot(
-            sop_id=sop_id,
-            env_key=env_key,
-            source_version="test",
-            updated_at=None,
-            payload={"id": sop_id, "title": "Release"},
-        )
 
 
 class FakeCheck:
@@ -110,7 +98,6 @@ async def test_start_check_returns_accepted_and_schedules_runner() -> None:
     session = FakeSession()
     repository = FakeRepository()
     app.dependency_overrides[get_session] = make_session_override(session)
-    app.dependency_overrides[get_sop_client] = FakeSopClient
     app.dependency_overrides[get_sop_quality_check_repository] = lambda: repository
 
     async with AsyncClient(

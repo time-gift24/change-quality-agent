@@ -6,6 +6,7 @@ from app.core.checkpoints import open_postgres_checkpointer
 from app.core.database import async_session
 from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
+from app.services.sop_client import MockSopClient
 from app.services.sop_quality_streaming import SopQualityBroadcast
 
 # LangGraph treats non-empty checkpoint namespaces as subgraph paths.
@@ -18,6 +19,8 @@ async def run_sop_quality_check(
     *,
     checkpointer: Any,
     llm_provider_repository: Any,
+    sop_client: Any,
+    submit_quality_result: Any,
     broadcast: SopQualityBroadcast | None = None,
 ) -> dict[str, Any]:
     try:
@@ -33,6 +36,8 @@ async def run_sop_quality_check(
         graph = build_sop_quality_graph(
             checkpointer=checkpointer,
             llm_provider_repository=llm_provider_repository,
+            sop_client=sop_client,
+            submit_quality_result=submit_quality_result,
             on_live_event=_live_event_publisher(
                 broadcast,
                 check_id,
@@ -44,7 +49,6 @@ async def run_sop_quality_check(
             "check_id": str(check.id),
             "sop_id": check.sop_id,
             "env_key": check.env_key,
-            "sop_snapshot": check.sop_snapshot,
         }
 
         final_state = await graph.ainvoke(initial_state, config=config)
@@ -91,6 +95,8 @@ async def run_sop_quality_check_with_new_session(
                     repository,
                     checkpointer=checkpointer,
                     llm_provider_repository=llm_provider_repository,
+                    sop_client=MockSopClient(),
+                    submit_quality_result=_mock_external_submit,
                     broadcast=broadcast,
                 )
         except Exception as exc:
@@ -133,6 +139,13 @@ async def _mark_failed(
     await repository.commit()
     await _publish_event(broadcast, check_id, failed_event)
     return {"status": "failed", "error": error}
+
+
+async def _mock_external_submit(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "external_status": "mock_submitted",
+        "check_id": payload.get("check_id"),
+    }
 
 
 async def _publish_event(

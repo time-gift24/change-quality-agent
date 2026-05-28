@@ -1,7 +1,42 @@
+import inspect
+from collections.abc import Callable
+from typing import Any
+
 from app.agent.sop_quality.state import SopQualityState
+from app.agent.sop_quality.nodes.review_sop import (
+    _load_json_object,
+    _normalize_result,
+)
+
+LiveEventCallback = Callable[[dict[str, Any]], Any]
+
+
+def make_summarize_result(
+    on_live_event: LiveEventCallback | None = None,
+):
+    async def summarize_result(state: SopQualityState) -> SopQualityState:
+        result_state = _summarize_result_state(state)
+        result = result_state.get("result")
+        if isinstance(result, dict):
+            await _publish_live_event(
+                on_live_event,
+                {
+                    "type": "messages",
+                    "node": "summarize_result",
+                    "channel": "summary",
+                    "message": result.get("report_markdown") or result.get("summary"),
+                },
+            )
+        return result_state
+
+    return summarize_result
 
 
 async def summarize_result(state: SopQualityState) -> SopQualityState:
+    return await make_summarize_result()(state)
+
+
+def _summarize_result_state(state: SopQualityState) -> SopQualityState:
     existing_result = state.get("result")
     if isinstance(existing_result, dict):
         return {
@@ -10,6 +45,20 @@ async def summarize_result(state: SopQualityState) -> SopQualityState:
             "quality_result": existing_result.get("quality_result", "pass"),
             "findings": existing_result.get("findings", []),
             "result": existing_result,
+        }
+
+    review_output = state.get("review_output")
+    if isinstance(review_output, str) and review_output.strip():
+        result = {
+            **_result_from_review_output(review_output),
+            "review_output": review_output.strip(),
+        }
+        return {
+            "summary": result["summary"],
+            "report_markdown": result["report_markdown"],
+            "quality_result": result["quality_result"],
+            "findings": result["findings"],
+            "result": result,
         }
 
     findings = state.get("findings", [])
@@ -30,6 +79,38 @@ async def summarize_result(state: SopQualityState) -> SopQualityState:
             "report_markdown": report_markdown,
         },
     }
+
+
+async def _publish_live_event(
+    on_live_event: LiveEventCallback | None,
+    event: dict[str, Any],
+) -> None:
+    if on_live_event is None:
+        return
+    result = on_live_event(event)
+    if inspect.isawaitable(result):
+        await result
+
+
+def _result_from_review_output(review_output: str) -> dict:
+    try:
+        return _normalize_result(_load_json_object(review_output))
+    except ValueError:
+        summary = _first_non_empty_line(review_output)
+        return {
+            "quality_result": "warn",
+            "summary": summary,
+            "findings": [],
+            "report_markdown": review_output.strip(),
+        }
+
+
+def _first_non_empty_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return "SOP quality review completed."
 
 
 def _report_markdown(summary: str, findings: list[dict]) -> str:

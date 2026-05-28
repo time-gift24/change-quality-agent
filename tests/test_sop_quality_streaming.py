@@ -14,16 +14,16 @@ async def test_broadcast_delivers_message_to_all_subscribers() -> None:
         async with broadcast.subscribe(check_id) as second:
             await broadcast.publish(
                 check_id,
-                {"type": "live", "node": "check_steps", "message": "Checking."},
+                {"type": "live", "node": "review_sop", "message": "Checking."},
             )
 
             assert await first.get() == {
                 "type": "live",
-                "node": "check_steps",
+                "node": "review_sop",
                 "message": "Checking.",
             }
             assert await second.get() == {
                 "type": "live",
-                "node": "check_steps",
+                "node": "review_sop",
                 "message": "Checking.",
             }

@@ -2,10 +2,26 @@ import pytest
 from langchain_core.messages import AIMessageChunk
 
 from app.agent.sop_quality.graph import build_sop_quality_graph
+from app.schemas.sop import SopSnapshot
 
 
 class FakeLlmProviderRepository:
     pass
+
+
+class FakeSopClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
+        self.calls.append((sop_id, env_key))
+        return SopSnapshot(
+            sop_id=sop_id,
+            env_key=env_key,
+            source_version="test",
+            updated_at=None,
+            payload={"title": "Release", "steps": [{"name": "deploy"}]},
+        )
 
 
 class FakeAgent:
@@ -27,7 +43,7 @@ class StreamingFakeAgent:
     async def astream(self, inputs, stream_mode=None):
         self.stream_modes.append(stream_mode)
         for chunk in self.chunks:
-            yield ("messages", (chunk, {"langgraph_node": "check_steps"}))
+            yield ("messages", (chunk, {"langgraph_node": "review_sop"}))
 
     async def ainvoke(self, inputs):
         self.invoke_called = True
@@ -41,34 +57,31 @@ class StreamingFakeAgent:
         }
 
 
+async def fake_submit_quality_result(payload):
+    return {"external_status": "submitted", "quality_result": payload["quality_result"]}
+
+
 @pytest.mark.asyncio
 async def test_sop_quality_graph_returns_agent_result() -> None:
     repository = FakeLlmProviderRepository()
-    agent = FakeAgent(
-        """
-        {
-          "quality_result": "warn",
-          "summary": "Release SOP needs clearer rollback instructions.",
-          "findings": [
-            {
-              "severity": "medium",
-              "title": "Rollback is underspecified",
-              "recommendation": "Add owner and exact rollback command."
-            }
-          ],
-          "report_markdown": "## SOP Quality Report\\n\\nRelease SOP needs clearer rollback instructions."
-        }
-        """
-    )
+    sop_client = FakeSopClient()
+    agent = FakeAgent("Release SOP needs clearer rollback instructions.")
     factory_calls: list[object] = []
+    submissions: list[dict] = []
 
     async def fake_create_deep_agent_by_provider(llm_provider_repository, **kwargs):
         factory_calls.append(llm_provider_repository)
         return agent
 
+    async def submit_quality_result(payload):
+        submissions.append(payload)
+        return {"external_status": "submitted"}
+
     graph = build_sop_quality_graph(
+        sop_client=sop_client,
         llm_provider_repository=repository,
         create_deep_agent_by_provider=fake_create_deep_agent_by_provider,
+        submit_quality_result=submit_quality_result,
     )
 
     result = await graph.ainvoke(
@@ -76,51 +89,54 @@ async def test_sop_quality_graph_returns_agent_result() -> None:
             "check_id": "check-1",
             "sop_id": "release-checklist",
             "env_key": "dev",
-            "sop_snapshot": {
-                "sop_id": "release-checklist",
-                "payload": {"title": "Release", "steps": [{"name": "deploy"}]},
-            },
         }
     )
 
     assert factory_calls == [repository]
     assert result["quality_result"] == "warn"
     assert result["summary"] == "Release SOP needs clearer rollback instructions."
-    assert result["findings"][0]["title"] == "Rollback is underspecified"
+    assert result["findings"] == []
     assert result["result"]["quality_result"] == "warn"
+    assert result["sop_snapshot"]["payload"]["title"] == "Release"
+    assert result["submission_result"] == {"external_status": "submitted"}
+    assert submissions[0]["quality_result"] == "warn"
+    assert sop_client.calls == [("release-checklist", "dev")]
     assert agent.inputs[0]["messages"][0]["content"].find("release-checklist") > -1
 
 
 @pytest.mark.asyncio
-async def test_sop_quality_graph_fails_when_agent_returns_invalid_json() -> None:
+async def test_sop_quality_graph_wraps_unstructured_agent_output() -> None:
     repository = FakeLlmProviderRepository()
+    sop_client = FakeSopClient()
     agent = FakeAgent("This SOP looks fine.")
 
     async def fake_create_deep_agent_by_provider(llm_provider_repository, **kwargs):
         return agent
 
     graph = build_sop_quality_graph(
+        sop_client=sop_client,
         llm_provider_repository=repository,
         create_deep_agent_by_provider=fake_create_deep_agent_by_provider,
+        submit_quality_result=fake_submit_quality_result,
     )
 
-    with pytest.raises(ValueError, match="valid JSON"):
-        await graph.ainvoke(
-            {
-                "check_id": "check-1",
-                "sop_id": "release-checklist",
-                "env_key": "dev",
-                "sop_snapshot": {
-                    "sop_id": "release-checklist",
-                    "payload": {"title": "Release"},
-                },
-            }
-        )
+    result = await graph.ainvoke(
+        {
+            "check_id": "check-1",
+            "sop_id": "release-checklist",
+            "env_key": "dev",
+        }
+    )
+
+    assert result["quality_result"] == "warn"
+    assert result["summary"] == "This SOP looks fine."
+    assert result["result"]["report_markdown"] == "This SOP looks fine."
 
 
 @pytest.mark.asyncio
 async def test_sop_quality_graph_normalizes_common_agent_severity_variants() -> None:
     repository = FakeLlmProviderRepository()
+    sop_client = FakeSopClient()
     agent = FakeAgent(
         """
         {
@@ -147,8 +163,10 @@ async def test_sop_quality_graph_normalizes_common_agent_severity_variants() -> 
         return agent
 
     graph = build_sop_quality_graph(
+        sop_client=sop_client,
         llm_provider_repository=repository,
         create_deep_agent_by_provider=fake_create_deep_agent_by_provider,
+        submit_quality_result=fake_submit_quality_result,
     )
 
     result = await graph.ainvoke(
@@ -156,10 +174,6 @@ async def test_sop_quality_graph_normalizes_common_agent_severity_variants() -> 
             "check_id": "check-1",
             "sop_id": "release-checklist",
             "env_key": "dev",
-            "sop_snapshot": {
-                "sop_id": "release-checklist",
-                "payload": {"title": "Release"},
-            },
         }
     )
 
@@ -169,6 +183,7 @@ async def test_sop_quality_graph_normalizes_common_agent_severity_variants() -> 
 @pytest.mark.asyncio
 async def test_sop_quality_graph_streams_content_deltas_without_reasoning_text() -> None:
     repository = FakeLlmProviderRepository()
+    sop_client = FakeSopClient()
     chunks = [
         AIMessageChunk(
             content="",
@@ -185,9 +200,11 @@ async def test_sop_quality_graph_streams_content_deltas_without_reasoning_text()
         return agent
 
     graph = build_sop_quality_graph(
+        sop_client=sop_client,
         llm_provider_repository=repository,
         create_deep_agent_by_provider=fake_create_deep_agent_by_provider,
         on_live_event=live_events.append,
+        submit_quality_result=fake_submit_quality_result,
     )
 
     result = await graph.ainvoke(
@@ -195,10 +212,6 @@ async def test_sop_quality_graph_streams_content_deltas_without_reasoning_text()
             "check_id": "check-1",
             "sop_id": "release-checklist",
             "env_key": "dev",
-            "sop_snapshot": {
-                "sop_id": "release-checklist",
-                "payload": {"title": "Release"},
-            },
         }
     )
 
@@ -208,29 +221,35 @@ async def test_sop_quality_graph_streams_content_deltas_without_reasoning_text()
     assert live_events == [
         {
             "type": "messages",
-            "node": "check_steps",
+            "node": "review_sop",
             "channel": "thinking",
             "message": "正在分析 SOP...",
         },
         {
             "type": "messages",
-            "node": "check_steps",
+            "node": "review_sop",
             "message": '{"quality_result":"pass","summary":"',
         },
         {
             "type": "messages",
-            "node": "check_steps",
+            "node": "review_sop",
             "message": "Looks ready.",
         },
         {
             "type": "messages",
-            "node": "check_steps",
+            "node": "review_sop",
             "message": '","findings":[],"report_markdown":"## SOP Quality Report"}',
         },
         {
             "type": "messages",
-            "node": "check_steps",
+            "node": "summarize_result",
             "channel": "summary",
             "message": "## SOP Quality Report",
+        },
+        {
+            "type": "messages",
+            "node": "submit_result",
+            "channel": "summary",
+            "message": "External submission: submitted.",
         },
     ]

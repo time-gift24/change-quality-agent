@@ -67,6 +67,10 @@ class FakeLlmProviderRepository:
     pass
 
 
+class FakeSopClient:
+    pass
+
+
 class FakeBroadcast:
     def __init__(self) -> None:
         self.messages: list[dict] = []
@@ -111,6 +115,10 @@ class FakeGraph:
         return FakeSnapshot()
 
 
+async def fake_submit_quality_result(payload):
+    return {"external_status": "submitted", "payload": payload}
+
+
 @pytest.mark.asyncio
 async def test_runner_marks_success_and_writes_lifecycle_events(monkeypatch) -> None:
     check = FakeCheck()
@@ -128,6 +136,8 @@ async def test_runner_marks_success_and_writes_lifecycle_events(monkeypatch) -> 
         repository,
         checkpointer=None,
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
     )
 
     assert result["status"] == "succeeded"
@@ -155,6 +165,8 @@ async def test_runner_broadcasts_persisted_event_envelopes(monkeypatch) -> None:
         checkpointer=None,
         broadcast=broadcast,
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
     )
 
     assert broadcast.messages[0]["type"] == "started"
@@ -181,6 +193,8 @@ async def test_runner_reads_latest_top_level_checkpoint(monkeypatch) -> None:
         repository,
         checkpointer=InMemorySaver(),
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
     )
 
     assert result["status"] == "succeeded"
@@ -209,10 +223,14 @@ async def test_runner_passes_llm_provider_repository_to_graph(monkeypatch) -> No
         repository,
         checkpointer=None,
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
     )
 
     assert result["status"] == "succeeded"
     assert build_calls[0]["llm_provider_repository"] is llm_provider_repository
+    assert isinstance(build_calls[0]["sop_client"], FakeSopClient)
+    assert build_calls[0]["submit_quality_result"] is fake_submit_quality_result
 
 
 @pytest.mark.asyncio
@@ -227,11 +245,11 @@ async def test_runner_broadcasts_live_graph_events_with_check_context(
     class LiveGraph(FakeGraph):
         async def ainvoke(self, initial_state, *, config):
             await build_calls[0]["on_live_event"](
-                {
-                    "type": "messages",
-                    "node": "check_steps",
-                    "message": "Streaming",
-                }
+                    {
+                        "type": "messages",
+                        "node": "review_sop",
+                        "message": "Streaming",
+                    }
             )
             return await super().ainvoke(initial_state, config=config)
 
@@ -252,6 +270,8 @@ async def test_runner_broadcasts_live_graph_events_with_check_context(
         repository,
         checkpointer=None,
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
         broadcast=broadcast,
     )
 
@@ -260,7 +280,7 @@ async def test_runner_broadcasts_live_graph_events_with_check_context(
     )
     assert live_message["check_id"] == check.id
     assert live_message["sequence"] == 2
-    assert live_message["node"] == "check_steps"
+    assert live_message["node"] == "review_sop"
     assert live_message["message"] == "Streaming"
 
 
@@ -270,7 +290,14 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
 
-    def fail_build(*, checkpointer, llm_provider_repository, on_live_event):
+    def fail_build(
+        *,
+        checkpointer,
+        llm_provider_repository,
+        sop_client,
+        submit_quality_result,
+        on_live_event,
+    ):
         raise RuntimeError("graph unavailable")
 
     monkeypatch.setattr(sop_quality_runner, "build_sop_quality_graph", fail_build)
@@ -280,6 +307,8 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
         repository,
         checkpointer=None,
         llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
     )
 
     assert result["status"] == "failed"

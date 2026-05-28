@@ -153,7 +153,7 @@ function event(
     check_id: "check-1",
     sequence: 1,
     type: "checkpoint",
-    node: "check_steps",
+    node: "review_sop",
     checkpoint_id: "checkpoint-1",
     task_id: null,
     message: "Checkpoint saved.",

@@ -40,7 +40,7 @@ describe("SopQualityCheckObserverView", () => {
         state={{
           ...viewState(),
           nodes: {
-            check_steps: {
+            review_sop: {
               status: "running",
               thinkingText: "正在分析 SOP...",
               streamText: "## SOP Quality Report",

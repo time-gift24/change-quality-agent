@@ -166,7 +166,7 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
 
     expected_operations = {
         ("/api/sop-quality-checks", "get"): {"200", "401", "422"},
-        ("/api/sop-quality-checks", "post"): {"200", "202", "401", "404", "502", "422"},
+        ("/api/sop-quality-checks", "post"): {"200", "202", "401", "422"},
         ("/api/sop-quality-checks/{check_id}", "get"): {"200", "401", "404", "422"},
         ("/api/sop-quality-checks/{check_id}/events", "get"): {
             "200",

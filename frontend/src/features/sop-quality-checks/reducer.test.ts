@@ -13,7 +13,7 @@ describe("sop quality check reducer", () => {
         check_id: "check-1",
         sequence: 2,
         type: "checkpoint",
-        node: "check_steps",
+        node: "review_sop",
         checkpoint_id: "checkpoint-1",
         task_id: null,
         message: "Checkpoint saved.",
@@ -30,7 +30,7 @@ describe("sop quality check reducer", () => {
       check_id: "check-1",
       sequence: 2,
       type: "messages",
-      node: "check_steps",
+      node: "review_sop",
       checkpoint_id: null,
       task_id: null,
       message: "Hello ",
@@ -40,7 +40,7 @@ describe("sop quality check reducer", () => {
       check_id: "check-1",
       sequence: 2,
       type: "messages",
-      node: "check_steps",
+      node: "review_sop",
       checkpoint_id: null,
       task_id: null,
       message: "world",
@@ -48,7 +48,7 @@ describe("sop quality check reducer", () => {
 
     expect(second.latestSequence).toBe(2);
     expect(second.needsRefresh).toBe(false);
-    expect(second.nodes.check_steps).toMatchObject({
+    expect(second.nodes.review_sop).toMatchObject({
       status: "running",
       streamText: "Hello world",
       firstSequence: 2,
@@ -62,7 +62,7 @@ describe("sop quality check reducer", () => {
       sequence: 2,
       type: "messages",
       channel: "thinking",
-      node: "check_steps",
+      node: "review_sop",
       checkpoint_id: null,
       task_id: null,
       message: "正在分析 SOP...",
@@ -73,13 +73,13 @@ describe("sop quality check reducer", () => {
       sequence: 2,
       type: "messages",
       channel: "summary",
-      node: "check_steps",
+      node: "review_sop",
       checkpoint_id: null,
       task_id: null,
       message: "## SOP Quality Report",
     });
 
-    expect(summary.nodes.check_steps).toMatchObject({
+    expect(summary.nodes.review_sop).toMatchObject({
       status: "running",
       thinkingText: "正在分析 SOP...",
       streamText: "## SOP Quality Report",

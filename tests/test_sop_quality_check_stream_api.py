@@ -20,7 +20,7 @@ class FakeEvent:
         self.check_id = check_id
         self.sequence = sequence
         self.type = event_type
-        self.node = "check_steps"
+        self.node = "review_sop"
         self.checkpoint_id = f"checkpoint-{sequence}"
         self.task_id = None
         self.message = message or f"event {sequence}"

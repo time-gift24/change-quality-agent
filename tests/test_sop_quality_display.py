@@ -8,9 +8,9 @@ def test_running_display_does_not_claim_no_issues_before_findings_exist() -> Non
         is_running=True,
     )
 
-    check_steps = state["nodes"].get("check_steps")
+    summarize_result = state["nodes"].get("summarize_result")
 
-    assert check_steps is None or "No obvious" not in check_steps["streamText"]
+    assert summarize_result is None or "No obvious" not in summarize_result["streamText"]
 
 
 def test_completed_empty_findings_can_report_no_structural_issues() -> None:
@@ -23,6 +23,6 @@ def test_completed_empty_findings_can_report_no_structural_issues() -> None:
         is_running=False,
     )
 
-    assert state["nodes"]["check_steps"]["streamText"] == (
+    assert state["nodes"]["summarize_result"]["streamText"] == (
         "No obvious structural issues found."
     )

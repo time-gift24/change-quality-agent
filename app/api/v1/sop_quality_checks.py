@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, s
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.agent.sop_quality.display import display_state_from_graph_values
-from app.api.deps import SessionDep, SopClientDep, SopQualityCheckRepositoryDep
+from app.api.deps import SessionDep, SopQualityCheckRepositoryDep
 from app.core.config import settings
 from app.schemas.sop_quality_checks import (
     SopQualityCheckDetail,
@@ -16,7 +16,6 @@ from app.schemas.sop_quality_checks import (
     SopQualityCheckStatus,
     SopQualityCheckSummary,
 )
-from app.services.sop_client import SopClientError, SopNotFoundError
 from app.services.sop_quality import SopQualityService
 from app.services.sop_quality_runner import run_sop_quality_check_with_new_session
 from app.services.sop_quality_streaming import SopQualityBroadcast
@@ -33,7 +32,6 @@ async def start_sop_quality_check(
     background_tasks: BackgroundTasks,
     request: Request,
     session: SessionDep,
-    sop_client: SopClientDep,
     repository: SopQualityCheckRepositoryDep,
     sop_id: Annotated[str, Query(min_length=1)],
     env: Annotated[str, Query(min_length=1)],
@@ -51,17 +49,11 @@ async def start_sop_quality_check(
 
     service = SopQualityService(
         settings=settings,
-        sop_client=sop_client,
         repository=repository,
         schedule_check=schedule_check,
         commit=session.commit,
     )
-    try:
-        result = await service.start_check(sop_id, env)
-    except SopNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
-    except SopClientError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY) from exc
+    result = await service.start_check(sop_id, env)
 
     status_code = status.HTTP_202_ACCEPTED if result.created else status.HTTP_200_OK
     return JSONResponse(
@@ -220,6 +212,10 @@ def _graph_values_from_check(check) -> dict[str, object]:
             values["findings"] = check.result["findings"]
         if isinstance(check.result.get("quality_result"), str):
             values["quality_result"] = check.result["quality_result"]
+        if isinstance(check.result.get("review_output"), str):
+            values["review_output"] = check.result["review_output"]
+        if isinstance(check.result.get("submission_result"), dict):
+            values["submission_result"] = check.result["submission_result"]
     return values
 
 

@@ -13,8 +13,9 @@ type ChatPageProps = {
 
 const DEFAULT_REGISTERED_NODE_IDS = [
   "load_sop",
-  "check_steps",
+  "review_sop",
   "summarize_result",
+  "submit_result",
 ];
 
 export function ChatPage({

@@ -15,14 +15,16 @@ type Props = {
 
 const DEFAULT_REGISTERED_NODE_IDS = [
   "load_sop",
-  "check_steps",
+  "review_sop",
   "summarize_result",
+  "submit_result",
 ];
 
 const NODE_LABELS: Record<string, string> = {
   load_sop: "读取 SOP",
-  check_steps: "检查步骤",
+  review_sop: "质检分析",
   summarize_result: "生成总结",
+  submit_result: "提交结果",
 };
 
 export function SopQualityCheckObserver({

@@ -110,7 +110,7 @@ async def test_append_event_increments_sequence_without_payload(session) -> None
     second = await repository.append_event(
         check.id,
         event_type="checkpoint",
-        node="check_steps",
+        node="review_sop",
         checkpoint_id="checkpoint-1",
         message="Checkpoint saved.",
     )

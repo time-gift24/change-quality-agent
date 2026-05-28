@@ -9,7 +9,6 @@ from app.repositories.sop_quality_checks import (
     SopQualityCheckRepository,
 )
 from app.schemas.sop_quality_checks import SopQualityCheckStatus
-from app.services.sop_client import SopClient
 
 SOP_QUALITY_GRAPH_NAME = "sop_quality"
 SOP_QUALITY_GRAPH_VERSION = "sop-quality@1"
@@ -36,13 +35,11 @@ class SopQualityService:
         self,
         *,
         settings: Settings,
-        sop_client: SopClient,
         repository: SopQualityCheckRepository,
         schedule_check: Scheduler | None = None,
         commit: Committer = _noop_commit,
     ) -> None:
         self._settings = settings
-        self._sop_client = sop_client
         self._repository = repository
         self._schedule_check = schedule_check
         self._commit = commit
@@ -62,15 +59,13 @@ class SopQualityService:
                 created=False,
             )
 
-        sop_snapshot = await self._sop_client.get_sop(sop_id, env_key)
-
         try:
             check = await self._repository.create_check(
                 sop_id=sop_id,
                 env_key=env_key,
                 graph_name=SOP_QUALITY_GRAPH_NAME,
                 graph_version=SOP_QUALITY_GRAPH_VERSION,
-                sop_snapshot=sop_snapshot.model_dump(mode="json"),
+                sop_snapshot={},
                 created_by=created_by,
             )
         except ActiveSopQualityCheckExistsError as exc:

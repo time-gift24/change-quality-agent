@@ -11,13 +11,8 @@ AgentFactory = Callable[..., Awaitable[Any]]
 LiveEventCallback = Callable[[dict[str, Any]], Any]
 
 SYSTEM_PROMPT = """You are a strict SOP quality reviewer.
-Return only one JSON object with these fields:
-- quality_result: one of "pass", "warn", or "fail"
-- summary: concise user-facing summary
-- findings: list of objects with severity, title, and recommendation
-- finding severity must be one of "low", "medium", or "high"
-- report_markdown: markdown report for display
-Do not include prose outside the JSON object."""
+Review the SOP for operational quality, completeness, ambiguity, and execution risk.
+Use any available tools that help the review. Do not hide important caveats."""
 
 SEVERITY_ALIASES = {
     "info": "low",
@@ -44,7 +39,7 @@ SEVERITY_ALIASES = {
 }
 
 
-def make_llm_check_steps(
+def make_review_sop(
     llm_provider_repository: Any,
     *,
     create_deep_agent_by_provider: AgentFactory = create_deepagents_by_llm_provider,
@@ -52,7 +47,7 @@ def make_llm_check_steps(
 ) -> Callable[[SopQualityState], Awaitable[SopQualityState]]:
     agent: Any | None = None
 
-    async def llm_check_steps(state: SopQualityState) -> SopQualityState:
+    async def review_sop(state: SopQualityState) -> SopQualityState:
         nonlocal agent
         if agent is None:
             agent = await create_deep_agent_by_provider(
@@ -66,25 +61,9 @@ def make_llm_check_steps(
             {"messages": [_user_message(state)]},
             on_live_event=on_live_event,
         )
-        result = _parse_agent_result(output)
-        await _publish_live_event(
-            on_live_event,
-            {
-                "type": "messages",
-                "node": "check_steps",
-                "channel": "summary",
-                "message": result["report_markdown"] or result["summary"],
-            },
-        )
-        return {
-            "quality_result": result["quality_result"],
-            "summary": result["summary"],
-            "findings": result["findings"],
-            "report_markdown": result["report_markdown"],
-            "result": result,
-        }
+        return {"review_output": _agent_text(output)}
 
-    return llm_check_steps
+    return review_sop
 
 
 async def _run_agent(
@@ -105,7 +84,7 @@ async def _run_agent(
 
     async for chunk_type, chunk in stream:
         event = runtime_stream_event(chunk_type, chunk)
-        event["node"] = event.get("node") or "check_steps"
+        event["node"] = event.get("node") or "review_sop"
         if _reasoning_delta(chunk) and not thinking_published:
             thinking_published = True
             await _publish_live_event(
@@ -216,18 +195,10 @@ def _user_message(state: SopQualityState) -> dict[str, str]:
         "role": "user",
         "content": (
             "Review this SOP for operational quality, completeness, ambiguity, "
-            "and execution risk. Return the required JSON object.\n\n"
+            "and execution risk. Use the format that best communicates your review.\n\n"
             f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)}"
         ),
     }
-
-
-def _parse_agent_result(output: Any) -> dict[str, Any]:
-    if isinstance(output, dict) and isinstance(output.get("structured_response"), dict):
-        parsed = output["structured_response"]
-    else:
-        parsed = _load_json_object(_agent_text(output))
-    return _normalize_result(parsed)
 
 
 def _agent_text(output: Any) -> str:
@@ -243,7 +214,7 @@ def _agent_text(output: Any) -> str:
     content = getattr(output, "content", None)
     if content is not None:
         return _content_text(content)
-    raise ValueError("SOP quality agent did not return valid JSON.")
+    raise ValueError("SOP quality agent did not return text output.")
 
 
 def _message_content(message: Any) -> str:
@@ -263,7 +234,7 @@ def _content_text(content: Any) -> str:
             elif isinstance(item, dict) and isinstance(item.get("text"), str):
                 parts.append(item["text"])
         return "\n".join(parts)
-    raise ValueError("SOP quality agent did not return valid JSON.")
+    raise ValueError("SOP quality agent did not return text output.")
 
 
 def _load_json_object(text: str) -> dict[str, Any]:
