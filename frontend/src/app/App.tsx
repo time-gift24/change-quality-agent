@@ -12,6 +12,11 @@ import {
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
 import { DevUserPicker } from "../features/auth/DevUserPicker";
 import { DevUserSwitcher } from "../features/auth/DevUserSwitcher";
+import {
+  AgentCreatePage,
+  AgentEditPage,
+} from "../features/agents/pages/AgentFormPage";
+import { AgentListPage } from "../features/agents/pages/AgentListPage";
 import { LlmProviderDetailPage } from "../features/llmProviders/pages/LlmProviderDetailPage";
 import {
   LlmProviderCreatePage,
@@ -53,6 +58,11 @@ export function App() {
               <Route element={<LlmProviderCreatePage />} path="llm-providers/new" />
               <Route element={<LlmProviderEditPage />} path="llm-providers/:providerId/edit" />
               <Route element={<LlmProviderDetailPage />} path="llm-providers/:providerId" />
+            </Route>
+            <Route element={<ProtectedRoute route={workspaceRoutes.agents} />}>
+              <Route element={<AgentListPage />} path="agents" />
+              <Route element={<AgentCreatePage />} path="agents/new" />
+              <Route element={<AgentEditPage />} path="agents/:agentId/edit" />
             </Route>
             <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>

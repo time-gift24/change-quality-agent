@@ -102,6 +102,7 @@ export function WorkspaceSidebar({
 function iconForRoute(routeKey: WorkspaceRouteKey) {
   if (routeKey === "sop") return <PencilIcon />;
   if (routeKey === "llm-providers") return <CpuIcon />;
+  if (routeKey === "agents") return <SparklesIcon />;
   return <ServerIcon />;
 }
 
@@ -211,6 +212,25 @@ function CpuIcon() {
       <rect x="6" y="6" width="12" height="12" rx="2" />
       <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" />
       <path d="M10 10h4v4h-4z" />
+    </svg>
+  );
+}
+
+function SparklesIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z" />
+      <path d="M19 14l.9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z" />
+      <path d="M5 14l.7 1.7L7.5 16l-1.8.7L5 18l-.7-1.7L2.5 16l1.8-.7z" />
     </svg>
   );
 }
