@@ -1,11 +1,16 @@
-from typing import Protocol
+from collections.abc import Callable, Sequence
+from typing import Protocol, TypeAlias
 from uuid import UUID
 
 from deepagents import create_deep_agent as deepagents_create_deep_agent
 from langchain.agents import create_agent as langchain_create_agent
+from langchain_core.tools import BaseTool
 
 from app.core.json_types import JsonObject
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
+
+
+AgentTool: TypeAlias = BaseTool | Callable[..., object] | JsonObject
 
 
 class LlmProviderAgentConfigurationError(RuntimeError):
@@ -46,7 +51,7 @@ class AgentFactory:
         self,
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
-        tools: list[object] | None = None,
+        tools: Sequence[AgentTool] | None = None,
         model_config: JsonObject | None = None,
     ) -> object:
         configured_model = await self._configured_model(model_config)
@@ -60,7 +65,7 @@ class AgentFactory:
         self,
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
-        tools: list[object] | None = None,
+        tools: Sequence[AgentTool] | None = None,
         model_config: JsonObject | None = None,
     ) -> object:
         configured_model = await self._configured_model(model_config)
