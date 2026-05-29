@@ -9,6 +9,12 @@ from app.core.config import settings
 from app.core.llm_models import LlmProviderRuntimeConfig
 
 
+def test_httpx_socks_proxy_support_is_installed() -> None:
+    client = httpx.Client(proxy="socks5://127.0.0.1:7897")
+
+    client.close()
+
+
 def test_create_chat_model_builds_codeagent_with_internal_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
