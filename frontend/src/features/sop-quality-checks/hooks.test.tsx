@@ -78,15 +78,24 @@ describe("sop quality check hooks", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderHook(() => useSopQualityCheck("check-1"));
+    const { result, unmount } = renderHook(() => useSopQualityCheck("check-1"));
 
     await waitFor(() => {
-      expect(MockEventSource.instances).toHaveLength(1);
+      expect(result.current.detail?.session_id).toBe(42);
+    });
+    await waitFor(() => {
+      const urls = MockEventSource.instances.map((i) => i.url);
+      expect(
+        urls.some((u) => /^\/api\/sessions\/42\/stream\?after=/.test(u)),
+      ).toBe(true);
     });
 
-    expect(MockEventSource.instances[0]?.url).toMatch(
-      /^\/api\/sessions\/42\/stream\?after=/,
+    const sessionStreams = MockEventSource.instances.filter((i) =>
+      /^\/api\/sessions\/42\/stream\?after=/.test(i.url),
     );
+    expect(sessionStreams).toHaveLength(1);
+
+    unmount();
   });
 
   it("ignores stale detail after check id changes", async () => {
