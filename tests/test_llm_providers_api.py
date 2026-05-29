@@ -5,11 +5,11 @@ from httpx import ASGITransport, AsyncClient
 import pytest
 
 from app.api import deps
-from app.api.v1 import llm_providers as llm_provider_api
 from app.core.database import get_session
 from app.main import app
 from app.repositories.llm_providers import LlmProviderNotFoundError
 from app.schemas.llm_providers import LlmProviderModelTestResponse
+from app.services import llm_providers as llm_provider_service
 
 
 class FakeSession:
@@ -292,7 +292,7 @@ async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(
-        llm_provider_api,
+        llm_provider_service,
         "test_provider_model_connectivity",
         fake_test_provider_model,
     )
@@ -363,7 +363,7 @@ async def test_test_provider_model_returns_502_on_failure(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(
-        llm_provider_api,
+        llm_provider_service,
         "test_provider_model_connectivity",
         fake_test_provider_model,
     )

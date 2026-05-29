@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -13,8 +13,16 @@ from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
+from app.services.agents import AgentService
+from app.services.auth import AuthService
+from app.services.llm_providers import LlmProviderService
+from app.services.mcp_servers import McpServerService
+from app.services.sessions import SessionService
 from app.services.session_streaming import SessionBroadcast
 from app.services.sop_client import MockSopClient, SopClient
+from app.services.sop_quality import SopQualityService
+from app.services.sop_quality_runner import run_sop_quality_check_with_new_session
+from app.services.sop_quality_streaming import SopQualityBroadcast
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -62,6 +70,16 @@ def get_agent_repository(session: SessionDep) -> AgentRepository:
 AgentRepositoryDep = Annotated[AgentRepository, Depends(get_agent_repository)]
 
 
+def get_agent_service(
+    session: SessionDep,
+    repository: AgentRepositoryDep,
+) -> AgentService:
+    return AgentService(repository=repository, commit=session.commit)
+
+
+AgentServiceDep = Annotated[AgentService, Depends(get_agent_service)]
+
+
 def get_llm_provider_repository(session: SessionDep) -> LlmProviderRepository:
     return LlmProviderRepository(session)
 
@@ -69,6 +87,19 @@ def get_llm_provider_repository(session: SessionDep) -> LlmProviderRepository:
 LlmProviderRepositoryDep = Annotated[
     LlmProviderRepository,
     Depends(get_llm_provider_repository),
+]
+
+
+def get_llm_provider_service(
+    session: SessionDep,
+    repository: LlmProviderRepositoryDep,
+) -> LlmProviderService:
+    return LlmProviderService(repository=repository, commit=session.commit)
+
+
+LlmProviderServiceDep = Annotated[
+    LlmProviderService,
+    Depends(get_llm_provider_service),
 ]
 
 
@@ -84,6 +115,20 @@ def get_user_repository(session: SessionDep) -> UserRepository:
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
+def get_auth_service() -> AuthService:
+    return AuthService(settings=settings)
+
+
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def get_dev_auth_service(repository: UserRepositoryDep) -> AuthService:
+    return AuthService(settings=settings, repository=repository)
+
+
+DevAuthServiceDep = Annotated[AuthService, Depends(get_dev_auth_service)]
 
 
 def require_admin_user(request: Request) -> None:
@@ -127,4 +172,77 @@ def get_mcp_runtime_manager() -> McpRuntimeManager:
 McpRuntimeManagerDep = Annotated[
     McpRuntimeManager,
     Depends(get_mcp_runtime_manager),
+]
+
+
+def get_mcp_server_service(
+    repository: McpRepositoryDep,
+    runtime: McpRuntimeManagerDep,
+) -> McpServerService:
+    return McpServerService(repository=repository, runtime=runtime)
+
+
+McpServerServiceDep = Annotated[
+    McpServerService,
+    Depends(get_mcp_server_service),
+]
+
+
+_sop_quality_broadcast = SopQualityBroadcast()
+
+
+def get_sop_quality_broadcast() -> SopQualityBroadcast:
+    return _sop_quality_broadcast
+
+
+SopQualityBroadcastDep = Annotated[
+    SopQualityBroadcast,
+    Depends(get_sop_quality_broadcast),
+]
+
+
+def get_session_service(
+    repository: SessionRepositoryDep,
+    broadcast: SessionBroadcastDep,
+) -> SessionService:
+    return SessionService(repository=repository, broadcast=broadcast)
+
+
+SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
+
+
+def get_sop_quality_service(
+    background_tasks: BackgroundTasks,
+    request: Request,
+    session: SessionDep,
+    repository: SopQualityCheckRepositoryDep,
+    session_repository: SessionRepositoryDep,
+    session_broadcast: SessionBroadcastDep,
+    broadcast: SopQualityBroadcastDep,
+) -> SopQualityService:
+    def schedule_check(check_id) -> None:
+        executor = getattr(request.app.state, "sop_quality_check_executor", None)
+        if executor is not None:
+            background_tasks.add_task(executor, check_id)
+            return
+        background_tasks.add_task(
+            run_sop_quality_check_with_new_session,
+            check_id,
+            broadcast=broadcast,
+            session_broadcast=session_broadcast,
+        )
+
+    return SopQualityService(
+        settings=settings,
+        repository=repository,
+        session_repository=session_repository,
+        schedule_check=schedule_check,
+        commit=session.commit,
+        broadcast=broadcast,
+    )
+
+
+SopQualityServiceDep = Annotated[
+    SopQualityService,
+    Depends(get_sop_quality_service),
 ]

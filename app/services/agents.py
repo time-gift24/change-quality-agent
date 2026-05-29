@@ -5,7 +5,11 @@ from uuid import UUID
 
 from app.core.llm_models import LlmProviderRuntimeConfig
 from app.models.agents import Agent, AgentVersion
-from app.repositories.agents import AgentRepository
+from app.repositories.agents import (
+    AgentDraftInvalidError,
+    AgentNotFoundError,
+    AgentRepository,
+)
 from app.repositories.llm_providers import (
     LlmProviderNotFoundError,
     LlmProviderRepository,
@@ -45,6 +49,12 @@ class AgentService:
         self._repository = repository
         self._commit = commit
 
+    async def list_agents(self, *, include_deleted: bool = False) -> list[Agent]:
+        return await self._repository.list_agents(include_deleted=include_deleted)
+
+    async def get_agent(self, agent_id: UUID) -> Agent:
+        return await self._require_agent(agent_id)
+
     async def create_agent(self, request: AgentCreate) -> Agent:
         agent = await self._repository.create_agent(
             display_name=request.display_name,
@@ -71,9 +81,33 @@ class AgentService:
         await self._commit_if_configured()
         return version
 
+    async def list_versions(self, agent_id: UUID) -> list[AgentVersion]:
+        await self._require_agent(agent_id)
+        return await self._repository.list_versions(agent_id)
+
+    async def get_version(
+        self,
+        agent_id: UUID,
+        version_number: int,
+    ) -> AgentVersion:
+        await self._require_agent(agent_id)
+        version = await self._repository.get_version_by_number(
+            agent_id,
+            version_number,
+        )
+        if version is None:
+            raise AgentNotFoundError(agent_id)
+        return version
+
     async def delete_agent(self, agent_id: UUID) -> Agent:
         agent = await self._repository.soft_delete(agent_id)
         await self._commit_if_configured()
+        return agent
+
+    async def _require_agent(self, agent_id: UUID) -> Agent:
+        agent = await self._repository.get_agent(agent_id)
+        if agent is None:
+            raise AgentNotFoundError(agent_id)
         return agent
 
     def _draft_update_kwargs(self, request: AgentDraftUpdate) -> dict[str, Any]:

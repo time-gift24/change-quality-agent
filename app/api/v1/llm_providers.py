@@ -3,10 +3,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Path, Response, status
 
-from app.api.deps import LlmProviderRepositoryDep, SessionDep
-from app.core.llm_connectivity import test_provider_model_connectivity
-from app.core.llm_models import LlmProviderRuntimeConfig
-from app.repositories.llm_providers import (
+from app.api.deps import LlmProviderServiceDep
+from app.services.llm_providers import (
+    LlmProviderModelNotConfiguredError,
     LlmProviderNotFoundError,
 )
 from app.schemas.llm_providers import (
@@ -23,31 +22,30 @@ router = APIRouter(prefix="/api/v1/llm-providers", tags=["llm-providers"])
 
 @router.get("")
 async def list_llm_providers(
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> list[LlmProviderSummary]:
-    providers = await repository.list()
+    providers = await service.list_providers()
     return [LlmProviderSummary.model_validate(provider) for provider in providers]
 
 
 @router.post("", response_model=LlmProviderDetail, status_code=status.HTTP_201_CREATED)
 async def create_llm_provider(
     payload: LlmProviderCreate,
-    session: SessionDep,
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> LlmProviderDetail:
-    provider = await repository.create(**payload.model_dump(mode="json"))
-    await session.commit()
+    provider = await service.create_provider(payload)
     return LlmProviderDetail.model_validate(provider)
 
 
 @router.get("/{provider_id}")
 async def get_llm_provider(
     provider_id: Annotated[UUID, Path()],
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> LlmProviderDetail:
-    provider = await repository.get_by_id(provider_id)
-    if provider is None:
-        raise _not_found()
+    try:
+        provider = await service.get_provider(provider_id)
+    except LlmProviderNotFoundError as exc:
+        raise _not_found() from exc
     return LlmProviderDetail.model_validate(provider)
 
 
@@ -55,29 +53,24 @@ async def get_llm_provider(
 async def update_llm_provider(
     provider_id: Annotated[UUID, Path()],
     payload: LlmProviderUpdate,
-    session: SessionDep,
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> LlmProviderDetail:
-    values = _normalize_update_values(payload.model_dump(exclude_unset=True, mode="json"))
     try:
-        provider = await repository.update(provider_id, **values)
+        provider = await service.update_provider(provider_id, payload)
     except LlmProviderNotFoundError as exc:
         raise _not_found() from exc
-    await session.commit()
     return LlmProviderDetail.model_validate(provider)
 
 
 @router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_llm_provider(
     provider_id: Annotated[UUID, Path()],
-    session: SessionDep,
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> Response:
     try:
-        await repository.soft_delete(provider_id)
+        await service.delete_provider(provider_id)
     except LlmProviderNotFoundError as exc:
         raise _not_found() from exc
-    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -85,21 +78,17 @@ async def delete_llm_provider(
 async def test_llm_provider_model(
     provider_id: Annotated[UUID, Path()],
     payload: LlmProviderModelTestRequest,
-    repository: LlmProviderRepositoryDep,
+    service: LlmProviderServiceDep,
 ) -> LlmProviderModelTestResponse:
-    provider = await repository.get_by_id(provider_id)
-    if provider is None:
-        raise _not_found()
-    if payload.model not in provider.models:
+    try:
+        result = await service.test_model(provider_id, payload)
+    except LlmProviderNotFoundError as exc:
+        raise _not_found() from exc
+    except LlmProviderModelNotConfiguredError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Model is not configured for this provider.",
-        )
-
-    result = await test_provider_model_connectivity(
-        _runtime_config(provider),
-        payload.model,
-    )
+        ) from exc
     if result.status == "failed":
         return Response(
             content=result.model_dump_json(),
@@ -113,23 +102,4 @@ def _not_found() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="LLM provider not found.",
-    )
-
-
-def _normalize_update_values(values: dict[str, object]) -> dict[str, object]:
-    for field in ("default_headers", "default_query"):
-        if field in values and values[field] is None:
-            values[field] = {}
-    return values
-
-
-def _runtime_config(provider) -> LlmProviderRuntimeConfig:
-    return LlmProviderRuntimeConfig(
-        id=provider.id,
-        provider_type=provider.provider_type,
-        base_url=provider.base_url,
-        api_key=provider.api_key,
-        default_headers=dict(provider.default_headers or {}),
-        default_query=dict(provider.default_query or {}),
-        enabled=provider.enabled,
     )

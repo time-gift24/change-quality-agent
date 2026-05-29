@@ -10,9 +10,8 @@ from fastapi import (
     status,
 )
 
-from app.api.deps import AgentRepositoryDep, SessionDep
-from app.repositories.agents import (
-    AgentRepository,
+from app.api.deps import AgentServiceDep
+from app.services.agents import (
     AgentDraftInvalidError,
     AgentNotFoundError,
 )
@@ -25,7 +24,6 @@ from app.schemas.agents import (
     AgentVersionDetail,
     AgentVersionSummary,
 )
-from app.services.agents import AgentService
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -33,31 +31,30 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_agent(
     request: AgentCreate,
-    session: SessionDep,
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> AgentDetail:
-    service = AgentService(repository=repository, commit=session.commit)
     agent = await service.create_agent(request)
     return agent_to_detail(agent)
 
 
 @router.get("")
 async def list_agents(
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
     include_deleted: Annotated[bool, Query()] = False,
 ) -> list[AgentSummary]:
-    agents = await repository.list_agents(include_deleted=include_deleted)
+    agents = await service.list_agents(include_deleted=include_deleted)
     return [agent_to_summary(agent) for agent in agents]
 
 
 @router.get("/{agent_id}")
 async def get_agent(
     agent_id: Annotated[UUID, Path()],
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> AgentDetail:
-    agent = await repository.get_agent(agent_id)
-    if agent is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    try:
+        agent = await service.get_agent(agent_id)
+    except AgentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
     return agent_to_detail(agent)
 
 
@@ -65,10 +62,8 @@ async def get_agent(
 async def update_agent_draft(
     agent_id: Annotated[UUID, Path()],
     request: AgentDraftUpdate,
-    session: SessionDep,
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> AgentDetail:
-    service = AgentService(repository=repository, commit=session.commit)
     try:
         agent = await service.update_draft(agent_id, request)
     except AgentNotFoundError as exc:
@@ -79,10 +74,8 @@ async def update_agent_draft(
 @router.post("/{agent_id}/publish", status_code=status.HTTP_201_CREATED)
 async def publish_agent(
     agent_id: Annotated[UUID, Path()],
-    session: SessionDep,
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> AgentVersionDetail:
-    service = AgentService(repository=repository, commit=session.commit)
     try:
         version = await service.publish_agent(agent_id)
     except AgentNotFoundError as exc:
@@ -95,11 +88,10 @@ async def publish_agent(
 @router.get("/{agent_id}/versions")
 async def list_agent_versions(
     agent_id: Annotated[UUID, Path()],
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> list[AgentVersionSummary]:
     try:
-        await _require_agent(repository, agent_id)
-        versions = await repository.list_versions(agent_id)
+        versions = await service.list_versions(agent_id)
     except AgentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
     return [version_to_summary(version) for version in versions]
@@ -109,26 +101,21 @@ async def list_agent_versions(
 async def get_agent_version(
     agent_id: Annotated[UUID, Path()],
     version_number: Annotated[int, Path(ge=1)],
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> AgentVersionDetail:
     try:
-        await _require_agent(repository, agent_id)
+        version = await service.get_version(agent_id, version_number)
     except AgentNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
 
-    version = await repository.get_version_by_number(agent_id, version_number)
-    if version is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     return version_to_detail(version)
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_agent(
     agent_id: Annotated[UUID, Path()],
-    session: SessionDep,
-    repository: AgentRepositoryDep,
+    service: AgentServiceDep,
 ) -> Response:
-    service = AgentService(repository=repository, commit=session.commit)
     try:
         await service.delete_agent(agent_id)
     except AgentNotFoundError as exc:
@@ -173,13 +160,6 @@ def version_to_summary(version) -> AgentVersionSummary:
 
 def version_to_detail(version) -> AgentVersionDetail:
     return AgentVersionDetail.model_validate(version)
-
-
-async def _require_agent(repository: AgentRepository, agent_id: UUID):
-    agent = await repository.get_agent(agent_id)
-    if agent is None:
-        raise AgentNotFoundError(agent_id)
-    return agent
 
 
 def _draft_config_or_none(agent) -> AgentDraftConfig | None:

@@ -1,57 +1,48 @@
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from app.api.deps import UserRepositoryDep
-from app.core.config import settings
-from app.repositories.users import DEV_USERS
+from app.api.deps import AuthServiceDep, DevAuthServiceDep
 from app.schemas.users import DevLoginRequest, UserPublic
+from app.services.auth import (
+    AuthRequiredError,
+    DevLoginAccountNotFoundError,
+    DevLoginDisabledError,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-DEV_LOGIN_ACCOUNTS = frozenset(user["account"] for user in DEV_USERS)
-
 
 @router.get("/me")
-async def get_me(request: Request) -> UserPublic:
+async def get_me(request: Request, service: AuthServiceDep) -> UserPublic:
     current_user = getattr(request.state, "current_user", None)
-    if current_user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
-    return user_to_public(current_user)
+    try:
+        return service.current_user_public(current_user)
+    except AuthRequiredError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from exc
 
 
 @router.post("/dev-login")
 async def dev_login(
     payload: DevLoginRequest,
     response: Response,
-    repository: UserRepositoryDep,
+    service: DevAuthServiceDep,
 ) -> UserPublic:
-    if not settings.auth_dev_mode:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    if payload.account not in DEV_LOGIN_ACCOUNTS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-
-    user = await repository.get_by_account(payload.account)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    try:
+        user = await service.dev_login(payload.account)
+    except DevLoginDisabledError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN) from exc
+    except DevLoginAccountNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
 
     response.set_cookie(
-        settings.auth_session_cookie_name,
+        service.session_cookie_name,
         payload.account,
         httponly=True,
     )
-    return user_to_public(user)
+    return user
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout() -> Response:
+async def logout(service: AuthServiceDep) -> Response:
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie(settings.auth_session_cookie_name)
+    response.delete_cookie(service.session_cookie_name)
     return response
-
-
-def user_to_public(user) -> UserPublic:
-    return UserPublic(
-        id=user.id,
-        account=user.account,
-        is_admin=user.is_admin,
-        meta=user.meta or {},
-    )
