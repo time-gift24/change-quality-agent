@@ -2,7 +2,9 @@
 
 import inspect
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Protocol
+
+from app.core.json_types import JsonObject
 
 
 class _SessionRepositoryLike(Protocol):
@@ -12,13 +14,13 @@ class _SessionRepositoryLike(Protocol):
         *,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
+        additional_kwargs: JsonObject | None = None,
+    ) -> object:
         ...
 
 
 class _BroadcastLike(Protocol):
-    async def publish(self, session_id: int, message: dict[str, Any]) -> None:
+    async def publish(self, session_id: int, message: dict[str, object]) -> None:
         ...
 
 
@@ -31,7 +33,7 @@ class RepositorySessionMessageWriter:
         repository: _SessionRepositoryLike,
         session_id: int,
         broadcast: _BroadcastLike | None = None,
-        commit: Callable[[], Any] | None = None,
+        commit: Callable[[], object] | None = None,
     ) -> None:
         self._repository = repository
         self._session_id = session_id
@@ -44,9 +46,9 @@ class RepositorySessionMessageWriter:
         step: str,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
-        merged: dict[str, Any] = dict(additional_kwargs or {})
+        additional_kwargs: JsonObject | None = None,
+    ) -> object:
+        merged: JsonObject = dict(additional_kwargs or {})
         merged["step"] = step
 
         message = await self._repository.append_message(
@@ -70,7 +72,7 @@ class RepositorySessionMessageWriter:
         return message
 
 
-def _message_to_dict(message: Any) -> dict[str, Any]:
+def _message_to_dict(message: object) -> JsonObject:
     created_at = getattr(message, "created_at", None)
     return {
         "id": str(getattr(message, "id", "")),

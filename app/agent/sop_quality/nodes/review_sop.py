@@ -1,11 +1,12 @@
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import cast
 
 from app.agent.sop_quality.state import SopQualityState
 from app.core.agent_streaming import DeepAgentRunInput, DeepAgentStreamRunner
+from app.core.json_types import JsonObject
 
-CreateDeepagents = Callable[..., Awaitable[Any]]
+CreateDeepagents = Callable[..., Awaitable[object]]
 
 SYSTEM_PROMPT = """You are a strict SOP quality reviewer.
 Review the SOP for operational quality, completeness, ambiguity, and execution risk.
@@ -72,7 +73,7 @@ def _user_message(state: SopQualityState) -> dict[str, str]:
     }
 
 
-def _load_json_object(text: str) -> dict[str, Any]:
+def _load_json_object(text: str) -> JsonObject:
     candidate = _strip_code_fence(text.strip())
     start = candidate.find("{")
     if start < 0:
@@ -83,7 +84,7 @@ def _load_json_object(text: str) -> dict[str, Any]:
         raise ValueError("SOP quality agent did not return valid JSON.") from exc
     if not isinstance(parsed, dict):
         raise ValueError("SOP quality agent did not return a JSON object.")
-    return parsed
+    return cast(JsonObject, parsed)
 
 
 def _strip_code_fence(text: str) -> str:
@@ -95,7 +96,7 @@ def _strip_code_fence(text: str) -> str:
     return text
 
 
-def _normalize_result(parsed: dict[str, Any]) -> dict[str, Any]:
+def _normalize_result(parsed: JsonObject) -> JsonObject:
     quality_result = parsed.get("quality_result")
     if quality_result not in {"pass", "warn", "fail"}:
         raise ValueError("SOP quality agent returned an invalid quality_result.")
@@ -121,7 +122,7 @@ def _normalize_result(parsed: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _normalize_finding(finding: Any) -> dict[str, str]:
+def _normalize_finding(finding: object) -> dict[str, str]:
     if not isinstance(finding, dict):
         raise ValueError("SOP quality agent returned invalid findings.")
     severity = _normalize_severity(finding.get("severity"))
@@ -138,7 +139,7 @@ def _normalize_finding(finding: Any) -> dict[str, str]:
     }
 
 
-def _normalize_severity(value: Any) -> str:
+def _normalize_severity(value: object) -> str:
     if not isinstance(value, str):
         raise ValueError("SOP quality agent returned an invalid finding severity.")
     severity = SEVERITY_ALIASES.get(value.strip().lower())

@@ -1,7 +1,6 @@
 import os
 from datetime import UTC, datetime
 from inspect import signature
-from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -33,7 +32,7 @@ async def session():
     await engine.dispose()
 
 
-def repository_types() -> Any:
+def repository_types() -> object:
     try:
         from app.repositories import agents
     except ModuleNotFoundError as exc:

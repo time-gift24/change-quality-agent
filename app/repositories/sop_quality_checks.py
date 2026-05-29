@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -7,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sop_quality_checks import SopQualityCheck, SopQualityEvent
+from app.core.json_types import JsonObject
 
 ACTIVE_CHECK_STATUSES = {"pending", "running"}
 
@@ -28,7 +28,7 @@ class SopQualityCheckRepository:
         env_key: str,
         graph_name: str,
         graph_version: str,
-        sop_snapshot: dict[str, Any],
+        sop_snapshot: JsonObject,
         created_by: str | None = None,
         session_id: int | None = None,
         thread_id: str | None = None,
@@ -116,8 +116,8 @@ class SopQualityCheckRepository:
         check_id: UUID,
         status: str,
         quality_result: str | None = None,
-        result: dict[str, Any] | None = None,
-        error: dict[str, Any] | None = None,
+        result: JsonObject | None = None,
+        error: JsonObject | None = None,
     ) -> SopQualityCheck:
         check = await self._require_check(check_id)
         await self._session.refresh(check)

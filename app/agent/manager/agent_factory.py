@@ -1,8 +1,10 @@
-from typing import Any, Protocol
+from typing import Protocol
+from uuid import UUID
 
 from deepagents import create_deep_agent as deepagents_create_deep_agent
 from langchain.agents import create_agent as langchain_create_agent
 
+from app.core.json_types import JsonObject
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 
 
@@ -11,7 +13,7 @@ class LlmProviderAgentConfigurationError(RuntimeError):
 
 
 class LlmProviderLike(Protocol):
-    id: Any
+    id: UUID
     provider_type: str
     base_url: str | None
     api_key: str | None
@@ -44,9 +46,9 @@ class AgentFactory:
         self,
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
-        tools: list[Any] | None = None,
-        model_config: dict[str, Any] | None = None,
-    ) -> Any:
+        tools: list[object] | None = None,
+        model_config: JsonObject | None = None,
+    ) -> object:
         configured_model = await self._configured_model(model_config)
         return self._create_agent_factory(
             model=configured_model,
@@ -58,9 +60,9 @@ class AgentFactory:
         self,
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
-        tools: list[Any] | None = None,
-        model_config: dict[str, Any] | None = None,
-    ) -> Any:
+        tools: list[object] | None = None,
+        model_config: JsonObject | None = None,
+    ) -> object:
         configured_model = await self._configured_model(model_config)
         return self._create_deep_agent_factory(
             model=configured_model,
@@ -68,7 +70,7 @@ class AgentFactory:
             system_prompt=system_prompt,
         )
 
-    async def _configured_model(self, model_config: dict[str, Any] | None) -> Any:
+    async def _configured_model(self, model_config: JsonObject | None) -> object:
         provider = await self._first_provider()
         return self._provider_model_factory(
             _first_model(provider),

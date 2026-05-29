@@ -1,8 +1,13 @@
 import json
-from typing import Any
+from typing import Protocol
 
 
-def build_sop_quality_user_message(run: Any) -> dict[str, str]:
+class SopQualityRunLike(Protocol):
+    subject_snapshot: object
+    subject_id: object
+
+
+def build_sop_quality_user_message(run: SopQualityRunLike) -> dict[str, str]:
     sop_snapshot = json.dumps(
         run.subject_snapshot,
         ensure_ascii=False,

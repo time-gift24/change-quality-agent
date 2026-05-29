@@ -1,7 +1,7 @@
 from time import perf_counter
-from typing import Any
 
 from app.core.agent_runtime import to_jsonable
+from app.core.json_types import JsonObject, JsonValue
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 from app.schemas.llm_providers import LlmProviderModelTestResponse, REDACTED
 
@@ -44,7 +44,7 @@ def _elapsed_ms(started: float) -> float:
     return round((perf_counter() - started) * 1000, 2)
 
 
-def _message_content(value: Any) -> str:
+def _message_content(value: object) -> str:
     content = getattr(value, "content", None)
     if isinstance(content, str):
         return content
@@ -53,7 +53,7 @@ def _message_content(value: Any) -> str:
     return str(value)
 
 
-def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> dict[str, Any]:
+def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> JsonObject:
     return {
         "model": model,
         "provider_type": provider.provider_type,
@@ -66,9 +66,9 @@ def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> dict[str, 
     }
 
 
-def _response_trace(value: Any) -> dict[str, Any]:
+def _response_trace(value: object) -> JsonObject:
     raw = to_jsonable(value)
-    response: dict[str, Any] = {
+    response: JsonObject = {
         "content": _message_content(value),
         "raw": raw,
     }
@@ -89,7 +89,7 @@ def _sanitize_mapping(
     }
 
 
-def _sanitize_value(value: Any, provider: LlmProviderRuntimeConfig) -> Any:
+def _sanitize_value(value: JsonValue, provider: LlmProviderRuntimeConfig) -> JsonValue:
     if isinstance(value, str):
         return _sanitize_error(value, provider)
     if isinstance(value, list):

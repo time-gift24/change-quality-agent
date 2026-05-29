@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import Any
 from uuid import UUID
 
 from fastapi import Request
 
 from app.core.config import settings
 from app.core.database import async_session
+from app.core.json_types import JsonObject
 from app.repositories.users import UserRepository
 
 
@@ -14,7 +14,7 @@ class CurrentUser:
     id: UUID
     account: str
     is_admin: bool
-    meta: dict[str, Any]
+    meta: JsonObject
 
 
 AUTH_REQUIRED_DETAIL = "Authentication required."

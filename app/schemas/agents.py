@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+
+from app.core.json_types import JsonObject
 
 
 class AgentDraftConfig(BaseModel):
@@ -11,7 +12,7 @@ class AgentDraftConfig(BaseModel):
     system_prompt: str = Field(min_length=1)
     model: str = Field(min_length=1)
     provider_id: UUID | None = None
-    model_parameters: dict[str, Any] = Field(
+    model_parameters: JsonObject = Field(
         default_factory=dict,
         validation_alias=AliasChoices("model_config", "model_parameters"),
         serialization_alias="model_config",
@@ -75,7 +76,7 @@ class AgentVersionDetail(AgentVersionSummary):
 
     agent_id: UUID
     system_prompt: str
-    model_parameters: dict[str, Any] = Field(
+    model_parameters: JsonObject = Field(
         default_factory=dict,
         validation_alias=AliasChoices("model_config", "model_parameters"),
         serialization_alias="model_config",

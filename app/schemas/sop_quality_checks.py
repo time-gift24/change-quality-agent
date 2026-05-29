@@ -1,9 +1,11 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.json_types import JsonObject
 
 
 class SopQualityCheckStatus(StrEnum):
@@ -40,7 +42,7 @@ class SopQualityDisplayState(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     latest_sequence: int = 0
-    nodes: dict[str, Any] = Field(default_factory=dict)
+    nodes: JsonObject = Field(default_factory=dict)
     is_running: bool = False
 
 
@@ -50,8 +52,8 @@ class SopQualityCheckDetail(SopQualityCheckSummary):
     thread_id: str
     checkpoint_ns: str
     current_checkpoint_id: str | None = None
-    result: dict[str, Any] | None = None
-    error: dict[str, Any] | None = None
+    result: JsonObject | None = None
+    error: JsonObject | None = None
     display_state: SopQualityDisplayState
     session_id: int | None = None
 

@@ -1,6 +1,5 @@
 import os
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -30,7 +29,7 @@ async def session():
     await engine.dispose()
 
 
-def repository_types() -> Any:
+def repository_types() -> object:
     try:
         from app.repositories import users
     except ModuleNotFoundError as exc:
@@ -47,21 +46,21 @@ def test_user_repository_module_defines_expected_public_api() -> None:
 
 
 class FakeResult:
-    def __init__(self, user: Any) -> None:
+    def __init__(self, user: object) -> None:
         self._user = user
 
-    def scalar_one(self) -> Any:
+    def scalar_one(self) -> object:
         return self._user
 
 
 class RecordingSession:
     def __init__(self) -> None:
         self.flushes = 0
-        self.params: list[dict[str, Any]] = []
+        self.params: list[dict[str, object]] = []
         self.sql: list[str] = []
         self.returned_user = SimpleNamespace(id="user-id")
 
-    async def execute(self, statement: Any) -> FakeResult:
+    async def execute(self, statement: object) -> FakeResult:
         compiled = statement.compile(dialect=postgresql.dialect())
         self.params.append(compiled.params)
         self.sql.append(str(compiled))

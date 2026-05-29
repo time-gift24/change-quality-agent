@@ -2,17 +2,19 @@
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Protocol
 
 from langchain_core.messages import BaseMessage
+
+from app.core.json_types import JsonObject
 
 
 @dataclass
 class DeepAgentRunInput:
     """Input payload for a single DeepAgent step run."""
 
-    messages: list[Any] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    messages: list[JsonObject] = field(default_factory=list)
+    metadata: JsonObject = field(default_factory=dict)
 
 
 @dataclass
@@ -20,7 +22,7 @@ class DeepAgentRunResult:
     """Output of a single DeepAgent step run."""
 
     final_text: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: JsonObject = field(default_factory=dict)
 
 
 class SessionMessageWriter(Protocol):
@@ -32,12 +34,12 @@ class SessionMessageWriter(Protocol):
         step: str,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
+        additional_kwargs: JsonObject | None = None,
+    ) -> object:
         ...
 
 
-LiveEventPublisher = Callable[[dict[str, Any]], Awaitable[None]]
+LiveEventPublisher = Callable[[JsonObject], Awaitable[None]]
 
 
 class DeepAgentStreamRunner:
@@ -57,7 +59,7 @@ class DeepAgentStreamRunner:
     async def run_step(
         self,
         *,
-        agent: Any,
+        agent: object,
         step: str,
         input: DeepAgentRunInput,
     ) -> DeepAgentRunResult:
@@ -79,8 +81,8 @@ class DeepAgentStreamRunner:
 
     async def _run_astream(
         self,
-        astream: Callable[..., Any],
-        payload: dict[str, Any],
+        astream: Callable[..., object],
+        payload: JsonObject,
         *,
         step: str,
     ) -> str:
@@ -127,7 +129,7 @@ class DeepAgentStreamRunner:
 
         return "".join(chunks)
 
-    async def _run_invoke(self, agent: Any, payload: dict[str, Any]) -> str:
+    async def _run_invoke(self, agent: object, payload: JsonObject) -> str:
         ainvoke = getattr(agent, "ainvoke", None)
         if ainvoke is not None:
             output = await ainvoke(payload)
@@ -139,17 +141,17 @@ class DeepAgentStreamRunner:
         output = invoke(payload)
         return _extract_text(output)
 
-    async def _publish(self, event: dict[str, Any]) -> None:
+    async def _publish(self, event: JsonObject) -> None:
         if self._publisher is None:
             return
         await self._publisher(event)
 
 
-def _is_tuple(value: Any) -> bool:
+def _is_tuple(value: object) -> bool:
     return isinstance(value, tuple | list) and len(value) >= 1
 
 
-def _content_delta(message: Any) -> str:
+def _content_delta(message: object) -> str:
     if isinstance(message, BaseMessage):
         content = message.content
         return content if isinstance(content, str) else ""
@@ -160,7 +162,7 @@ def _content_delta(message: Any) -> str:
     return content if isinstance(content, str) else ""
 
 
-def _has_reasoning(message: Any) -> bool:
+def _has_reasoning(message: object) -> bool:
     additional = None
     if isinstance(message, dict):
         additional = message.get("additional_kwargs")
@@ -175,7 +177,7 @@ def _has_reasoning(message: Any) -> bool:
     return False
 
 
-def _extract_text(output: Any) -> str:
+def _extract_text(output: object) -> str:
     if isinstance(output, str):
         return output
     if isinstance(output, dict):
@@ -187,7 +189,7 @@ def _extract_text(output: Any) -> str:
     raise ValueError("Agent did not return text output.")
 
 
-def _message_text(message: Any) -> str:
+def _message_text(message: object) -> str:
     if isinstance(message, dict):
         content = message.get("content")
     else:

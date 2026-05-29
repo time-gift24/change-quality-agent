@@ -1,8 +1,10 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
+
+from app.core.json_types import JsonObject
 
 
 SessionStatus = Literal["active", "completed", "failed", "interrupted"]
@@ -29,5 +31,5 @@ class SessionMessage(BaseModel):
     sequence: int
     role: MessageRole
     content: str
-    additional_kwargs: dict[str, Any]
+    additional_kwargs: JsonObject
     created_at: datetime

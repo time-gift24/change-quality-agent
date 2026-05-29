@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 import pytest
 
+from app.core.json_types import JsonObject
 from app.services.session_messages import RepositorySessionMessageWriter
 
 
@@ -14,7 +14,7 @@ class FakeMessage:
         sequence: int,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any],
+        additional_kwargs: JsonObject,
     ) -> None:
         self.id = uuid4()
         self.session_id = session_id
@@ -36,7 +36,7 @@ class FakeRepository:
         *,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
+        additional_kwargs: JsonObject | None = None,
     ) -> FakeMessage:
         sequence = len(self.appended) + 1
         message = FakeMessage(
@@ -56,9 +56,9 @@ class FakeRepository:
 class FakeBroadcast:
     def __init__(self, repository: FakeRepository | None = None) -> None:
         self._repository = repository
-        self.published: list[tuple[int, dict[str, Any]]] = []
+        self.published: list[tuple[int, dict[str, object]]] = []
 
-    async def publish(self, session_id: int, message: dict[str, Any]) -> None:
+    async def publish(self, session_id: int, message: dict[str, object]) -> None:
         if self._repository is not None:
             assert self._repository.commits == 1
         self.published.append((session_id, message))

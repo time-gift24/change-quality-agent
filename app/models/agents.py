@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -16,6 +15,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.json_types import JsonObject
 
 
 class Agent(Base):
@@ -34,7 +34,7 @@ class Agent(Base):
         default=True,
         server_default=text("true"),
     )
-    draft_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    draft_config: Mapped[JsonObject | None] = mapped_column(JSONB)
     latest_version_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey(
@@ -91,7 +91,7 @@ class AgentVersion(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("llm_providers.id"),
     )
-    model_config: Mapped[dict[str, Any]] = mapped_column(
+    model_config: Mapped[JsonObject] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,

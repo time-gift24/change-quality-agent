@@ -51,6 +51,19 @@ message, and timestamp. Durable transcript content lives in the shared
 
 Use Postgres 13 for local end-to-end SOP quality check debugging.
 
+## Backend Typing
+
+Use `app.core.json_types.JsonValue` and `JsonObject` for open JSON payloads,
+JSONB columns, Pydantic response fields, and persisted message metadata. Prefer
+`object` or a small `Protocol` for opaque framework objects when the code only
+needs a few attributes or methods.
+
+`typing.Any` is reserved for explicit dynamic boundaries: Pydantic
+`model_validator(mode="before")` raw inputs and third-party LangChain/LangGraph
+model hooks whose accepted config or payload shape is provider-specific. Run
+`uv run python scripts/check_any_usage.py` before submitting backend typing
+changes; the script fails if new `Any` usage appears outside the allowlist.
+
 Database and migrations:
 
 ```bash

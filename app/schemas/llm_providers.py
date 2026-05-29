@@ -11,6 +11,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.core.json_types import JsonObject
 from app.core.llm_provider_types import LlmProviderType
 
 
@@ -131,8 +132,8 @@ class LlmProviderModelTestResponse(BaseModel):
     latency_ms: float
     message: str | None = None
     error: str | None = None
-    request: dict[str, Any] | None = None
-    response: dict[str, Any] | None = None
+    request: JsonObject | None = None
+    response: JsonObject | None = None
 
 
 def _normalize_models(value: list[str]) -> list[str]:

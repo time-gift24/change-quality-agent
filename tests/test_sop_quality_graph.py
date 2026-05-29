@@ -1,9 +1,8 @@
-from typing import Any
-
 import pytest
 
 from app.agent.sop_quality.graph import build_sop_quality_graph
 from app.core.agent_streaming import DeepAgentRunInput, DeepAgentRunResult
+from app.core.json_types import JsonObject
 from app.schemas.sop import SopSnapshot
 
 
@@ -27,18 +26,18 @@ class FakeAgent:
 
 
 class FakeAgentFactory:
-    def __init__(self, agents: list[Any] | None = None) -> None:
+    def __init__(self, agents: list[object] | None = None) -> None:
         self.agents = agents or [FakeAgent()]
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[JsonObject] = []
 
-    async def create_deepagents(self, **kwargs: Any) -> Any:
+    async def create_deepagents(self, **kwargs: object) -> object:
         self.calls.append(dict(kwargs))
         return self.agents[len(self.calls) - 1]
 
 
 class FakeMessageWriter:
     def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[JsonObject] = []
 
     async def append_step_message(
         self,
@@ -46,7 +45,7 @@ class FakeMessageWriter:
         step: str,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
+        additional_kwargs: JsonObject | None = None,
     ):
         self.calls.append(
             {
@@ -66,12 +65,12 @@ class FakeMessageWriter:
 class FakeStreamRunner:
     def __init__(self, final_text: str) -> None:
         self.final_text = final_text
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[dict[str, object]] = []
 
     async def run_step(
         self,
         *,
-        agent: Any,
+        agent: object,
         step: str,
         input: DeepAgentRunInput,
     ) -> DeepAgentRunResult:

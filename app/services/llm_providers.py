@@ -1,6 +1,5 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
 from uuid import UUID
 
 from app.core.llm_connectivity import test_provider_model_connectivity

@@ -2,7 +2,7 @@ import inspect
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from langchain.agents import create_agent as langchain_create_agent
@@ -12,13 +12,14 @@ from app.core.llm_models import (
     create_chat_model,
     create_provider_chat_model,
 )
+from app.core.json_types import JsonObject, JsonValue
 from app.core.stream_events import runtime_stream_event
 
 
 @dataclass(frozen=True)
 class AgentRuntimeResult:
-    messages: list[dict[str, Any]]
-    raw_output: dict[str, Any]
+    messages: list[JsonObject]
+    raw_output: JsonObject
 
 
 class StaticToolResolver:
@@ -26,13 +27,22 @@ class StaticToolResolver:
         self,
         tool_allowlist: list[str],
         mcp_server_ids: list[str],
-    ) -> list[Any]:
+    ) -> list[object]:
         return []
 
 
 class LlmProviderResolver(Protocol):
     async def resolve(self, provider_id: UUID) -> LlmProviderRuntimeConfig:
         pass
+
+
+class AgentVersionLike(Protocol):
+    model: str
+    system_prompt: str
+    provider_id: UUID | None
+    model_config: Mapping[str, JsonValue] | None
+    tool_allowlist: list[str]
+    mcp_server_ids: list[str]
 
 
 class AgentRuntime:
@@ -54,8 +64,8 @@ class AgentRuntime:
     async def run(
         self,
         *,
-        version: Any,
-        messages: list[dict[str, Any]],
+        version: AgentVersionLike,
+        messages: list[JsonObject],
     ) -> AgentRuntimeResult:
         agent = await self._build_agent(version)
         raw_output = await self._invoke(agent, {"messages": messages})
@@ -68,8 +78,8 @@ class AgentRuntime:
     async def stream(
         self,
         *,
-        version: Any,
-        messages: list[dict[str, Any]],
+        version: AgentVersionLike,
+        messages: list[JsonObject],
     ):
         agent = await self._build_agent(version)
         payload = {"messages": messages}
@@ -98,7 +108,7 @@ class AgentRuntime:
         async for chunk_type, chunk in stream:
             yield runtime_stream_event(chunk_type, chunk)
 
-    async def _build_agent(self, version: Any) -> Any:
+    async def _build_agent(self, version: AgentVersionLike) -> object:
         tools = self._tool_resolver.resolve(
             list(getattr(version, "tool_allowlist", [])),
             list(getattr(version, "mcp_server_ids", [])),
@@ -125,7 +135,7 @@ class AgentRuntime:
         )
         return agent
 
-    async def _invoke(self, agent: Any, payload: dict[str, Any]) -> Any:
+    async def _invoke(self, agent: object, payload: JsonObject) -> object:
         invoke = getattr(agent, "ainvoke", None)
         if invoke is not None:
             result = invoke(payload)
@@ -143,7 +153,7 @@ class AgentRuntime:
         return result
 
 
-def to_jsonable(value: Any) -> Any:
+def to_jsonable(value: object) -> JsonValue:
     if value is None or isinstance(value, str | int | float | bool):
         return value
 
@@ -174,20 +184,20 @@ def to_jsonable(value: Any) -> Any:
     return value
 
 
-def _json_key(key: Any) -> str:
+def _json_key(key: object) -> str:
     if isinstance(key, str):
         return key
     return str(to_jsonable(key))
 
 
-def _extract_messages(output: dict[str, Any]) -> list[dict[str, Any]]:
+def _extract_messages(output: JsonObject) -> list[JsonObject]:
     messages = output.get("messages", [])
     if not isinstance(messages, list):
         return []
     return [_message_to_dict(message) for message in messages]
 
 
-def _message_to_dict(message: Any) -> dict[str, Any]:
+def _message_to_dict(message: object) -> JsonObject:
     converted = to_jsonable(message)
     if isinstance(converted, Mapping):
         return dict(converted)

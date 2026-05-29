@@ -1,13 +1,13 @@
 from copy import deepcopy
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.users import User
+from app.core.json_types import JsonObject
 
-DEV_USERS: tuple[dict[str, Any], ...] = (
+DEV_USERS: tuple[JsonObject, ...] = (
     {
         "account": "common",
         "refresh_token": "dev-common-refresh-token",
@@ -37,7 +37,7 @@ class UserRepository:
         account: str,
         refresh_token: str,
         is_admin: bool,
-        meta: dict[str, Any],
+        meta: JsonObject,
     ) -> User:
         statement = insert(User).values(
             account=account,

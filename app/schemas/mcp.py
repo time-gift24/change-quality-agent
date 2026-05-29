@@ -13,6 +13,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.core.json_types import JsonObject
+
 
 REDACTED = "********"
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
@@ -42,7 +44,7 @@ class McpServerTool(BaseModel):
 
     name: str
     description: str | None = None
-    input_schema: dict = Field(default_factory=dict)
+    input_schema: JsonObject = Field(default_factory=dict)
     discovered_at: datetime | None = None
 
 

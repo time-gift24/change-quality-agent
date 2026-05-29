@@ -73,7 +73,7 @@ def create_provider_chat_model(
     provider: LlmProviderRuntimeConfig,
     **model_config: Any,
 ) -> BaseChatModel:
-    provider_config: dict[str, Any] = {
+    provider_config: dict[str, object] = {
         "model_provider": provider.provider_type,
     }
     if provider.base_url:
@@ -103,7 +103,7 @@ def _with_deepseek_reasoning_passthrough(
         input_: Any,
         stop: list[str] | None = None,
         **kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         payload = original_get_request_payload(input_, stop=stop, **kwargs)
         _copy_reasoning_content_to_payload(self, input_, payload)
         return payload
@@ -115,7 +115,7 @@ def _with_deepseek_reasoning_passthrough(
 def _copy_reasoning_content_to_payload(
     chat_model: BaseChatModel,
     input_: Any,
-    payload: dict[str, Any],
+    payload: dict[str, object],
 ) -> None:
     try:
         messages = chat_model._convert_input(input_).to_messages()

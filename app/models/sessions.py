@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, func, text
@@ -7,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.json_types import JsonObject
 
 
 class Session(Base):
@@ -51,7 +51,7 @@ class Message(Base):
     sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    additional_kwargs: Mapped[dict[str, Any]] = mapped_column(
+    additional_kwargs: Mapped[JsonObject] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,

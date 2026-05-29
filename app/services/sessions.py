@@ -1,6 +1,5 @@
 import asyncio
 from collections.abc import AsyncIterator
-from typing import Any
 
 from app.repositories.sessions import SessionRepository
 from app.services.session_streaming import SessionBroadcast
@@ -48,7 +47,7 @@ class SessionService:
         *,
         after: int = 0,
         poll_interval_seconds: float = 0.5,
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, object]]:
         await self.get_session(session_id)
         cursor = after
         async with self._broadcast.subscribe(session_id) as queue:
