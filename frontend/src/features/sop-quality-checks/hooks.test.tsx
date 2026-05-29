@@ -64,6 +64,31 @@ describe("sop quality check hooks", () => {
     expect(CHECK_EVENT_NAMES).toContain("messages");
   });
 
+  it("opens the session stream when detail has session_id", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/sop-quality-checks/check-1") {
+        return Promise.resolve(
+          jsonResponse(detail({ session_id: 42, latest_sequence: 5 })),
+        );
+      }
+      if (url === "/api/sessions/42/messages?after=0") {
+        return Promise.resolve(jsonResponse([]));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderHook(() => useSopQualityCheck("check-1"));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    expect(MockEventSource.instances[0]?.url).toMatch(
+      /^\/api\/sessions\/42\/stream\?after=/,
+    );
+  });
+
   it("ignores stale detail after check id changes", async () => {
     const requests: Array<Deferred<Response>> = [];
     const fetchMock = vi.fn(() => {
@@ -178,6 +203,7 @@ function detail(
       nodes: {},
       is_running: true,
     },
+    session_id: null,
     ...overrides,
   };
 }

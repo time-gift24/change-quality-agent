@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createInitialSessionViewState,
+  type SessionViewState,
+} from "../sessions/reducer";
+import {
   createInitialSopQualityCheckViewState,
+  projectSessionStateToSopView,
   reduceSopQualityCheckEvent,
 } from "./reducer";
 
@@ -83,6 +88,119 @@ describe("sop quality check reducer", () => {
       status: "running",
       thinkingText: "正在分析 SOP...",
       streamText: "## SOP Quality Report",
+    });
+  });
+
+  describe("projectSessionStateToSopView", () => {
+    it("projects session messages grouped by step into SOP nodes", () => {
+      const sessionState: SessionViewState = createInitialSessionViewState();
+      sessionState.messages = [
+        {
+          id: "msg-1",
+          session_id: 1,
+          sequence: 1,
+          role: "assistant",
+          content: "loaded sop content",
+          additional_kwargs: { step: "load_sop", kind: "step_message" },
+          created_at: "",
+        },
+        {
+          id: "msg-2",
+          session_id: 1,
+          sequence: 2,
+          role: "assistant",
+          content: "review result",
+          additional_kwargs: { step: "review_sop", kind: "step_message" },
+          created_at: "",
+        },
+      ];
+
+      const result = projectSessionStateToSopView(sessionState);
+
+      expect(result.nodes.load_sop).toMatchObject({
+        status: "done",
+        streamText: "loaded sop content",
+      });
+      expect(result.nodes.review_sop).toMatchObject({
+        status: "done",
+        streamText: "review result",
+      });
+      expect(result.latestSequence).toBe(2);
+    });
+
+    it("marks last step as running when isRunning is true", () => {
+      const sessionState: SessionViewState = createInitialSessionViewState();
+      sessionState.messages = [
+        {
+          id: "msg-1",
+          session_id: 1,
+          sequence: 1,
+          role: "assistant",
+          content: "loaded",
+          additional_kwargs: { step: "load_sop" },
+          created_at: "",
+        },
+        {
+          id: "msg-2",
+          session_id: 1,
+          sequence: 2,
+          role: "assistant",
+          content: "reviewing...",
+          additional_kwargs: { step: "review_sop" },
+          created_at: "",
+        },
+      ];
+
+      const result = projectSessionStateToSopView(sessionState, true);
+
+      expect(result.nodes.load_sop.status).toBe("done");
+      expect(result.nodes.review_sop.status).toBe("running");
+    });
+
+    it("uses liveBuffers for running steps", () => {
+      const sessionState: SessionViewState = createInitialSessionViewState();
+      sessionState.messages = [
+        {
+          id: "msg-1",
+          session_id: 1,
+          sequence: 1,
+          role: "assistant",
+          content: "loaded",
+          additional_kwargs: { step: "load_sop" },
+          created_at: "",
+        },
+      ];
+      sessionState.liveBuffers = {
+        "step:review_sop": "streaming text...",
+      };
+      sessionState.thinking = { "step:review_sop": true };
+
+      const result = projectSessionStateToSopView(sessionState, true);
+
+      expect(result.nodes.review_sop).toMatchObject({
+        status: "running",
+        streamText: "streaming text...",
+        thinkingText: "思考中",
+      });
+    });
+
+    it("ignores messages without step", () => {
+      const sessionState: SessionViewState = createInitialSessionViewState();
+      sessionState.messages = [
+        {
+          id: "msg-1",
+          session_id: 1,
+          sequence: 1,
+          role: "user",
+          content: "orphan",
+          additional_kwargs: {},
+          created_at: "",
+        },
+      ];
+
+      const result = projectSessionStateToSopView(sessionState);
+
+      expect(Object.keys(result.nodes)).toHaveLength(0);
     });
   });
 });
