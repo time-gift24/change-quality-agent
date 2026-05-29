@@ -3,34 +3,34 @@ from typing import Literal, TypedDict
 from app.core.json_types import JsonObject
 
 SopQualityResultValue = Literal["pass", "warn", "fail"]
-SopQualityFindingSeverity = Literal["low", "medium", "high"]
+SopQualityFindingSeverity = Literal["低风险", "中风险", "高风险"]
 
 
 class SopQualityFinding(TypedDict):
-    """One actionable issue identified while reviewing an SOP."""
+    """SOP 评审中识别出的一个可执行问题。"""
 
-    # Normalized risk level for sorting, filtering, and UI badges.
+    # 归一化风险等级，用于排序、筛选和 UI 标签。
     severity: SopQualityFindingSeverity
-    # Short, user-facing issue name.
+    # 面向用户的简短问题标题。
     title: str
-    # Concrete remediation guidance for the SOP owner.
+    # 给 SOP 负责人的具体整改建议。
     recommendation: str
 
 
 class SopQualityReviewResult(TypedDict, total=False):
-    """Canonical SOP quality review artifact persisted after graph execution."""
+    """SOP 质量检查图执行完成后持久化的标准评审产物。"""
 
-    # Overall review verdict. `warn` means usable with non-blocking issues.
+    # 总体评审结论。`warn` 表示可用但存在非阻塞问题。
     quality_result: SopQualityResultValue
-    # Concise human-readable review summary.
+    # 面向人的简短评审摘要。
     summary: str
-    # Structured review issues. Empty means no specific SOP defects were found.
+    # 结构化评审问题列表。空列表表示未发现明确的 SOP 缺陷。
     findings: list[SopQualityFinding]
-    # Final user-facing report body shown in messages and detail views.
+    # 最终面向用户展示的 Markdown 报告正文。
     report_markdown: str
-    # Raw DeepAgent/LLM review text kept for traceability and debugging.
+    # DeepAgent/LLM 原始评审文本，用于追踪和排查。
     review_output: str
-    # JSON-safe receipt returned by the external result submission boundary.
+    # 外部结果提交边界返回的 JSON-safe 回执。
     submission_result: JsonObject
 
 
@@ -40,7 +40,7 @@ class SopQualityError(TypedDict):
 
 
 class SopQualityState(TypedDict, total=False):
-    """LangGraph state shared by SOP quality nodes during one check run."""
+    """一次 SOP 质量检查运行中各 LangGraph 节点共享的状态。"""
 
     check_id: str
     sop_id: str

@@ -105,8 +105,8 @@ def _message_step(message: JsonObject) -> str | None:
 
 def _findings_text(findings: list[JsonObject]) -> str:
     if not findings:
-        return "No obvious structural issues found."
-    return "\n".join(f"- {item.get('title', 'Finding')}" for item in findings)
+        return "未发现明显结构性问题。"
+    return "\n".join(f"- {item.get('title', '问题')}" for item in findings)
 
 
 def _submission_text(submission_result: JsonObject) -> str:

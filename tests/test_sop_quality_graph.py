@@ -135,7 +135,7 @@ async def test_ordinary_nodes_append_step_messages_via_writer() -> None:
     writer = FakeMessageWriter()
     runner = FakeStreamRunner(
         '{"quality_result":"pass","summary":"Looks ready.",'
-        '"findings":[],"report_markdown":"## SOP Quality Report"}'
+        '"findings":[],"report_markdown":"## SOP 质量报告"}'
     )
 
     graph = build_sop_quality_graph(

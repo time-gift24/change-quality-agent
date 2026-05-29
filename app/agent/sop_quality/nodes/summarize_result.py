@@ -59,9 +59,9 @@ def _summarize_result_state(state: SopQualityState) -> SopQualityState:
     findings = state.get("findings", [])
     quality_result = state.get("quality_result", "pass")
     summary = (
-        "No blocking SOP quality issues found."
+        "未发现阻塞性的 SOP 质量问题。"
         if not findings
-        else f"Found {len(findings)} SOP quality issue(s)."
+        else f"发现 {len(findings)} 个 SOP 质量问题。"
     )
     report_markdown = _report_markdown(summary, findings)
     return {
@@ -94,13 +94,13 @@ def _first_non_empty_line(text: str) -> str:
         stripped = line.strip()
         if stripped:
             return stripped
-    return "SOP quality review completed."
+    return "SOP 质量评审已完成。"
 
 
 def _report_markdown(summary: str, findings: list[SopQualityFinding]) -> str:
     if not findings:
-        return f"## SOP Quality Report\n\n{summary}\n"
-    lines = ["## SOP Quality Report", "", summary, ""]
+        return f"## SOP 质量报告\n\n{summary}\n"
+    lines = ["## SOP 质量报告", "", summary, ""]
     for finding in findings:
         lines.append(
             f"- **{finding['severity']}** {finding['title']}: "
