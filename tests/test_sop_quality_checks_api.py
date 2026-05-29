@@ -4,7 +4,11 @@ from uuid import uuid4
 from httpx import ASGITransport, AsyncClient
 import pytest
 
-from app.api.deps import get_session, get_sop_quality_check_repository
+from app.api.deps import (
+    get_session,
+    get_session_repository,
+    get_sop_quality_check_repository,
+)
 from app.main import app
 
 
@@ -16,8 +20,31 @@ class FakeSession:
         self.commits += 1
 
 
+class FakeRuntimeSession:
+    def __init__(self, session_id: int = 1, thread_id: str = "thread-1") -> None:
+        self.id = session_id
+        self.thread_id = thread_id
+
+
+class FakeSessionRepository:
+    def __init__(self) -> None:
+        self.created: list[FakeRuntimeSession] = []
+        self._next_id = 1
+
+    async def create_session(
+        self, title: str | None = None, thread_id: str | None = None
+    ) -> FakeRuntimeSession:
+        runtime_session = FakeRuntimeSession(
+            session_id=self._next_id,
+            thread_id=thread_id or f"thread-{self._next_id}",
+        )
+        self._next_id += 1
+        self.created.append(runtime_session)
+        return runtime_session
+
+
 class FakeCheck:
-    def __init__(self, check_id=None) -> None:
+    def __init__(self, check_id=None, session_id: int | None = 99) -> None:
         self.id = check_id or uuid4()
         self.sop_id = "release-checklist"
         self.env_key = "dev"
@@ -34,14 +61,18 @@ class FakeCheck:
         self.started_at = None
         self.finished_at = None
         self.latest_sequence = 0
+        self.session_id = session_id
 
 
 class FakeRepository:
     def __init__(self) -> None:
         self.check = FakeCheck()
         self.events = []
+        self.last_create_kwargs: dict = {}
 
     async def create_check(self, **kwargs):
+        self.last_create_kwargs = kwargs
+        self.check.session_id = kwargs.get("session_id")
         return self.check
 
     async def get_active_check(self, *, sop_id, env_key):
@@ -97,8 +128,10 @@ def clear_overrides():
 async def test_start_check_returns_accepted_and_schedules_runner() -> None:
     session = FakeSession()
     repository = FakeRepository()
+    session_repository = FakeSessionRepository()
     app.dependency_overrides[get_session] = make_session_override(session)
     app.dependency_overrides[get_sop_quality_check_repository] = lambda: repository
+    app.dependency_overrides[get_session_repository] = lambda: session_repository
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -113,12 +146,17 @@ async def test_start_check_returns_accepted_and_schedules_runner() -> None:
     assert body["check_id"] == str(repository.check.id)
     assert body["created"] is True
     assert app.state.scheduled_check_ids == [str(repository.check.id)]
+    assert session_repository.created, "session should be created before check"
+    assert repository.last_create_kwargs["session_id"] == session_repository.created[0].id
 
 
 @pytest.mark.asyncio
-async def test_get_check_detail_returns_display_state() -> None:
+async def test_get_check_detail_returns_session_id() -> None:
     repository = FakeRepository()
+    repository.check.session_id = 42
+    session_repository = FakeSessionRepository()
     app.dependency_overrides[get_sop_quality_check_repository] = lambda: repository
+    app.dependency_overrides[get_session_repository] = lambda: session_repository
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -127,5 +165,7 @@ async def test_get_check_detail_returns_display_state() -> None:
         response = await client.get(f"/api/sop-quality-checks/{repository.check.id}")
 
     assert response.status_code == 200
-    assert response.json()["check_id"] == str(repository.check.id)
-    assert "display_state" in response.json()
+    body = response.json()
+    assert body["check_id"] == str(repository.check.id)
+    assert body["session_id"] == 42
+    assert "display_state" in body

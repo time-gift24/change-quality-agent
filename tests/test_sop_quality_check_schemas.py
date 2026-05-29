@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from app.schemas.sop_quality_checks import (
+    SopQualityCheckDetail,
     SopQualityCheckEvent,
     SopQualityCheckStartResponse,
     SopQualityCheckStatus,
@@ -28,3 +29,9 @@ def test_event_schema_has_no_payload() -> None:
     assert "payload" not in fields
     assert "channel" in fields
     assert "message" in fields
+
+
+def test_check_detail_exposes_session_id() -> None:
+    fields = SopQualityCheckDetail.model_fields
+
+    assert "session_id" in fields

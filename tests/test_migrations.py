@@ -7,6 +7,9 @@ BASE_MIGRATION_PATH = Path(
 MIGRATION_0008 = Path(
     "migrations/versions/20260529_0008_create_sessions_messages.py"
 )
+MIGRATION_0009 = Path(
+    "migrations/versions/20260529_0009_add_sop_quality_session_id.py"
+)
 
 
 def test_alembic_revision_ids_are_unique() -> None:
@@ -36,7 +39,7 @@ def test_alembic_revision_graph_has_single_head() -> None:
         down_revisions.update(_down_revisions(module))
 
     heads = revisions - down_revisions
-    assert heads == {"20260529_0008"}
+    assert heads == {"20260529_0009"}
 
 
 def test_base_migration_creates_sop_quality_tables_only() -> None:
@@ -76,6 +79,15 @@ def test_sessions_migration_creates_transcript_tables() -> None:
     assert "uq_messages_session_sequence" in source
     assert "ix_messages_session_created_at" in source
     assert "user_id" not in source
+
+
+def test_session_id_migration_links_sop_quality_to_sessions() -> None:
+    source = MIGRATION_0009.read_text()
+
+    assert "session_id" in source
+    assert "sop_quality_checks" in source
+    assert "sessions" in source
+    assert "fk_sop_quality_checks_session_id" in source
 
 
 def _string_assignment(module: ast.Module, name: str) -> str | None:

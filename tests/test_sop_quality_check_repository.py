@@ -5,6 +5,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core.database import Base
+from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import (
     ActiveSopQualityCheckExistsError,
     SopQualityCheckRepository,
@@ -137,3 +138,23 @@ async def test_interrupt_active_checks_on_startup(session) -> None:
     assert interrupted[0].status == "interrupted"
     events = await repository.get_events_after(check.id)
     assert events[-1].type == "interrupted"
+
+
+async def test_create_check_accepts_session_id_and_thread_id(session) -> None:
+    session_repo = SessionRepository(session)
+    runtime_session = await session_repo.create_session(thread_id="thread-fixed")
+
+    repository = SopQualityCheckRepository(session)
+    check = await repository.create_check(
+        sop_id="release-checklist",
+        env_key="dev",
+        graph_name="sop_quality",
+        graph_version="sop-quality@1",
+        sop_snapshot={"sop_id": "release-checklist"},
+        session_id=runtime_session.id,
+        thread_id=runtime_session.thread_id,
+    )
+
+    assert check.session_id == runtime_session.id
+    assert check.thread_id == "thread-fixed"
+

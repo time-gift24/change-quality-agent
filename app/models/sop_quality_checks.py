@@ -34,6 +34,11 @@ class SopQualityCheck(Base):
         primary_key=True,
         default=uuid4,
     )
+    session_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("sessions.id"),
+        nullable=True,
+    )
     sop_id: Mapped[str] = mapped_column(Text, nullable=False)
     env_key: Mapped[str] = mapped_column(Text, nullable=False)
     graph_name: Mapped[str] = mapped_column(Text, nullable=False)

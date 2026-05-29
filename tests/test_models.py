@@ -38,6 +38,15 @@ def test_sop_quality_check_active_unique_index() -> None:
     assert "running" in where
 
 
+def test_sop_quality_check_links_to_session() -> None:
+    columns = SopQualityCheck.__table__.columns
+
+    assert "session_id" in columns
+    assert columns["session_id"].nullable is True
+    foreign_keys = columns["session_id"].foreign_keys
+    assert {fk.target_fullname for fk in foreign_keys} == {"sessions.id"}
+
+
 def test_sop_quality_event_model_has_no_payload_column() -> None:
     columns = SopQualityEvent.__table__.columns
 

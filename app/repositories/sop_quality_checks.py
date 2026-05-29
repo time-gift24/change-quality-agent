@@ -30,6 +30,8 @@ class SopQualityCheckRepository:
         graph_version: str,
         sop_snapshot: dict[str, Any],
         created_by: str | None = None,
+        session_id: int | None = None,
+        thread_id: str | None = None,
     ) -> SopQualityCheck:
         active = await self.get_active_check(sop_id=sop_id, env_key=env_key)
         if active is not None:
@@ -40,11 +42,12 @@ class SopQualityCheckRepository:
             env_key=env_key,
             graph_name=graph_name,
             graph_version=graph_version,
-            thread_id=str(uuid4()),
+            thread_id=thread_id or str(uuid4()),
             checkpoint_ns="",
             status="pending",
             sop_snapshot=sop_snapshot,
             created_by=created_by,
+            session_id=session_id,
         )
         self._session.add(check)
         try:

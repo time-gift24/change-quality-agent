@@ -53,6 +53,7 @@ class SopQualityCheckDetail(SopQualityCheckSummary):
     result: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
     display_state: SopQualityDisplayState
+    session_id: int | None = None
 
 
 class SopQualityCheckEvent(BaseModel):

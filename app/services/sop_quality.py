@@ -1,6 +1,7 @@
 import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID
 
 from app.core.config import Settings
@@ -15,6 +16,14 @@ SOP_QUALITY_GRAPH_VERSION = "sop-quality@1"
 
 Scheduler = Callable[[UUID], object]
 Committer = Callable[[], object]
+
+
+class _SessionRepositoryLike(Protocol):
+    async def create_session(
+        self,
+        title: str | None = None,
+        thread_id: str | None = None,
+    ): ...
 
 
 @dataclass(frozen=True)
@@ -36,11 +45,13 @@ class SopQualityService:
         *,
         settings: Settings,
         repository: SopQualityCheckRepository,
+        session_repository: _SessionRepositoryLike,
         schedule_check: Scheduler | None = None,
         commit: Committer = _noop_commit,
     ) -> None:
         self._settings = settings
         self._repository = repository
+        self._session_repository = session_repository
         self._schedule_check = schedule_check
         self._commit = commit
 
@@ -59,6 +70,10 @@ class SopQualityService:
                 created=False,
             )
 
+        runtime_session = await self._session_repository.create_session(
+            title=f"SOP quality check: {sop_id}",
+        )
+
         try:
             check = await self._repository.create_check(
                 sop_id=sop_id,
@@ -67,6 +82,8 @@ class SopQualityService:
                 graph_version=SOP_QUALITY_GRAPH_VERSION,
                 sop_snapshot={},
                 created_by=created_by,
+                session_id=runtime_session.id,
+                thread_id=runtime_session.thread_id,
             )
         except ActiveSopQualityCheckExistsError as exc:
             active = await self._repository.get_check(exc.active_check_id)

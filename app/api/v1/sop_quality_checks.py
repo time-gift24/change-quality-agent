@@ -7,7 +7,11 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, s
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.agent.sop_quality.display import display_state_from_graph_values
-from app.api.deps import SessionDep, SopQualityCheckRepositoryDep
+from app.api.deps import (
+    SessionDep,
+    SessionRepositoryDep,
+    SopQualityCheckRepositoryDep,
+)
 from app.core.config import settings
 from app.schemas.sop_quality_checks import (
     SopQualityCheckDetail,
@@ -33,6 +37,7 @@ async def start_sop_quality_check(
     request: Request,
     session: SessionDep,
     repository: SopQualityCheckRepositoryDep,
+    session_repository: SessionRepositoryDep,
     sop_id: Annotated[str, Query(min_length=1)],
     env: Annotated[str, Query(min_length=1)],
 ) -> JSONResponse:
@@ -50,6 +55,7 @@ async def start_sop_quality_check(
     service = SopQualityService(
         settings=settings,
         repository=repository,
+        session_repository=session_repository,
         schedule_check=schedule_check,
         commit=session.commit,
     )
@@ -201,6 +207,7 @@ def _check_to_detail(check) -> SopQualityCheckDetail:
         result=check.result,
         error=check.error,
         display_state=display_state,
+        session_id=getattr(check, "session_id", None),
     )
 
 
