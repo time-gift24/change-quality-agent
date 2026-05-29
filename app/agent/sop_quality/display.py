@@ -17,7 +17,7 @@ def display_state_from_graph_values(
     )
     nodes: JsonObject = {}
     if values.get("sop_snapshot"):
-        nodes["load_sop"] = {"status": "done", "streamText": "SOP snapshot loaded."}
+        nodes["load_sop"] = {"status": "done", "streamText": "SOP 快照已读取。"}
     if isinstance(values.get("review_output"), str):
         nodes["review_sop"] = {
             "status": "done" if not is_running else "running",

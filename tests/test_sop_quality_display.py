@@ -33,11 +33,11 @@ def test_completed_empty_findings_can_report_no_structural_issues() -> None:
 
 def test_display_from_session_messages_groups_by_step() -> None:
     messages = [
-        {"step": "load_sop", "role": "assistant", "content": "Loaded SOP release."},
-        {"step": "review_sop", "role": "assistant", "content": "Review in progress"},
-        {"step": "review_sop", "role": "assistant", "content": "Review complete."},
-        {"step": "summarize_result", "role": "assistant", "content": "## Report"},
-        {"step": "submit_result", "role": "assistant", "content": "Submitted."},
+        {"step": "load_sop", "role": "assistant", "content": "已读取 SOP release。"},
+        {"step": "review_sop", "role": "assistant", "content": "正在评审"},
+        {"step": "review_sop", "role": "assistant", "content": "评审完成。"},
+        {"step": "summarize_result", "role": "assistant", "content": "## 报告"},
+        {"step": "submit_result", "role": "assistant", "content": "已提交。"},
     ]
     state = display_state_from_session_messages(
         messages,
@@ -46,17 +46,17 @@ def test_display_from_session_messages_groups_by_step() -> None:
     )
 
     assert state["nodes"]["load_sop"]["status"] == "done"
-    assert state["nodes"]["load_sop"]["streamText"] == "Loaded SOP release."
+    assert state["nodes"]["load_sop"]["streamText"] == "已读取 SOP release。"
     # review_sop concatenates messages
-    assert "Review complete." in state["nodes"]["review_sop"]["streamText"]
+    assert "评审完成。" in state["nodes"]["review_sop"]["streamText"]
     assert state["nodes"]["summarize_result"]["status"] == "done"
     assert state["nodes"]["submit_result"]["status"] == "done"
 
 
 def test_display_from_session_messages_running_status() -> None:
     messages = [
-        {"step": "load_sop", "role": "assistant", "content": "Loaded."},
-        {"step": "review_sop", "role": "assistant", "content": "Thinking..."},
+        {"step": "load_sop", "role": "assistant", "content": "已读取。"},
+        {"step": "review_sop", "role": "assistant", "content": "正在思考..."},
     ]
     state = display_state_from_session_messages(
         messages,

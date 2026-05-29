@@ -22,7 +22,7 @@ describe("SopQualityCheckObserverView", () => {
           nodes: {
             load_sop: {
               status: "done",
-              streamText: "SOP snapshot loaded.",
+              streamText: "SOP 快照已读取。",
             },
           },
         }}

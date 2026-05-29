@@ -171,8 +171,8 @@ async def test_stream_does_not_replay_session_messages_for_check(
     """SOP stream owns check lifecycle; session messages use /api/sessions."""
     monkeypatch.setattr(checks_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     check, session_repository = override_repository
-    session_repository.add_message(FakeMessage(1, "load_sop", "Loaded SOP X."))
-    session_repository.add_message(FakeMessage(2, "review_sop", "Reviewing..."))
+    session_repository.add_message(FakeMessage(1, "load_sop", "已读取 SOP X。"))
+    session_repository.add_message(FakeMessage(2, "review_sop", "正在评审..."))
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -186,5 +186,5 @@ async def test_stream_does_not_replay_session_messages_for_check(
     assert "event: checkpoint" in response.text
     assert "event: completed" in response.text
     assert "event: message" not in response.text
-    assert "Loaded SOP X." not in response.text
-    assert "Reviewing..." not in response.text
+    assert "已读取 SOP X。" not in response.text
+    assert "正在评审..." not in response.text

@@ -102,14 +102,14 @@ async def test_writer_publishes_persisted_message_event() -> None:
     await writer.append_step_message(
         step="load_sop",
         role="system",
-        content="SOP loaded.",
+        content="SOP 已读取。",
     )
 
     assert len(broadcast.published) == 1
     session_id, event = broadcast.published[0]
     assert session_id == 7
     assert event["type"] == "message"
-    assert event["content"] == "SOP loaded."
+    assert event["content"] == "SOP 已读取。"
     assert event["additional_kwargs"]["step"] == "load_sop"
 
 
@@ -127,7 +127,7 @@ async def test_writer_commits_before_publishing_persisted_message() -> None:
     await writer.append_step_message(
         step="load_sop",
         role="system",
-        content="SOP loaded.",
+        content="SOP 已读取。",
     )
 
     assert repo.commits == 1
