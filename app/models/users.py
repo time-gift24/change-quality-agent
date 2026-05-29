@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Index, Text, func, text
@@ -8,6 +7,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.json_types import JsonObject
 
 
 class User(Base):
@@ -27,7 +27,7 @@ class User(Base):
         default=False,
         server_default=text("false"),
     )
-    meta: Mapped[dict[str, Any]] = mapped_column(
+    meta: Mapped[JsonObject] = mapped_column(
         MutableDict.as_mutable(JSONB),
         nullable=False,
         default=dict,

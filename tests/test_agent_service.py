@@ -14,7 +14,7 @@ def service_type():
 
 def draft_config() -> AgentDraftConfig:
     return AgentDraftConfig(
-        system_prompt="You are careful.",
+        system_prompt="你是谨慎的评审助手。",
         model="openai:gpt-5-mini",
         model_config={"temperature": 0},
         tool_allowlist=["search_sop"],

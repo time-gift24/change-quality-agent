@@ -16,7 +16,7 @@ class FakeVersion:
         self.model = "openai:gpt-5-mini"
         self.provider_id = None
         self.model_config = {"temperature": 0.2}
-        self.system_prompt = "Review risky changes carefully."
+        self.system_prompt = "请谨慎评审高风险变更。"
         self.tool_allowlist = ["search_sop"]
         self.mcp_server_ids = ["change-docs"]
 
@@ -82,8 +82,8 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
     created: dict[str, object] = {}
     raw_output = {
         "messages": [
-            {"role": "user", "content": "Can this deploy?"},
-            {"role": "assistant", "content": "Review passed."},
+            {"role": "user", "content": "这次变更可以发布吗？"},
+            {"role": "assistant", "content": "评审通过。"},
         ],
         "status": "ok",
     }
@@ -100,7 +100,7 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
         tool_resolver=resolver,
         model_factory=lambda model, **_: model,
     )
-    input_messages = [{"role": "user", "content": "Can this deploy?"}]
+    input_messages = [{"role": "user", "content": "这次变更可以发布吗？"}]
 
     result = await runtime.run(version=version, messages=input_messages)
 
@@ -108,7 +108,7 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
     assert created == {
         "model": "openai:gpt-5-mini",
         "tools": resolver.tools,
-        "system_prompt": "Review risky changes carefully.",
+        "system_prompt": "请谨慎评审高风险变更。",
     }
     assert agent.inputs == [{"messages": input_messages}]
     assert result.messages == raw_output["messages"]
@@ -139,7 +139,7 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
         tool_resolver=resolver,
     )
 
-    await runtime.run(version=version, messages=[{"role": "user", "content": "Hi"}])
+    await runtime.run(version=version, messages=[{"role": "user", "content": "你好。"}])
 
     assert model_factory_calls == [
         ("openai:gpt-5-mini", {"temperature": 0.2}),
@@ -216,7 +216,7 @@ async def test_runtime_awaits_async_tool_resolver() -> None:
 
     await runtime.run(
         version=FakeVersion(),
-        messages=[{"role": "user", "content": "Hi"}],
+        messages=[{"role": "user", "content": "你好。"}],
     )
 
     assert resolver.calls == [(["search_sop"], ["change-docs"])]
@@ -226,8 +226,8 @@ async def test_runtime_awaits_async_tool_resolver() -> None:
 @pytest.mark.asyncio
 async def test_runtime_returns_json_serializable_raw_output_for_langchain_messages() -> None:
     raw_output = {
-        "messages": [AIMessage(content="Review passed.")],
-        "nested": {"message": AIMessage(content="Nested review details.")},
+        "messages": [AIMessage(content="评审通过。")],
+        "nested": {"message": AIMessage(content="嵌套评审详情。")},
     }
     runtime = AgentRuntime(
         create_agent=lambda **_: FakeAgent(raw_output),
@@ -237,13 +237,13 @@ async def test_runtime_returns_json_serializable_raw_output_for_langchain_messag
 
     result = await runtime.run(
         version=FakeVersion(),
-        messages=[{"role": "user", "content": "Can this deploy?"}],
+        messages=[{"role": "user", "content": "这次变更可以发布吗？"}],
     )
 
     json.dumps(result.raw_output)
-    assert result.messages[0]["content"] == "Review passed."
-    assert result.raw_output["messages"][0]["content"] == "Review passed."
-    assert result.raw_output["nested"]["message"]["content"] == "Nested review details."
+    assert result.messages[0]["content"] == "评审通过。"
+    assert result.raw_output["messages"][0]["content"] == "评审通过。"
+    assert result.raw_output["nested"]["message"]["content"] == "嵌套评审详情。"
 
 
 @pytest.mark.asyncio
@@ -254,7 +254,7 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
 
         def invoke(self, payload):
             self.payload = payload
-            return {"messages": [{"role": "assistant", "content": "Done."}]}
+            return {"messages": [{"role": "assistant", "content": "已完成。"}]}
 
     agent = SyncAgent()
     runtime = AgentRuntime(
@@ -262,12 +262,12 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
         tool_resolver=FakeResolver(),
         model_factory=lambda model, **_: model,
     )
-    messages = [{"role": "user", "content": "Run the check."}]
+    messages = [{"role": "user", "content": "运行检查。"}]
 
     result = await runtime.run(version=FakeVersion(), messages=messages)
 
     assert agent.payload == {"messages": messages}
-    assert result.messages == [{"role": "assistant", "content": "Done."}]
+    assert result.messages == [{"role": "assistant", "content": "已完成。"}]
 
 
 @pytest.mark.asyncio
@@ -321,7 +321,7 @@ async def test_agent_runtime_stream_extracts_content_block_message_deltas() -> N
 async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
     class NonStreamingAgent:
         async def ainvoke(self, payload):
-            return {"messages": [{"role": "assistant", "content": "done"}]}
+            return {"messages": [{"role": "assistant", "content": "已完成。"}]}
 
     runtime = AgentRuntime(
         create_agent=lambda **_: NonStreamingAgent(),
@@ -339,7 +339,7 @@ async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
             "node": "agent",
             "payload": {
                 "final": True,
-                "messages": [{"role": "assistant", "content": "done"}],
+                "messages": [{"role": "assistant", "content": "已完成。"}],
             },
         }
     ]

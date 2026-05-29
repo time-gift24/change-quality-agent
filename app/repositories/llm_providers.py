@@ -1,11 +1,23 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.llm_providers import LlmProvider
+
+
+class LlmProviderValues(TypedDict):
+    display_name: NotRequired[str]
+    description: NotRequired[str | None]
+    provider_type: NotRequired[str]
+    base_url: NotRequired[str | None]
+    api_key: NotRequired[str | None]
+    default_headers: NotRequired[dict[str, str]]
+    default_query: NotRequired[dict[str, str]]
+    models: NotRequired[list[str]]
+    enabled: NotRequired[bool]
 
 
 class LlmProviderNotFoundError(KeyError):
@@ -16,7 +28,7 @@ class LlmProviderRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create(self, **values: Any) -> LlmProvider:
+    async def create(self, **values: Unpack[LlmProviderValues]) -> LlmProvider:
         provider = LlmProvider(**values)
         self._session.add(provider)
         await self._session.flush()
@@ -42,7 +54,11 @@ class LlmProviderRepository:
             raise LlmProviderNotFoundError(f"LLM provider not found: {provider_id}")
         return provider
 
-    async def update(self, provider_id: UUID, **values: Any) -> LlmProvider:
+    async def update(
+        self,
+        provider_id: UUID,
+        **values: Unpack[LlmProviderValues],
+    ) -> LlmProvider:
         provider = await self.require_by_id(provider_id)
         for field, value in values.items():
             setattr(provider, field, value)

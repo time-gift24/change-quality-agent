@@ -1,12 +1,13 @@
 from time import perf_counter
-from typing import Any
 
 from app.core.agent_runtime import to_jsonable
+from app.core.json_types import JsonObject, JsonValue
+from app.core.llm_model_config import LlmModelParameters, dump_llm_model_parameters
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 from app.schemas.llm_providers import LlmProviderModelTestResponse, REDACTED
 
-TEST_MESSAGES = [{"role": "user", "content": "ping"}]
-TEST_MODEL_CONFIG = {"temperature": 0}
+TEST_MESSAGES = [{"role": "user", "content": "请简短回复：连通性测试通过。"}]
+TEST_MODEL_CONFIG = LlmModelParameters(temperature=0)
 
 
 async def test_provider_model_connectivity(
@@ -16,7 +17,8 @@ async def test_provider_model_connectivity(
     started = perf_counter()
     request_trace = _request_trace(provider, model)
     try:
-        chat_model = create_provider_chat_model(model, provider, **TEST_MODEL_CONFIG)
+        model_config = dump_llm_model_parameters(TEST_MODEL_CONFIG)
+        chat_model = create_provider_chat_model(model, provider, **model_config)
         result = await chat_model.ainvoke(TEST_MESSAGES)
         return LlmProviderModelTestResponse(
             status="ok",
@@ -44,7 +46,7 @@ def _elapsed_ms(started: float) -> float:
     return round((perf_counter() - started) * 1000, 2)
 
 
-def _message_content(value: Any) -> str:
+def _message_content(value: object) -> str:
     content = getattr(value, "content", None)
     if isinstance(content, str):
         return content
@@ -53,7 +55,7 @@ def _message_content(value: Any) -> str:
     return str(value)
 
 
-def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> dict[str, Any]:
+def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> JsonObject:
     return {
         "model": model,
         "provider_type": provider.provider_type,
@@ -62,13 +64,13 @@ def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> dict[str, 
         "default_headers": _sanitize_mapping(provider.default_headers, provider),
         "default_query": _sanitize_mapping(provider.default_query, provider),
         "messages": TEST_MESSAGES,
-        "model_config": TEST_MODEL_CONFIG,
+        "model_config": dump_llm_model_parameters(TEST_MODEL_CONFIG),
     }
 
 
-def _response_trace(value: Any) -> dict[str, Any]:
+def _response_trace(value: object) -> JsonObject:
     raw = to_jsonable(value)
-    response: dict[str, Any] = {
+    response: JsonObject = {
         "content": _message_content(value),
         "raw": raw,
     }
@@ -89,7 +91,7 @@ def _sanitize_mapping(
     }
 
 
-def _sanitize_value(value: Any, provider: LlmProviderRuntimeConfig) -> Any:
+def _sanitize_value(value: JsonValue, provider: LlmProviderRuntimeConfig) -> JsonValue:
     if isinstance(value, str):
         return _sanitize_error(value, provider)
     if isinstance(value, list):

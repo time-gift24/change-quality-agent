@@ -12,7 +12,7 @@ export function AgentCreatePage() {
 
   return (
     <AgentPageLayout
-      description="创建 ReAct Agent 配置草稿，选择模型来源并填写 System Prompt。"
+      description="创建 ReAct Agent 配置草稿，选择模型来源并填写系统提示词。"
       items={[{ label: "Agent 配置", to: "/agents" }, { label: "新增" }]}
       title="新增 Agent"
     >

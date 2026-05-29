@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any
 
 from pydantic import BaseModel
+
+from app.core.json_types import JsonObject
 
 
 class EnvironmentPublic(BaseModel):
@@ -15,4 +16,4 @@ class SopSnapshot(BaseModel):
     env_key: str
     source_version: str | None = None
     updated_at: datetime | None = None
-    payload: dict[str, Any]
+    payload: JsonObject

@@ -1,6 +1,5 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
 from uuid import UUID
 
 from app.core.llm_models import LlmProviderRuntimeConfig
@@ -110,9 +109,9 @@ class AgentService:
             raise AgentNotFoundError(agent_id)
         return agent
 
-    def _draft_update_kwargs(self, request: AgentDraftUpdate) -> dict[str, Any]:
+    def _draft_update_kwargs(self, request: AgentDraftUpdate) -> dict[str, object]:
         fields_set = request.model_fields_set
-        kwargs: dict[str, Any] = {}
+        kwargs: dict[str, object] = {}
         if "display_name" in fields_set and request.display_name is not None:
             kwargs["display_name"] = request.display_name
         if "description" in fields_set:

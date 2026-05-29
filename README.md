@@ -51,6 +51,25 @@ message, and timestamp. Durable transcript content lives in the shared
 
 Use Postgres 13 for local end-to-end SOP quality check debugging.
 
+## Backend Typing
+
+Prefer explicit Pydantic models, `TypedDict`, or small `Protocol` types for
+business structures. Convert those structures to
+`app.core.json_types.JsonValue` or `JsonObject` only at JSON boundaries: JSONB
+columns, external trace payloads, framework stream events, and persisted
+message metadata. For example, agent LLM settings use
+`app.core.llm_model_config.LlmModelParameters` in schemas/runtime code and are
+dumped to JSON only when persisted or passed into LangChain.
+
+Use `object` or a small `Protocol` for opaque framework objects when the code
+only needs a few attributes or methods.
+
+`typing.Any` is reserved for explicit dynamic boundaries: Pydantic
+`model_validator(mode="before")` raw inputs and third-party LangChain/LangGraph
+model hooks whose accepted config or payload shape is provider-specific. Run
+`uv run python scripts/check_any_usage.py` before submitting backend typing
+changes; the script fails if new `Any` usage appears outside the allowlist.
+
 Database and migrations:
 
 ```bash

@@ -152,12 +152,12 @@ def test_create_provider_chat_model_preserves_deepseek_reasoning_content() -> No
 
     payload = model._get_request_payload(
         [
-            HumanMessage(content="review this SOP"),
+            HumanMessage(content="请评审这份 SOP。"),
             AIMessage(
                 content="",
                 additional_kwargs={"reasoning_content": "private reasoning"},
             ),
-            HumanMessage(content="continue"),
+            HumanMessage(content="请继续。"),
         ]
     )
 
@@ -174,12 +174,12 @@ def test_create_chat_model_preserves_codeagent_reasoning_content(
 
     payload = model._get_request_payload(
         [
-            HumanMessage(content="review this SOP"),
+            HumanMessage(content="请评审这份 SOP。"),
             AIMessage(
                 content="",
                 additional_kwargs={"reasoning_content": "private reasoning"},
             ),
-            HumanMessage(content="continue"),
+            HumanMessage(content="请继续。"),
         ]
     )
 

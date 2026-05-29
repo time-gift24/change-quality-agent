@@ -1,12 +1,12 @@
-from typing import Any
+from app.core.json_types import JsonObject
 
 
 def display_state_from_graph_values(
-    values: dict[str, Any],
+    values: JsonObject,
     *,
     latest_sequence: int = 0,
     is_running: bool = False,
-) -> dict[str, Any]:
+) -> JsonObject:
     raw_findings = values.get("findings")
     findings = raw_findings if isinstance(raw_findings, list) else None
     result = values.get("result") if isinstance(values.get("result"), dict) else None
@@ -15,9 +15,9 @@ def display_state_from_graph_values(
         if isinstance(values.get("submission_result"), dict)
         else None
     )
-    nodes: dict[str, Any] = {}
+    nodes: JsonObject = {}
     if values.get("sop_snapshot"):
-        nodes["load_sop"] = {"status": "done", "streamText": "SOP snapshot loaded."}
+        nodes["load_sop"] = {"status": "done", "streamText": "SOP 快照已读取。"}
     if isinstance(values.get("review_output"), str):
         nodes["review_sop"] = {
             "status": "done" if not is_running else "running",
@@ -46,11 +46,11 @@ def display_state_from_graph_values(
 
 
 def display_state_from_session_messages(
-    messages: list[dict[str, Any]],
+    messages: list[JsonObject],
     *,
     latest_sequence: int = 0,
     is_running: bool = False,
-) -> dict[str, Any]:
+) -> JsonObject:
     """Project session messages into the SOP display state grouped by step.
 
     Each session message is expected to carry a `step` key (either at the top
@@ -73,7 +73,7 @@ def display_state_from_session_messages(
         if step not in seen_order:
             seen_order.append(step)
 
-    nodes: dict[str, Any] = {}
+    nodes: JsonObject = {}
     last_seen = seen_order[-1] if seen_order else None
     for step in seen_order:
         chunks = grouped[step]
@@ -91,7 +91,7 @@ def display_state_from_session_messages(
     }
 
 
-def _message_step(message: dict[str, Any]) -> str | None:
+def _message_step(message: JsonObject) -> str | None:
     step = message.get("step")
     if isinstance(step, str):
         return step
@@ -103,12 +103,12 @@ def _message_step(message: dict[str, Any]) -> str | None:
     return None
 
 
-def _findings_text(findings: list[dict[str, Any]]) -> str:
+def _findings_text(findings: list[JsonObject]) -> str:
     if not findings:
-        return "No obvious structural issues found."
-    return "\n".join(f"- {item.get('title', 'Finding')}" for item in findings)
+        return "未发现明显结构性问题。"
+    return "\n".join(f"- {item.get('title', '问题')}" for item in findings)
 
 
-def _submission_text(submission_result: dict[str, Any]) -> str:
+def _submission_text(submission_result: JsonObject) -> str:
     status = submission_result.get("external_status") or submission_result.get("status")
     return f"External submission: {status or 'completed'}."

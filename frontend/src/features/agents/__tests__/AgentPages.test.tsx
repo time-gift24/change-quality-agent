@@ -203,8 +203,8 @@ describe("Agent pages", () => {
     fireEvent.change(screen.getByLabelText("Agent 名称"), {
       target: { value: "Release Reviewer" },
     });
-    fireEvent.change(screen.getByLabelText("System Prompt"), {
-      target: { value: "You are careful." },
+    fireEvent.change(screen.getByLabelText("系统提示词"), {
+      target: { value: "你是谨慎的评审助手。" },
     });
     fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
 
@@ -265,7 +265,7 @@ function buildAgentDetail(overrides: Partial<AgentDetail> = {}): AgentDetail {
       model: "codeagent:deepseek-v4-pro",
       model_config: {},
       provider_id: null,
-      system_prompt: "You are careful.",
+      system_prompt: "你是谨慎的评审助手。",
       tool_allowlist: [],
     },
     ...overrides,

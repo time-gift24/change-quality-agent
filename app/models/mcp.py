@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
@@ -7,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.json_types import JsonObject
 
 
 class McpServer(Base):
@@ -80,7 +80,7 @@ class McpServerTool(Base):
     )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    input_schema: Mapped[dict[str, Any]] = mapped_column(
+    input_schema: Mapped[JsonObject] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,

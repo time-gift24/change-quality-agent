@@ -146,7 +146,7 @@ class FakeGraph:
                 "quality_result": "warn",
                 "summary": "Reviewed by fake graph.",
                 "findings": [],
-                "report_markdown": "## SOP Quality Report",
+                "report_markdown": "## SOP 质量报告",
             },
         }
 
@@ -179,7 +179,7 @@ class RuntimePublishingGraph:
                 "quality_result": "warn",
                 "summary": "Reviewed by fake graph.",
                 "findings": [],
-                "report_markdown": "## SOP Quality Report",
+                "report_markdown": "## SOP 质量报告",
             },
         }
 

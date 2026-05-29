@@ -100,7 +100,7 @@ describe("sop quality check reducer", () => {
           session_id: 1,
           sequence: 1,
           role: "assistant",
-          content: "loaded sop content",
+          content: "已读取 SOP 内容",
           additional_kwargs: { step: "load_sop", kind: "step_message" },
           created_at: "",
         },
@@ -119,7 +119,7 @@ describe("sop quality check reducer", () => {
 
       expect(result.nodes.load_sop).toMatchObject({
         status: "done",
-        streamText: "loaded sop content",
+        streamText: "已读取 SOP 内容",
       });
       expect(result.nodes.review_sop).toMatchObject({
         status: "done",
@@ -136,7 +136,7 @@ describe("sop quality check reducer", () => {
           session_id: 1,
           sequence: 1,
           role: "assistant",
-          content: "loaded",
+          content: "已读取",
           additional_kwargs: { step: "load_sop" },
           created_at: "",
         },
@@ -165,7 +165,7 @@ describe("sop quality check reducer", () => {
           session_id: 1,
           sequence: 1,
           role: "assistant",
-          content: "loaded",
+          content: "已读取",
           additional_kwargs: { step: "load_sop" },
           created_at: "",
         },

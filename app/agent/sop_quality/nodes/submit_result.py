@@ -1,14 +1,14 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
 
 from app.agent.sop_quality.state import SopQualityState
 from app.core.agent_streaming import SessionMessageWriter
+from app.core.json_types import JsonObject, JsonValue
 
-SubmitQualityResult = Callable[[dict[str, Any]], Any]
+SubmitQualityResult = Callable[[JsonObject], object]
 
 
-async def mock_submit_quality_result(payload: dict[str, Any]) -> dict[str, Any]:
+async def mock_submit_quality_result(payload: JsonObject) -> JsonObject:
     return {
         "external_status": "mock_submitted",
         "check_id": payload.get("check_id"),
@@ -56,14 +56,14 @@ def make_submit_result(
     return submit_result
 
 
-def _submission_text(submission_result: Any) -> str:
+def _submission_text(submission_result: object) -> str:
     if isinstance(submission_result, dict):
         status = submission_result.get("external_status") or submission_result.get("status")
         return f"External submission: {status or 'completed'}."
     return "External submission completed."
 
 
-def _json_safe(value: Any) -> Any:
+def _json_safe(value: object) -> JsonValue:
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, list | tuple):

@@ -33,9 +33,9 @@ class MockSopClient:
                 "title": f"Mock SOP {sop_id}",
                 "env": env_key,
                 "steps": [
-                    {"id": "prepare", "title": "Prepare change"},
-                    {"id": "review", "title": "Review change"},
-                    {"id": "execute", "title": "Execute change"},
+                    {"id": "prepare", "title": "准备变更"},
+                    {"id": "review", "title": "评审变更"},
+                    {"id": "execute", "title": "执行变更"},
                 ],
             },
         )

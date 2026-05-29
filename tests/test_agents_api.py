@@ -33,7 +33,7 @@ class FakeVersion:
         self.id = uuid4()
         self.agent_id = agent_id
         self.version_number = version_number
-        self.system_prompt = "You are careful."
+        self.system_prompt = "你是谨慎的评审助手。"
         self.model = "openai:gpt-5-mini"
         self.provider_id = None
         self.model_config = {"temperature": 0}
@@ -165,7 +165,7 @@ def clear_overrides():
 
 def draft_payload() -> dict[str, object]:
     return {
-        "system_prompt": "You are careful.",
+        "system_prompt": "你是谨慎的评审助手。",
         "model": "openai:gpt-5-mini",
         "provider_id": None,
         "model_config": {"temperature": 0},
@@ -295,7 +295,7 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
         "enabled": False,
         "draft": {
             **draft_payload(),
-            "system_prompt": "Review only risky changes.",
+            "system_prompt": "只评审高风险变更。",
             "model_config": {"temperature": 0.2},
         },
     }
@@ -310,7 +310,7 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
     body = response.json()
     assert body["description"] is None
     assert body["enabled"] is False
-    assert body["draft"]["system_prompt"] == "Review only risky changes."
+    assert body["draft"]["system_prompt"] == "只评审高风险变更。"
     assert body["draft"]["model_config"] == {"temperature": 0.2}
     assert repository.updated_id == agent.id
     assert repository.updated_kwargs is not None

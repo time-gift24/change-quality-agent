@@ -38,7 +38,7 @@ describe("agent API", () => {
         model: "codeagent:deepseek-v4-pro",
         model_config: {},
         provider_id: null,
-        system_prompt: "You are careful.",
+        system_prompt: "你是谨慎的评审助手。",
         tool_allowlist: [],
       },
     };
@@ -67,7 +67,7 @@ describe("agent API", () => {
         model: "gpt-5-mini",
         model_config: {},
         provider_id: "provider-1",
-        system_prompt: "You are careful.",
+        system_prompt: "你是谨慎的评审助手。",
         tool_allowlist: [],
       },
     };
@@ -106,7 +106,7 @@ function buildAgent(): AgentDetail {
       model: "codeagent:deepseek-v4-pro",
       model_config: {},
       provider_id: null,
-      system_prompt: "You are careful.",
+      system_prompt: "你是谨慎的评审助手。",
       tool_allowlist: [],
     },
     enabled: true,

@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.sessions import Message, Session
+from app.core.json_types import JsonObject
 
 
 class SessionRepository:
@@ -58,7 +58,7 @@ class SessionRepository:
         *,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
+        additional_kwargs: JsonObject | None = None,
     ) -> Message:
         sequence = await self._next_sequence(session_id)
         message = Message(

@@ -1,7 +1,6 @@
 import os
 from datetime import UTC, datetime
 from inspect import signature
-from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -11,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import app.models.agents  # noqa: F401
 from app.core.database import Base
+from app.core.llm_model_config import LlmModelParameters
 from app.schemas.agents import AgentDraftConfig
 
 requires_test_database = pytest.mark.skipif(
@@ -33,7 +33,7 @@ async def session():
     await engine.dispose()
 
 
-def repository_types() -> Any:
+def repository_types() -> object:
     try:
         from app.repositories import agents
     except ModuleNotFoundError as exc:
@@ -64,9 +64,19 @@ def test_update_draft_uses_public_sentinel_for_optional_fields() -> None:
 def test_dump_draft_config_uses_external_model_config_key() -> None:
     agents = repository_types()
 
-    payload = agents.dump_draft_config(draft_config(temperature=0.1))
+    payload = agents.dump_draft_config(
+        draft_config(
+            model_parameters=LlmModelParameters(
+                temperature=0.1,
+                reasoning_effort="high",
+            ),
+        ),
+    )
 
-    assert payload["model_config"] == {"temperature": 0.1}
+    assert payload["model_config"] == {
+        "temperature": 0.1,
+        "reasoning_effort": "high",
+    }
     assert "model_parameters" not in payload
 
 
@@ -97,16 +107,17 @@ def test_dump_draft_config_preserves_provider_id() -> None:
 
 def draft_config(
     *,
-    system_prompt: str = "You are careful.",
+    system_prompt: str = "你是谨慎的评审助手。",
     model: str = "openai:gpt-5-mini",
     provider_id=None,
     temperature: float = 0,
+    model_parameters: LlmModelParameters | None = None,
 ) -> AgentDraftConfig:
     return AgentDraftConfig(
         system_prompt=system_prompt,
         model=model,
         provider_id=provider_id,
-        model_config={"temperature": temperature},
+        model_config=model_parameters or {"temperature": temperature},
         tool_allowlist=["search_sop"],
         mcp_server_ids=["change-docs"],
     )
@@ -296,7 +307,7 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     await repository.update_draft(
         agent.id,
         draft=draft_config(
-            system_prompt="You are more concise.",
+            system_prompt="请更简洁地评审。",
             temperature=0.2,
         ),
     )
@@ -306,7 +317,7 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     assert first.model_config == {"temperature": 0}
     assert first.published_by == "publisher@example.com"
     assert second.version_number == 2
-    assert second.system_prompt == "You are more concise."
+    assert second.system_prompt == "请更简洁地评审。"
     assert second.model_config == {"temperature": 0.2}
 
     versions = await repository.list_versions(agent.id)

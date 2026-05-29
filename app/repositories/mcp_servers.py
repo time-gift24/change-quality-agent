@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import NotRequired, TypedDict, Unpack
 from uuid import UUID
 
 from sqlalchemy import delete, func, select
@@ -7,13 +7,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.mcp import McpServer, McpServerTool
+from app.core.json_types import JsonObject
+
+
+class McpServerValues(TypedDict):
+    name: NotRequired[str]
+    transport: NotRequired[str]
+    command: NotRequired[str | None]
+    args: NotRequired[list[str]]
+    env: NotRequired[dict[str, str]]
+    url: NotRequired[str | None]
+    headers: NotRequired[dict[str, str]]
+    enabled: NotRequired[bool]
+    desired_state: NotRequired[str]
 
 
 class McpServerRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def create_server(self, **values: Any) -> McpServer:
+    async def create_server(self, **values: Unpack[McpServerValues]) -> McpServer:
         server = McpServer(**values)
         self._session.add(server)
         await self._session.flush()
@@ -59,7 +72,11 @@ class McpServerRepository:
             raise KeyError(server_id)
         return server
 
-    async def update_server(self, server_id: UUID, **values: Any) -> McpServer:
+    async def update_server(
+        self,
+        server_id: UUID,
+        **values: Unpack[McpServerValues],
+    ) -> McpServer:
         server = await self.require_server(server_id)
         for key, value in values.items():
             setattr(server, key, value)
@@ -97,7 +114,7 @@ class McpServerRepository:
     async def replace_tools(
         self,
         server_id: UUID,
-        tools: list[dict[str, Any]],
+        tools: list[JsonObject],
     ) -> list[McpServerTool]:
         await self._session.execute(
             delete(McpServerTool).where(McpServerTool.server_id == server_id)
@@ -106,9 +123,9 @@ class McpServerRepository:
         tool_models = [
             McpServerTool(
                 server_id=server_id,
-                name=tool["name"],
-                description=tool.get("description"),
-                input_schema=tool.get("input_schema") or {},
+                name=_tool_name(tool),
+                description=_tool_description(tool),
+                input_schema=_tool_input_schema(tool),
                 discovered_at=discovered_at,
             )
             for tool in tools
@@ -125,3 +142,20 @@ class McpServerRepository:
 
     async def commit(self) -> None:
         await self._session.commit()
+
+
+def _tool_name(tool: JsonObject) -> str:
+    name = tool.get("name")
+    if not isinstance(name, str):
+        raise ValueError("MCP tool is missing a valid name.")
+    return name
+
+
+def _tool_description(tool: JsonObject) -> str | None:
+    description = tool.get("description")
+    return description if isinstance(description, str) else None
+
+
+def _tool_input_schema(tool: JsonObject) -> JsonObject:
+    input_schema = tool.get("input_schema")
+    return input_schema if isinstance(input_schema, dict) else {}

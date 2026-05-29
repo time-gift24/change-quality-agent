@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Protocol
 
 from langgraph.graph import END, StateGraph
 
@@ -6,12 +6,23 @@ from app.agent.sop_quality.nodes.load_sop import make_load_sop
 from app.agent.sop_quality.nodes.review_sop import make_review_sop
 from app.agent.sop_quality.nodes.summarize_result import make_summarize_result
 from app.agent.sop_quality.nodes.submit_result import (
+    SubmitQualityResult,
     make_submit_result,
     mock_submit_quality_result,
 )
 from app.agent.sop_quality.state import SopQualityState
-from app.core.agent_streaming import DeepAgentStreamRunner
-from app.services.sop_client import MockSopClient
+from app.core.agent_streaming import (
+    DeepAgentStreamRunner,
+    LiveEventPublisher,
+    SessionMessageWriter,
+)
+from app.core.json_types import JsonObject
+from app.services.sop_client import MockSopClient, SopClient
+
+
+class AgentFactoryLike(Protocol):
+    async def create_deepagents(self, **kwargs: object) -> object:
+        ...
 
 
 class _NoopMessageWriter:
@@ -21,8 +32,8 @@ class _NoopMessageWriter:
         step: str,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
+        additional_kwargs: JsonObject | None = None,
+    ) -> object:
         class _Msg:
             sequence = 0
 
@@ -30,14 +41,14 @@ class _NoopMessageWriter:
 
 
 def build_sop_quality_graph(
-    checkpointer: Any | None = None,
+    checkpointer: object | None = None,
     *,
-    sop_client: Any | None = None,
-    agent_factory: Any,
-    submit_quality_result=mock_submit_quality_result,
-    message_writer: Any | None = None,
-    deepagent_stream_runner: Any | None = None,
-    live_event_publisher: Any | None = None,
+    sop_client: SopClient | None = None,
+    agent_factory: AgentFactoryLike,
+    submit_quality_result: SubmitQualityResult = mock_submit_quality_result,
+    message_writer: SessionMessageWriter | None = None,
+    deepagent_stream_runner: DeepAgentStreamRunner | None = None,
+    live_event_publisher: LiveEventPublisher | None = None,
 ):
     writer = message_writer or _NoopMessageWriter()
     runner = deepagent_stream_runner or DeepAgentStreamRunner(

@@ -1,1 +1,1 @@
-"""SOP quality prompt builders."""
+"""SOP 质量检查提示词构造器。"""

@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, Text, func, text
@@ -7,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.core.json_types import JsonObject
 
 
 class SopQualityCheck(Base):
@@ -48,9 +48,9 @@ class SopQualityCheck(Base):
     current_checkpoint_id: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     quality_result: Mapped[str | None] = mapped_column(Text)
-    sop_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    error: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    sop_snapshot: Mapped[JsonObject] = mapped_column(JSONB, nullable=False)
+    result: Mapped[JsonObject | None] = mapped_column(JSONB)
+    error: Mapped[JsonObject | None] = mapped_column(JSONB)
     created_by: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

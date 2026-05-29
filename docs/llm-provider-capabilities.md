@@ -102,7 +102,7 @@ API 能力：
 2. 校验请求的 model 必须在 provider 的 `models` 列表中。
 3. 用 provider 配置构造 `LlmProviderRuntimeConfig`。
 4. 调用 `create_provider_chat_model(model, provider, temperature=0)`。
-5. 发送固定测试消息 `[{ "role": "user", "content": "ping" }]`。
+5. 发送固定中文测试消息 `[{ "role": "user", "content": "请简短回复：连通性测试通过。" }]`。
 6. 返回成功或失败结果。
 
 测试响应：
@@ -132,7 +132,7 @@ Agent draft 和 Agent version 都可以配置模型来源。
 
 ```json
 {
-  "system_prompt": "You are a careful reviewer.",
+  "system_prompt": "你是谨慎的变更质量评审助手。请指出风险、缺口和可执行的整改建议。",
   "model": "codeagent:deepseek-v4-pro",
   "provider_id": null,
   "model_config": {
@@ -151,7 +151,7 @@ Agent draft 和 Agent version 都可以配置模型来源。
 
 ```json
 {
-  "system_prompt": "You are a careful reviewer.",
+  "system_prompt": "你是谨慎的变更质量评审助手。请指出风险、缺口和可执行的整改建议。",
   "model": "gpt-5-mini",
   "provider_id": "00000000-0000-0000-0000-000000000000",
   "model_config": {
@@ -244,7 +244,7 @@ LLM Provider 组件：
 
 ## 当前边界
 
-- Provider 连通性测试目前只发送固定 `ping` 消息，不支持用户自定义测试 prompt。
+- Provider 连通性测试目前只发送固定中文测试消息，不支持用户自定义测试提示词。
 - `request` / `response` trace 是自由 JSON，适合诊断展示；如果后续要长期稳定对外，应升级为强类型 Pydantic schema。
 - Provider API key 仍是数据库明文字段；HTTP 响应会脱敏，但尚未实现存储层加密。
 - CodeAgent token provider 已支持每次请求刷新 header，但真正 token 刷新策略取决于 provider 实现。

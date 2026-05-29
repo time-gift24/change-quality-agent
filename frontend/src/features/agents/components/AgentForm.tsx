@@ -37,6 +37,8 @@ type AgentFormProps = {
 };
 
 const DEFAULT_CODEAGENT_MODEL = CODEAGENT_MODEL_OPTIONS[0];
+const DEFAULT_SYSTEM_PROMPT =
+  "你是谨慎的变更质量评审助手。请基于事实审查输入内容，指出风险、缺口和可执行的整改建议。";
 
 type FieldErrorKey = "display_name" | "system_prompt";
 
@@ -56,7 +58,7 @@ export function AgentForm({
   );
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [modelSource, setModelSource] = useState<ModelSource>("codeagent");
   const [codeAgentModel, setCodeAgentModel] = useState<string>(
     DEFAULT_CODEAGENT_MODEL,
@@ -103,7 +105,7 @@ export function AgentForm({
 
     setDisplayName("");
     setDescription("");
-    setSystemPrompt("");
+    setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
     setEnabled(true);
     setModelSource("codeagent");
     setCodeAgentModel(DEFAULT_CODEAGENT_MODEL);
@@ -178,7 +180,7 @@ export function AgentForm({
     }
 
     if (!systemPrompt.trim()) {
-      const message = "System Prompt 必填。";
+      const message = "系统提示词必填。";
       setError(message);
       setErrorField("system_prompt");
       setSystemPromptView("edit");
@@ -421,7 +423,7 @@ export function AgentForm({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               <label className="text-sm font-medium text-ink" htmlFor={systemPromptId}>
-                System Prompt
+                系统提示词
               </label>
               <span aria-hidden="true" className="text-error-deep">
                 *
@@ -456,13 +458,13 @@ export function AgentForm({
             />
           ) : (
             <div
-              aria-label="System Prompt 预览"
+              aria-label="系统提示词预览"
               className="min-h-[320px] overflow-auto rounded-xl border border-dashed border-hairline bg-canvas-soft/60 px-3 py-2.5"
             >
               {systemPrompt.trim() ? (
                 <StreamMarkdown>{systemPrompt}</StreamMarkdown>
               ) : (
-                <p className="text-xs text-mute">尚未填写 System Prompt，预览为空。</p>
+                <p className="text-xs text-mute">尚未填写系统提示词，预览为空。</p>
               )}
             </div>
           )}

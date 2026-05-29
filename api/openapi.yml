@@ -1611,6 +1611,37 @@ components:
           type: object
           additionalProperties: true
           nullable: true
+    LlmModelParameters:
+      type: object
+      additionalProperties: true
+      description: Common LLM invocation parameters. Provider-specific extensions
+        are allowed and are persisted as JSON at repository boundaries.
+      properties:
+        temperature:
+          type: number
+          minimum: 0
+          nullable: true
+        top_p:
+          type: number
+          minimum: 0
+          maximum: 1
+          nullable: true
+        max_tokens:
+          type: integer
+          minimum: 1
+          nullable: true
+        timeout:
+          type: number
+          exclusiveMinimum: 0
+          nullable: true
+        reasoning_effort:
+          type: string
+          minLength: 1
+          nullable: true
+        model_kwargs:
+          type: object
+          additionalProperties: true
+          nullable: true
     AgentDraftConfig:
       type: object
       required:
@@ -1630,8 +1661,7 @@ components:
           description: Stored provider id. When set, model must be a bare model name
             without a provider prefix.
         model_config:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/LlmModelParameters'
         tool_allowlist:
           type: array
           items:
@@ -1800,8 +1830,7 @@ components:
         system_prompt:
           type: string
         model_config:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/LlmModelParameters'
         tool_allowlist:
           type: array
           items:
@@ -1826,7 +1855,7 @@ components:
         content:
           type: string
           minLength: 1
-          example: Can this deploy?
+          example: 这次变更可以发布吗？
     SopQualityCheckStatus:
       type: string
       enum:

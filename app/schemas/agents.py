@@ -1,18 +1,33 @@
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    model_validator,
+)
+
+from app.core.llm_model_config import (
+    LlmModelParameters,
+    dump_llm_model_parameters,
+)
 
 
 class AgentDraftConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+    model_config = ConfigDict(
+        populate_by_name=True,
+        serialize_by_alias=True,
+        json_schema_mode_override="validation",
+    )
 
     system_prompt: str = Field(min_length=1)
     model: str = Field(min_length=1)
     provider_id: UUID | None = None
-    model_parameters: dict[str, Any] = Field(
-        default_factory=dict,
+    model_parameters: LlmModelParameters = Field(
+        default_factory=LlmModelParameters,
         validation_alias=AliasChoices("model_config", "model_parameters"),
         serialization_alias="model_config",
     )
@@ -24,6 +39,13 @@ class AgentDraftConfig(BaseModel):
         if self.provider_id is not None and ":" in self.model:
             raise ValueError("provider_id requires bare model name")
         return self
+
+    @field_serializer("model_parameters")
+    def serialize_model_parameters(
+        self,
+        value: LlmModelParameters,
+    ) -> dict[str, object]:
+        return dump_llm_model_parameters(value)
 
 
 class AgentCreate(BaseModel):
@@ -71,15 +93,23 @@ class AgentVersionDetail(AgentVersionSummary):
         from_attributes=True,
         populate_by_name=True,
         serialize_by_alias=True,
+        json_schema_mode_override="validation",
     )
 
     agent_id: UUID
     system_prompt: str
-    model_parameters: dict[str, Any] = Field(
-        default_factory=dict,
+    model_parameters: LlmModelParameters = Field(
+        default_factory=LlmModelParameters,
         validation_alias=AliasChoices("model_config", "model_parameters"),
         serialization_alias="model_config",
     )
     tool_allowlist: list[str] = Field(default_factory=list)
     mcp_server_ids: list[str] = Field(default_factory=list)
     published_by: str | None = None
+
+    @field_serializer("model_parameters")
+    def serialize_model_parameters(
+        self,
+        value: LlmModelParameters,
+    ) -> dict[str, object]:
+        return dump_llm_model_parameters(value)

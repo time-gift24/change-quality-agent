@@ -1,11 +1,16 @@
+from collections.abc import Callable, Sequence
+from typing import get_args, get_origin, get_type_hints
 from uuid import uuid4
 
 import pytest
+from langchain_core.tools import BaseTool
 
 from app.agent.manager.agent_factory import (
     AgentFactory,
+    AgentTool,
     LlmProviderAgentConfigurationError,
 )
+from app.core.json_types import JsonObject
 from app.core.llm_models import LlmProviderRuntimeConfig
 
 
@@ -32,6 +37,20 @@ class FakeRepository:
 
     async def list(self) -> list[FakeProvider]:
         return self.providers
+
+
+def test_agent_factory_tools_annotation_uses_langchain_tool_interface() -> None:
+    agent_tool_args = get_args(AgentTool)
+    assert BaseTool in agent_tool_args
+    assert JsonObject in agent_tool_args
+    assert any(get_origin(arg) is Callable for arg in agent_tool_args)
+
+    for factory_method in (AgentFactory.create_agent, AgentFactory.create_deepagents):
+        hints = get_type_hints(factory_method)
+        tools_hint = hints["tools"]
+        tools_args = get_args(tools_hint)
+        sequence_hint = next(arg for arg in tools_args if get_origin(arg) is Sequence)
+        assert get_args(sequence_hint) == (AgentTool,)
 
 
 @pytest.mark.asyncio
@@ -65,7 +84,7 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
     )
 
     agent = await factory.create_agent(
-        system_prompt="Review the SOP carefully.",
+        system_prompt="请仔细评审 SOP。",
         tools=tools,
         model_config={"temperature": 0},
     )
@@ -86,7 +105,7 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
         {
             "model": configured_model,
             "tools": tools,
-            "system_prompt": "Review the SOP carefully.",
+            "system_prompt": "请仔细评审 SOP。",
         }
     ]
 
@@ -144,19 +163,19 @@ async def test_agent_factory_create_deepagents_returns_fresh_agent_each_call() -
     )
 
     first = await factory.create_deepagents(
-        system_prompt="Review one.",
+        system_prompt="请评审第一份内容。",
         model_config={"temperature": 0},
     )
     second = await factory.create_deepagents(
-        system_prompt="Review two.",
+        system_prompt="请评审第二份内容。",
         model_config={"temperature": 0},
     )
 
     assert first is created_agents[0]
     assert second is created_agents[1]
     assert len(create_deep_agent_calls) == 2
-    assert create_deep_agent_calls[0]["system_prompt"] == "Review one."
-    assert create_deep_agent_calls[1]["system_prompt"] == "Review two."
+    assert create_deep_agent_calls[0]["system_prompt"] == "请评审第一份内容。"
+    assert create_deep_agent_calls[1]["system_prompt"] == "请评审第二份内容。"
 
 
 @pytest.mark.asyncio

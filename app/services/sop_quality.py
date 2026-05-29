@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from app.agent.sop_quality.display import (
@@ -10,6 +10,7 @@ from app.agent.sop_quality.display import (
     display_state_from_session_messages,
 )
 from app.core.config import Settings
+from app.core.json_types import JsonObject
 from app.repositories.sop_quality_checks import (
     ActiveSopQualityCheckExistsError,
     SopQualityCheckRepository,
@@ -97,7 +98,7 @@ class SopQualityService:
             )
 
         runtime_session = await self._session_repository.create_session(
-            title=f"SOP quality check: {sop_id}",
+            title=f"SOP 质量检查：{sop_id}",
         )
 
         try:
@@ -321,7 +322,7 @@ def message_to_event(message, check_id: UUID) -> dict[str, object]:
     }
 
 
-def message_to_display_dict(message) -> dict[str, object]:
+def message_to_display_dict(message) -> JsonObject:
     return {
         "step": step_from_message(message),
         "role": getattr(message, "role", None),
@@ -339,8 +340,8 @@ def step_from_message(message) -> str | None:
     return None
 
 
-def graph_values_from_check(check) -> dict[str, object]:
-    values: dict[str, object] = {"sop_snapshot": getattr(check, "sop_snapshot", {})}
+def graph_values_from_check(check) -> JsonObject:
+    values: JsonObject = {"sop_snapshot": getattr(check, "sop_snapshot", {})}
     if isinstance(check.result, dict):
         values["result"] = check.result
         if isinstance(check.result.get("findings"), list):

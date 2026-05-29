@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Sequence
-from typing import Any
+
+from app.core.json_types import JsonObject, JsonValue
 
 SUPPORTED_EVENT_TYPES = {
     "tasks",
@@ -37,7 +38,7 @@ def normalize_langgraph_chunk(
     }
 
 
-def runtime_stream_event(chunk_type: str, chunk: object) -> dict[str, Any]:
+def runtime_stream_event(chunk_type: str, chunk: object) -> JsonObject:
     event = normalize_langgraph_chunk(
         chunk_type=chunk_type,
         chunk=chunk,
@@ -64,7 +65,7 @@ def _build_payload(
     event_type: str,
     chunk: object,
     node: str | None,
-) -> dict[str, Any]:
+) -> JsonObject:
     if event_type == "updates" and node and isinstance(chunk, Mapping):
         return {"node": node, "update": _json_safe(chunk[node]), "raw": _json_safe(chunk)}
     if event_type == "error":
@@ -145,7 +146,7 @@ def _string_or_none(value: object) -> str | None:
     return value if isinstance(value, str) else None
 
 
-def _json_safe(value: object) -> Any:
+def _json_safe(value: object) -> JsonValue:
     if isinstance(value, Mapping):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, Sequence) and not isinstance(value, str | bytes):

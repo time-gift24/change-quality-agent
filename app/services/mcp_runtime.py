@@ -1,10 +1,10 @@
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from dataclasses import dataclass
 import logging
 import re
-from typing import Any, Protocol
+from typing import Protocol, cast
 from uuid import UUID
 
 from mcp import ClientSession, StdioServerParameters
@@ -16,6 +16,7 @@ from app.schemas.mcp import (
     McpLifecycleResponse,
     McpServerRuntimeStatus,
 )
+from app.core.json_types import JsonObject
 
 logger = logging.getLogger(__name__)
 
@@ -53,29 +54,48 @@ class McpRuntimeHandle:
 @dataclass
 class TransportMcpRuntimeHandle:
     transport: str
-    handle: Any
+    handle: object
 
 
 @dataclass
 class TaskOwnedMcpRuntimeHandle:
     task: asyncio.Task[None]
-    commands: asyncio.Queue[Any]
+    commands: asyncio.Queue["_TaskOwnedMcpCommand"]
 
 
 @dataclass
 class _TaskOwnedMcpCommand:
     name: str
-    future: asyncio.Future[Any]
+    future: asyncio.Future[object]
+
+
+class McpServerLike(Protocol):
+    id: UUID
+    name: str
+    transport: str
+    command: str | None
+    args: list[str]
+    env: dict[str, str]
+    url: str | None
+    headers: dict[str, str]
+    desired_state: str
+    runtime_status: str
+    last_checked_at: object
+    last_error: str | None
 
 
 class McpRepository(Protocol):
-    async def require_server(self, server_id: UUID) -> Any:
+    async def require_server(self, server_id: UUID) -> McpServerLike:
         ...
 
-    async def list_startup_servers(self) -> list[Any]:
+    async def list_startup_servers(self) -> list[McpServerLike]:
         ...
 
-    async def update_desired_state(self, server_id: UUID, desired_state: str) -> Any:
+    async def update_desired_state(
+        self,
+        server_id: UUID,
+        desired_state: str,
+    ) -> McpServerLike:
         ...
 
     async def update_runtime_status(
@@ -85,14 +105,14 @@ class McpRepository(Protocol):
         runtime_status: str,
         last_error: str | None = None,
         checked: bool = False,
-    ) -> Any:
+    ) -> McpServerLike:
         ...
 
     async def replace_tools(
         self,
         server_id: UUID,
-        tools: list[dict[str, Any]],
-    ) -> Any:
+        tools: list[JsonObject],
+    ) -> object:
         ...
 
     async def tool_count(self, server_id: UUID) -> int:
@@ -103,13 +123,13 @@ class McpRepository(Protocol):
 
 
 class McpProbe(Protocol):
-    async def start(self, server: Any) -> tuple[Any, list[dict[str, Any]]]:
+    async def start(self, server: McpServerLike) -> tuple[object, list[JsonObject]]:
         ...
 
-    async def list_tools(self, handle: Any) -> list[dict[str, Any]]:
+    async def list_tools(self, handle: object) -> list[JsonObject]:
         ...
 
-    async def stop(self, handle: Any) -> None:
+    async def stop(self, handle: object) -> None:
         ...
 
 
@@ -124,8 +144,8 @@ class StdioMcpProbe:
 
     async def start(
         self,
-        server: Any,
-    ) -> tuple[McpRuntimeHandle, list[dict[str, Any]]]:
+        server: McpServerLike,
+    ) -> tuple[McpRuntimeHandle, list[JsonObject]]:
         if server.command not in self._allowed_commands:
             raise McpCommandNotAllowedError(server.command or "")
         stdio_spec = self._stdio_spec(server)
@@ -152,13 +172,13 @@ class StdioMcpProbe:
             await _close_failed_startup_stack(exit_stack)
             raise
 
-    async def list_tools(self, handle: McpRuntimeHandle) -> list[dict[str, Any]]:
+    async def list_tools(self, handle: McpRuntimeHandle) -> list[JsonObject]:
         return await _list_session_tools(handle)
 
     async def stop(self, handle: McpRuntimeHandle) -> None:
         await handle.exit_stack.aclose()
 
-    def _stdio_spec(self, server: Any) -> str:
+    def _stdio_spec(self, server: McpServerLike) -> str:
         first_arg = server.args[0] if server.args else ""
         return f"{server.command}:{first_arg}"
 
@@ -166,8 +186,8 @@ class StdioMcpProbe:
 class StreamableHttpMcpProbe:
     async def start(
         self,
-        server: Any,
-    ) -> tuple[McpRuntimeHandle, list[dict[str, Any]]]:
+        server: McpServerLike,
+    ) -> tuple[McpRuntimeHandle, list[JsonObject]]:
         exit_stack = AsyncExitStack()
         try:
             read_stream, write_stream, _get_session_id = await exit_stack.enter_async_context(
@@ -183,7 +203,7 @@ class StreamableHttpMcpProbe:
             await _close_failed_startup_stack(exit_stack)
             raise
 
-    async def list_tools(self, handle: McpRuntimeHandle) -> list[dict[str, Any]]:
+    async def list_tools(self, handle: McpRuntimeHandle) -> list[JsonObject]:
         return await _list_session_tools(handle)
 
     async def stop(self, handle: McpRuntimeHandle) -> None:
@@ -202,13 +222,13 @@ class TransportMcpProbe:
 
     async def start(
         self,
-        server: Any,
-    ) -> tuple[TransportMcpRuntimeHandle, list[dict[str, Any]]]:
+        server: McpServerLike,
+    ) -> tuple[TransportMcpRuntimeHandle, list[JsonObject]]:
         probe = self._probe_for_transport(server.transport)
         handle, tools = await probe.start(server)
         return TransportMcpRuntimeHandle(transport=server.transport, handle=handle), tools
 
-    async def list_tools(self, handle: TransportMcpRuntimeHandle) -> list[dict[str, Any]]:
+    async def list_tools(self, handle: TransportMcpRuntimeHandle) -> list[JsonObject]:
         return await self._probe_for_transport(handle.transport).list_tools(handle.handle)
 
     async def stop(self, handle: TransportMcpRuntimeHandle) -> None:
@@ -228,11 +248,11 @@ class TaskOwnedMcpProbe:
 
     async def start(
         self,
-        server: Any,
-    ) -> tuple[TaskOwnedMcpRuntimeHandle, list[dict[str, Any]]]:
+        server: McpServerLike,
+    ) -> tuple[TaskOwnedMcpRuntimeHandle, list[JsonObject]]:
         loop = asyncio.get_running_loop()
-        started: asyncio.Future[list[dict[str, Any]]] = loop.create_future()
-        commands: asyncio.Queue[Any] = asyncio.Queue()
+        started: asyncio.Future[list[JsonObject]] = loop.create_future()
+        commands: asyncio.Queue[_TaskOwnedMcpCommand] = asyncio.Queue()
         task = asyncio.create_task(self._run(server, started, commands))
         handle = TaskOwnedMcpRuntimeHandle(task=task, commands=commands)
 
@@ -248,8 +268,8 @@ class TaskOwnedMcpProbe:
     async def list_tools(
         self,
         handle: TaskOwnedMcpRuntimeHandle,
-    ) -> list[dict[str, Any]]:
-        return await self._send(handle, "list_tools")
+    ) -> list[JsonObject]:
+        return cast(list[JsonObject], await self._send(handle, "list_tools"))
 
     async def stop(self, handle: TaskOwnedMcpRuntimeHandle) -> None:
         try:
@@ -261,9 +281,9 @@ class TaskOwnedMcpProbe:
 
     async def _run(
         self,
-        server: Any,
-        started: asyncio.Future[list[dict[str, Any]]],
-        commands: asyncio.Queue[Any],
+        server: McpServerLike,
+        started: asyncio.Future[list[JsonObject]],
+        commands: asyncio.Queue[_TaskOwnedMcpCommand],
     ) -> None:
         inner_handle = None
         try:
@@ -299,24 +319,24 @@ class TaskOwnedMcpProbe:
             _set_future_exception(started, exc)
             raise
 
-    async def _send(self, handle: TaskOwnedMcpRuntimeHandle, name: str) -> Any:
+    async def _send(self, handle: TaskOwnedMcpRuntimeHandle, name: str) -> object:
         if handle.task.done():
             await handle.task
             raise RuntimeError("MCP runtime worker is not running.")
 
         loop = asyncio.get_running_loop()
-        future: asyncio.Future[Any] = loop.create_future()
+        future: asyncio.Future[object] = loop.create_future()
         await handle.commands.put(_TaskOwnedMcpCommand(name=name, future=future))
         return await future
 
 
-async def _list_session_tools(handle: McpRuntimeHandle) -> list[dict[str, Any]]:
+async def _list_session_tools(handle: McpRuntimeHandle) -> list[JsonObject]:
     tools_result = await handle.session.list_tools()
     return [
         {
             "name": tool.name,
             "description": tool.description,
-            "input_schema": tool.inputSchema or {},
+            "input_schema": cast(JsonObject, tool.inputSchema or {}),
         }
         for tool in tools_result.tools
     ]
@@ -336,7 +356,7 @@ class McpRuntimeManager:
     def __init__(
         self,
         *,
-        repository_factory: Callable[[], Any],
+        repository_factory: Callable[[], object],
         probe: McpProbe | None = None,
         operation_timeout_seconds: float | None = 10.0,
         single_instance_confirmed: bool = True,
@@ -345,7 +365,7 @@ class McpRuntimeManager:
         self._probe = _task_owned_probe(probe or TransportMcpProbe())
         self._operation_timeout_seconds = operation_timeout_seconds
         self._single_instance_confirmed = single_instance_confirmed
-        self._handles: dict[UUID, Any] = {}
+        self._handles: dict[UUID, object] = {}
         self._locks: dict[UUID, asyncio.Lock] = {}
 
     async def start(self, server_id: UUID) -> McpLifecycleResponse:
@@ -578,7 +598,7 @@ class McpRuntimeManager:
             tool_count=await repository.tool_count(server_id),
         )
 
-    def _require_supported_transport(self, server: Any) -> None:
+    def _require_supported_transport(self, server: McpServerLike) -> None:
         if server.transport not in {"stdio", "http"}:
             raise UnsupportedMcpTransportError(server.transport)
 
@@ -596,7 +616,7 @@ class McpRuntimeManager:
             self._locks[server_id] = lock
         return lock
 
-    async def _run_operation(self, operation):
+    async def _run_operation(self, operation: Awaitable[object]) -> object:
         if self._operation_timeout_seconds is None:
             return await operation
         try:
@@ -612,10 +632,10 @@ class McpRuntimeManager:
         repository_or_context = self._repository_factory()
         if hasattr(repository_or_context, "__aenter__"):
             async with repository_or_context as repository:
-                yield repository
+                yield cast(McpRepository, repository)
             return
 
-        yield repository_or_context
+        yield cast(McpRepository, repository_or_context)
 
 
 def _task_owned_probe(probe: McpProbe) -> TaskOwnedMcpProbe:
@@ -624,17 +644,17 @@ def _task_owned_probe(probe: McpProbe) -> TaskOwnedMcpProbe:
     return TaskOwnedMcpProbe(probe)
 
 
-def _set_future_result(future: asyncio.Future[Any], result: Any) -> None:
+def _set_future_result(future: asyncio.Future[object], result: object) -> None:
     if not future.done():
         future.set_result(result)
 
 
-def _set_future_exception(future: asyncio.Future[Any], exc: BaseException) -> None:
+def _set_future_exception(future: asyncio.Future[object], exc: BaseException) -> None:
     if not future.done():
         future.set_exception(exc)
 
 
-def sanitize_mcp_error(exc: Exception, server: Any | None = None) -> str:
+def sanitize_mcp_error(exc: Exception, server: McpServerLike | None = None) -> str:
     message = str(exc) or MCP_OPERATION_TIMEOUT_MESSAGE
     for secret in sorted(_server_secret_values(server), key=len, reverse=True):
         message = message.replace(secret, REDACTED_ERROR_VALUE)
@@ -648,7 +668,7 @@ def sanitize_mcp_error(exc: Exception, server: Any | None = None) -> str:
     )
 
 
-def _server_secret_values(server: Any | None) -> set[str]:
+def _server_secret_values(server: McpServerLike | None) -> set[str]:
     if server is None:
         return set()
 

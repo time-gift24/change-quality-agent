@@ -1,8 +1,8 @@
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
 
+from app.core.json_types import JsonObject
 from app.core.agent_streaming import (
     DeepAgentRunInput,
     DeepAgentRunResult,
@@ -12,7 +12,7 @@ from app.core.agent_streaming import (
 
 class RecordingWriter:
     def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
+        self.calls: list[JsonObject] = []
 
     async def append_step_message(
         self,
@@ -20,7 +20,7 @@ class RecordingWriter:
         step: str,
         role: str,
         content: str,
-        additional_kwargs: dict[str, Any] | None = None,
+        additional_kwargs: JsonObject | None = None,
     ):
         record = {
             "step": step,
@@ -38,9 +38,9 @@ class RecordingWriter:
 
 class RecordingPublisher:
     def __init__(self) -> None:
-        self.events: list[dict[str, Any]] = []
+        self.events: list[JsonObject] = []
 
-    async def __call__(self, event: dict[str, Any]) -> None:
+    async def __call__(self, event: JsonObject) -> None:
         self.events.append(event)
 
 
@@ -53,9 +53,9 @@ class _FakeMessageWithDelta:
 
 
 class StreamingAgent:
-    def __init__(self, chunks: list[tuple[str, Any]]) -> None:
+    def __init__(self, chunks: list[tuple[str, object]]) -> None:
         self.chunks = chunks
-        self.astream_called_with: tuple[dict[str, Any], list[str]] | None = None
+        self.astream_called_with: tuple[JsonObject, list[str]] | None = None
 
     async def astream(self, payload, *, stream_mode=None):
         self.astream_called_with = (payload, list(stream_mode or []))
@@ -64,7 +64,7 @@ class StreamingAgent:
 
 
 class InvokeOnlyAgent:
-    def __init__(self, response: Any) -> None:
+    def __init__(self, response: object) -> None:
         self.response = response
         self.ainvoke = AsyncMock(return_value=response)
 
@@ -83,14 +83,14 @@ async def test_runner_prefers_astream_and_aggregates_content() -> None:
     result = await runner.run_step(
         agent=agent,
         step="review_sop",
-        input=DeepAgentRunInput(messages=[{"role": "user", "content": "review"}]),
+        input=DeepAgentRunInput(messages=[{"role": "user", "content": "请评审。"}]),
     )
 
     assert isinstance(result, DeepAgentRunResult)
     assert result.final_text == "Hello World"
     assert agent.astream_called_with is not None
     payload, stream_mode = agent.astream_called_with
-    assert payload == {"messages": [{"role": "user", "content": "review"}]}
+    assert payload == {"messages": [{"role": "user", "content": "请评审。"}]}
     assert "messages" in stream_mode
 
 
