@@ -30,6 +30,7 @@ class FakeSessionRepository:
     def __init__(self) -> None:
         self.created: list[FakeRuntimeSession] = []
         self._next_id = 1
+        self.messages: list = []
 
     async def create_session(
         self, title: str | None = None, thread_id: str | None = None
@@ -41,6 +42,9 @@ class FakeSessionRepository:
         self._next_id += 1
         self.created.append(runtime_session)
         return runtime_session
+
+    async def get_messages_after(self, session_id, after=0, limit=100):
+        return [m for m in self.messages if getattr(m, "session_id", None) == session_id and getattr(m, "sequence", 0) > after]
 
 
 class FakeCheck:

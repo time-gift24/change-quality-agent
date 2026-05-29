@@ -45,6 +45,64 @@ def display_state_from_graph_values(
     }
 
 
+def display_state_from_session_messages(
+    messages: list[dict[str, Any]],
+    *,
+    latest_sequence: int = 0,
+    is_running: bool = False,
+) -> dict[str, Any]:
+    """Project session messages into the SOP display state grouped by step.
+
+    Each session message is expected to carry a `step` key (either at the top
+    level or under `additional_kwargs.step`). The last user-visible step is
+    treated as the in-progress one when `is_running` is True; earlier steps
+    are considered done.
+    """
+    ordered_steps = ("load_sop", "review_sop", "summarize_result", "submit_result")
+    grouped: dict[str, list[str]] = {step: [] for step in ordered_steps}
+    seen_order: list[str] = []
+
+    for message in messages:
+        step = _message_step(message)
+        if step is None or step not in grouped:
+            continue
+        content = message.get("content") or ""
+        if not isinstance(content, str):
+            continue
+        grouped[step].append(content)
+        if step not in seen_order:
+            seen_order.append(step)
+
+    nodes: dict[str, Any] = {}
+    last_seen = seen_order[-1] if seen_order else None
+    for step in seen_order:
+        chunks = grouped[step]
+        if not chunks:
+            continue
+        status = "running" if (is_running and step == last_seen) else "done"
+        nodes[step] = {
+            "status": status,
+            "streamText": "\n".join(chunks),
+        }
+    return {
+        "latest_sequence": latest_sequence,
+        "nodes": nodes,
+        "is_running": is_running,
+    }
+
+
+def _message_step(message: dict[str, Any]) -> str | None:
+    step = message.get("step")
+    if isinstance(step, str):
+        return step
+    kwargs = message.get("additional_kwargs")
+    if isinstance(kwargs, dict):
+        step = kwargs.get("step")
+        if isinstance(step, str):
+            return step
+    return None
+
+
 def _findings_text(findings: list[dict[str, Any]]) -> str:
     if not findings:
         return "No obvious structural issues found."

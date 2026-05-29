@@ -6,7 +6,10 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from app.agent.sop_quality.display import display_state_from_graph_values
+from app.agent.sop_quality.display import (
+    display_state_from_graph_values,
+    display_state_from_session_messages,
+)
 from app.api.deps import (
     SessionDep,
     SessionRepositoryDep,
@@ -83,11 +86,16 @@ async def list_sop_quality_checks(
 async def get_sop_quality_check(
     check_id: UUID,
     repository: SopQualityCheckRepositoryDep,
+    session_repository: SessionRepositoryDep,
 ) -> SopQualityCheckDetail:
     check = await repository.get_check(check_id)
     if check is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    return _check_to_detail(check)
+    messages = []
+    session_id = getattr(check, "session_id", None)
+    if session_id is not None:
+        messages = await session_repository.get_messages_after(session_id, after=0, limit=500)
+    return _check_to_detail(check, messages)
 
 
 @router.get("/{check_id}/events")
@@ -107,16 +115,29 @@ async def get_sop_quality_check_events(
 async def stream_sop_quality_check(
     check_id: UUID,
     repository: SopQualityCheckRepositoryDep,
+    session_repository: SessionRepositoryDep,
     after: Annotated[int, Query(ge=0)] = 0,
 ) -> StreamingResponse:
     check = await repository.get_check(check_id)
     if check is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
+    session_id = getattr(check, "session_id", None)
+
     async def event_stream():
         cursor = after
+        message_cursor = after
         async with _broadcast.subscribe(check_id) as queue:
             while True:
+                if session_id is not None:
+                    messages = await session_repository.get_messages_after(
+                        session_id, after=message_cursor
+                    )
+                    for message in messages:
+                        sequence = int(getattr(message, "sequence", 0))
+                        message_cursor = max(message_cursor, sequence)
+                        yield format_message_sse(message, check_id)
+
                 events = await repository.get_events_after(check_id, after=cursor)
                 for event in events:
                     cursor = max(cursor, int(event.sequence))
@@ -124,6 +145,7 @@ async def stream_sop_quality_check(
                     yield format_sse(event_dict)
                     if event.type in TERMINAL_EVENT_TYPES:
                         return
+
                 if events:
                     continue
 
@@ -161,6 +183,21 @@ def format_live_sse(event: dict[str, object]) -> str:
     return f"event: {event_type}\ndata: {data}\n\n"
 
 
+def format_message_sse(message, check_id: UUID) -> str:
+    payload = {
+        "check_id": str(check_id),
+        "session_id": getattr(message, "session_id", None),
+        "sequence": getattr(message, "sequence", None),
+        "type": "message",
+        "role": getattr(message, "role", None),
+        "content": getattr(message, "content", None),
+        "additional_kwargs": dict(getattr(message, "additional_kwargs", {}) or {}),
+        "created_at": getattr(message, "created_at", None),
+    }
+    data = json.dumps(payload, ensure_ascii=False, default=str)
+    return f"event: message\ndata: {data}\n\n"
+
+
 def event_to_dict(event) -> dict[str, object]:
     return {
         "check_id": event.check_id,
@@ -189,14 +226,22 @@ def _check_to_summary(check) -> SopQualityCheckSummary:
     )
 
 
-def _check_to_detail(check) -> SopQualityCheckDetail:
+def _check_to_detail(check, messages=None) -> SopQualityCheckDetail:
     summary = _check_to_summary(check)
-    values = _graph_values_from_check(check)
-    display_state = display_state_from_graph_values(
-        values,
-        latest_sequence=summary.latest_sequence,
-        is_running=check.status in {"pending", "running"},
-    )
+    message_dicts = [_message_to_display_dict(m) for m in (messages or [])]
+    if message_dicts:
+        display_state = display_state_from_session_messages(
+            message_dicts,
+            latest_sequence=summary.latest_sequence,
+            is_running=check.status in {"pending", "running"},
+        )
+    else:
+        values = _graph_values_from_check(check)
+        display_state = display_state_from_graph_values(
+            values,
+            latest_sequence=summary.latest_sequence,
+            is_running=check.status in {"pending", "running"},
+        )
     return SopQualityCheckDetail(
         **summary.model_dump(),
         graph_name=check.graph_name,
@@ -209,6 +254,24 @@ def _check_to_detail(check) -> SopQualityCheckDetail:
         display_state=display_state,
         session_id=getattr(check, "session_id", None),
     )
+
+
+def _message_to_display_dict(message) -> dict[str, object]:
+    return {
+        "step": _step_from_message(message),
+        "role": getattr(message, "role", None),
+        "content": getattr(message, "content", None),
+        "additional_kwargs": dict(getattr(message, "additional_kwargs", {}) or {}),
+    }
+
+
+def _step_from_message(message) -> str | None:
+    kwargs = getattr(message, "additional_kwargs", None)
+    if isinstance(kwargs, dict):
+        step = kwargs.get("step")
+        if isinstance(step, str):
+            return step
+    return None
 
 
 def _graph_values_from_check(check) -> dict[str, object]:
