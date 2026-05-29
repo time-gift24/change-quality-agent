@@ -1,15 +1,15 @@
 import asyncio
+import logging
+import re
 from collections.abc import AsyncIterator, Callable
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from dataclasses import dataclass
-import logging
-import re
 from typing import Any, Protocol
 from uuid import UUID
 
 from mcp import ClientSession, StdioServerParameters
-from mcp.client.streamable_http import streamablehttp_client
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 
 from app.schemas.mcp import (
     McpDesiredState,
@@ -69,14 +69,13 @@ class _TaskOwnedMcpCommand:
 
 
 class McpRepository(Protocol):
-    async def require_server(self, server_id: UUID) -> Any:
-        ...
+    async def require_server(self, server_id: UUID) -> Any: ...
 
-    async def list_startup_servers(self) -> list[Any]:
-        ...
+    async def list_startup_servers(self) -> list[Any]: ...
 
-    async def update_desired_state(self, server_id: UUID, desired_state: str) -> Any:
-        ...
+    async def update_desired_state(
+        self, server_id: UUID, desired_state: str
+    ) -> Any: ...
 
     async def update_runtime_status(
         self,
@@ -85,32 +84,25 @@ class McpRepository(Protocol):
         runtime_status: str,
         last_error: str | None = None,
         checked: bool = False,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
     async def replace_tools(
         self,
         server_id: UUID,
         tools: list[dict[str, Any]],
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
-    async def tool_count(self, server_id: UUID) -> int:
-        ...
+    async def tool_count(self, server_id: UUID) -> int: ...
 
-    async def commit(self) -> None:
-        ...
+    async def commit(self) -> None: ...
 
 
 class McpProbe(Protocol):
-    async def start(self, server: Any) -> tuple[Any, list[dict[str, Any]]]:
-        ...
+    async def start(self, server: Any) -> tuple[Any, list[dict[str, Any]]]: ...
 
-    async def list_tools(self, handle: Any) -> list[dict[str, Any]]:
-        ...
+    async def list_tools(self, handle: Any) -> list[dict[str, Any]]: ...
 
-    async def stop(self, handle: Any) -> None:
-        ...
+    async def stop(self, handle: Any) -> None: ...
 
 
 class StdioMcpProbe:
@@ -170,8 +162,10 @@ class StreamableHttpMcpProbe:
     ) -> tuple[McpRuntimeHandle, list[dict[str, Any]]]:
         exit_stack = AsyncExitStack()
         try:
-            read_stream, write_stream, _get_session_id = await exit_stack.enter_async_context(
-                streamablehttp_client(server.url, headers=server.headers or {})
+            read_stream, write_stream, _get_session_id = (
+                await exit_stack.enter_async_context(
+                    streamablehttp_client(server.url, headers=server.headers or {})
+                )
             )
             session = await exit_stack.enter_async_context(
                 ClientSession(read_stream, write_stream)
@@ -206,10 +200,17 @@ class TransportMcpProbe:
     ) -> tuple[TransportMcpRuntimeHandle, list[dict[str, Any]]]:
         probe = self._probe_for_transport(server.transport)
         handle, tools = await probe.start(server)
-        return TransportMcpRuntimeHandle(transport=server.transport, handle=handle), tools
+        return (
+            TransportMcpRuntimeHandle(transport=server.transport, handle=handle),
+            tools,
+        )
 
-    async def list_tools(self, handle: TransportMcpRuntimeHandle) -> list[dict[str, Any]]:
-        return await self._probe_for_transport(handle.transport).list_tools(handle.handle)
+    async def list_tools(
+        self, handle: TransportMcpRuntimeHandle
+    ) -> list[dict[str, Any]]:
+        return await self._probe_for_transport(handle.transport).list_tools(
+            handle.handle
+        )
 
     async def stop(self, handle: TransportMcpRuntimeHandle) -> None:
         await self._probe_for_transport(handle.transport).stop(handle.handle)
@@ -596,7 +597,7 @@ class McpRuntimeManager:
             self._locks[server_id] = lock
         return lock
 
-    async def _run_operation(self, operation):
+    async def _run_operation(self, operation: object) -> object:
         if self._operation_timeout_seconds is None:
             return await operation
         try:

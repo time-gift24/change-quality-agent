@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-
 SessionStatus = Literal["active", "completed", "failed", "interrupted"]
 MessageRole = Literal["user", "assistant", "tool", "system"]
 

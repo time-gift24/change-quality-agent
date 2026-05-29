@@ -1,6 +1,5 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
 from uuid import UUID
 
 from app.core.llm_connectivity import test_provider_model_connectivity
@@ -37,23 +36,27 @@ class LlmProviderService:
     ) -> None:
         self._repository = repository
         self._commit = commit
-        self._connectivity_tester = connectivity_tester or test_provider_model_connectivity
+        self._connectivity_tester = (
+            connectivity_tester or test_provider_model_connectivity
+        )
 
-    async def list_providers(self):
+    async def list_providers(self) -> object:
         return await self._repository.list()
 
-    async def create_provider(self, payload: LlmProviderCreate):
+    async def create_provider(self, payload: LlmProviderCreate) -> object:
         provider = await self._repository.create(**payload.model_dump(mode="json"))
         await self._commit_if_configured()
         return provider
 
-    async def get_provider(self, provider_id: UUID):
+    async def get_provider(self, provider_id: UUID) -> object:
         provider = await self._repository.get_by_id(provider_id)
         if provider is None:
             raise LlmProviderNotFoundError(provider_id)
         return provider
 
-    async def update_provider(self, provider_id: UUID, payload: LlmProviderUpdate):
+    async def update_provider(
+        self, provider_id: UUID, payload: LlmProviderUpdate
+    ) -> object:
         values = _normalize_update_values(
             payload.model_dump(exclude_unset=True, mode="json")
         )
@@ -94,7 +97,7 @@ def _normalize_update_values(values: dict[str, object]) -> dict[str, object]:
     return values
 
 
-def _runtime_config(provider) -> LlmProviderRuntimeConfig:
+def _runtime_config(provider: object) -> LlmProviderRuntimeConfig:
     return LlmProviderRuntimeConfig(
         id=provider.id,
         provider_type=provider.provider_type,

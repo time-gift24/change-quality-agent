@@ -5,7 +5,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from app.models.mcp import McpServer, McpServerTool as McpServerToolModel
+from app.models.mcp import McpServer
+from app.models.mcp import McpServerTool as McpServerToolModel
 from app.schemas.mcp import (
     McpServerCreate,
     McpServerDetail,

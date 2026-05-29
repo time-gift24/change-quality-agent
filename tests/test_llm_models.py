@@ -1,6 +1,7 @@
+from uuid import uuid4
+
 import httpx
 import pytest
-from uuid import uuid4
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core import llm_models
@@ -14,7 +15,7 @@ def test_create_chat_model_builds_codeagent_with_internal_headers(
     calls: list[dict[str, object]] = []
 
     class FakeChatDeepSeek:
-        def __init__(self, **kwargs) -> None:
+        def __init__(self, **kwargs: object) -> None:
             calls.append(dict(kwargs))
 
     monkeypatch.setattr(settings, "codeagent_base_url", "https://llm.internal/v1")
@@ -49,7 +50,7 @@ def test_create_chat_model_falls_back_to_langchain_init(
     calls: list[tuple[str, dict[str, object]]] = []
     configured_model = object()
 
-    def fake_init_chat_model(model: str, **model_config):
+    def fake_init_chat_model(model: str, **model_config: object) -> object:
         calls.append((model, dict(model_config)))
         return configured_model
 
@@ -67,7 +68,7 @@ def test_create_provider_chat_model_passes_provider_config_to_init_chat_model(
     calls: list[tuple[str, dict[str, object]]] = []
     configured_model = object()
 
-    def fake_init_chat_model(model: str, **model_config):
+    def fake_init_chat_model(model: str, **model_config: object) -> object:
         calls.append((model, dict(model_config)))
         return configured_model
 
@@ -111,7 +112,7 @@ def test_create_provider_chat_model_omits_empty_provider_config(
 ) -> None:
     calls: list[tuple[str, dict[str, object]]] = []
 
-    def fake_init_chat_model(model: str, **model_config):
+    def fake_init_chat_model(model: str, **model_config: object) -> object:
         calls.append((model, dict(model_config)))
         return object()
 
@@ -204,7 +205,7 @@ async def test_codeagent_http_clients_refresh_token_per_request(
     tokens = iter(["first-token", "second-token"])
 
     class RotatingProvider:
-        def get_headers(self):
+        def get_headers(self) -> object:
             return {"X-Open-CodeAgent-Token": next(tokens)}
 
     http_client, http_async_client = llm_models._build_token_refreshing_http_clients(

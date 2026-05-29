@@ -1,8 +1,9 @@
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from app.agent.sop_quality.graph import build_sop_quality_graph
 from app.agent.manager.agent_factory import AgentFactory
+from app.agent.sop_quality.graph import build_sop_quality_graph
 from app.core.agent_streaming import DeepAgentStreamRunner
 from app.core.checkpoints import open_postgres_checkpointer
 from app.core.database import async_session
@@ -18,6 +19,13 @@ from app.services.sop_quality_streaming import SopQualityBroadcast
 TOP_LEVEL_CHECKPOINT_NS = ""
 
 
+@dataclass(frozen=True)
+class _GraphRuntime:
+    graph: Any
+    config: dict[str, Any]
+    session_id: int | None
+
+
 async def run_sop_quality_check(
     check_id: UUID,
     repository: SopQualityCheckRepository,
@@ -31,76 +39,34 @@ async def run_sop_quality_check(
     session_broadcast: SessionBroadcast | None = None,
 ) -> dict[str, Any]:
     try:
-        check = await repository.mark_running(check_id)
+        check = await _mark_started(repository, check_id, broadcast)
         if check is None:
             return {"status": "skipped"}
-        started_event = await repository.append_event(
-            check_id,
-            event_type="started",
-            message="SOP quality check started.",
-        )
-        await repository.commit()
-        await _publish_event(broadcast, check_id, started_event)
-
-        session_id = getattr(check, "session_id", None)
-        message_writer = _build_message_writer(
-            session_repository=session_repository,
-            session_id=session_id,
-            session_broadcast=session_broadcast,
-        )
-        live_event_publisher = _session_live_event_publisher(
-            session_broadcast,
-            session_id,
-        )
-        deepagent_stream_runner = DeepAgentStreamRunner(
-            message_writer=message_writer,
-            live_event_publisher=live_event_publisher,
-            session_id=session_id,
-        )
-
-        graph = build_sop_quality_graph(
+        runtime = _build_graph_runtime(
+            check=check,
             checkpointer=checkpointer,
-            agent_factory=AgentFactory(llm_provider_repository),
+            llm_provider_repository=llm_provider_repository,
             sop_client=sop_client,
             submit_quality_result=submit_quality_result,
-            message_writer=message_writer,
-            deepagent_stream_runner=deepagent_stream_runner,
-            live_event_publisher=live_event_publisher,
+            session_repository=session_repository,
+            session_broadcast=session_broadcast,
         )
-        config = _top_level_checkpoint_config(check.thread_id)
-        initial_state = {
-            "check_id": str(check.id),
-            "sop_id": check.sop_id,
-            "env_key": check.env_key,
-        }
-
-        final_state = await graph.ainvoke(initial_state, config=config)
-        checkpoint_id = await _latest_checkpoint_id(graph, config, checkpointer)
-        if checkpoint_id is not None:
-            await repository.set_current_checkpoint(check_id, checkpoint_id)
-            checkpoint_event = await repository.append_event(
-                check_id,
-                event_type="checkpoint",
-                checkpoint_id=checkpoint_id,
-                message="Checkpoint saved.",
-            )
-            await repository.commit()
-            await _publish_event(broadcast, check_id, checkpoint_event)
-        await repository.mark_terminal(
+        final_state = await _invoke_graph(runtime, check)
+        await _save_latest_checkpoint(
+            repository,
             check_id,
-            "succeeded",
-            quality_result=final_state.get("quality_result"),
-            result=final_state.get("result"),
+            runtime,
+            checkpointer,
+            broadcast,
         )
-        if session_repository is not None and session_id is not None:
-            await session_repository.set_status(session_id, "completed")
-        completed_event = await repository.append_event(
+        await _mark_succeeded(
+            repository,
             check_id,
-            event_type="completed",
-            message="SOP quality check completed.",
+            final_state,
+            session_id=runtime.session_id,
+            session_repository=session_repository,
+            broadcast=broadcast,
         )
-        await repository.commit()
-        await _publish_event(broadcast, check_id, completed_event)
         return {"status": "succeeded", "result": final_state.get("result")}
     except Exception as exc:
         return await _mark_failed(
@@ -110,6 +76,121 @@ async def run_sop_quality_check(
             broadcast=broadcast,
             session_repository=session_repository,
         )
+
+
+async def _mark_started(
+    repository: SopQualityCheckRepository,
+    check_id: UUID,
+    broadcast: SopQualityBroadcast | None,
+) -> Any | None:
+    check = await repository.mark_running(check_id)
+    if check is None:
+        return None
+    started_event = await repository.append_event(
+        check_id,
+        event_type="started",
+        message="SOP quality check started.",
+    )
+    await repository.commit()
+    await _publish_event(broadcast, check_id, started_event)
+    return check
+
+
+def _build_graph_runtime(
+    *,
+    check: Any,
+    checkpointer: Any,
+    llm_provider_repository: Any,
+    sop_client: Any,
+    submit_quality_result: Any,
+    session_repository: Any | None,
+    session_broadcast: SessionBroadcast | None,
+) -> _GraphRuntime:
+    session_id = getattr(check, "session_id", None)
+    message_writer = _build_message_writer(
+        session_repository=session_repository,
+        session_id=session_id,
+        session_broadcast=session_broadcast,
+    )
+    live_event_publisher = _session_live_event_publisher(session_broadcast, session_id)
+    graph = build_sop_quality_graph(
+        checkpointer=checkpointer,
+        agent_factory=AgentFactory(llm_provider_repository),
+        sop_client=sop_client,
+        submit_quality_result=submit_quality_result,
+        message_writer=message_writer,
+        deepagent_stream_runner=DeepAgentStreamRunner(
+            message_writer=message_writer,
+            live_event_publisher=live_event_publisher,
+            session_id=session_id,
+        ),
+        live_event_publisher=live_event_publisher,
+    )
+    return _GraphRuntime(
+        graph=graph,
+        config=_top_level_checkpoint_config(check.thread_id),
+        session_id=session_id,
+    )
+
+
+async def _invoke_graph(runtime: _GraphRuntime, check: Any) -> dict[str, Any]:
+    initial_state = {
+        "check_id": str(check.id),
+        "sop_id": check.sop_id,
+        "env_key": check.env_key,
+    }
+    return await runtime.graph.ainvoke(initial_state, config=runtime.config)
+
+
+async def _save_latest_checkpoint(
+    repository: SopQualityCheckRepository,
+    check_id: UUID,
+    runtime: _GraphRuntime,
+    checkpointer: Any,
+    broadcast: SopQualityBroadcast | None,
+) -> None:
+    checkpoint_id = await _latest_checkpoint_id(
+        runtime.graph,
+        runtime.config,
+        checkpointer,
+    )
+    if checkpoint_id is None:
+        return
+    await repository.set_current_checkpoint(check_id, checkpoint_id)
+    checkpoint_event = await repository.append_event(
+        check_id,
+        event_type="checkpoint",
+        checkpoint_id=checkpoint_id,
+        message="Checkpoint saved.",
+    )
+    await repository.commit()
+    await _publish_event(broadcast, check_id, checkpoint_event)
+
+
+async def _mark_succeeded(
+    repository: SopQualityCheckRepository,
+    check_id: UUID,
+    final_state: dict[str, Any],
+    *,
+    session_id: int | None,
+    session_repository: Any | None,
+    broadcast: SopQualityBroadcast | None,
+) -> None:
+    await repository.mark_terminal(
+        check_id,
+        "succeeded",
+        quality_result=final_state.get("quality_result"),
+        result=final_state.get("result"),
+    )
+    if session_repository is not None and session_id is not None:
+        await session_repository.set_status(session_id, "completed")
+    completed_event = await repository.append_event(
+        check_id,
+        event_type="completed",
+        message="SOP quality check completed.",
+    )
+    await repository.commit()
+    await _publish_event(broadcast, check_id, completed_event)
 
 
 async def run_sop_quality_check_with_new_session(
@@ -149,7 +230,7 @@ def _build_message_writer(
     session_repository: Any | None,
     session_id: int | None,
     session_broadcast: SessionBroadcast | None,
-):
+) -> object:
     if session_repository is None or session_id is None:
         return _NoopMessageWriter()
     return RepositorySessionMessageWriter(
@@ -238,7 +319,7 @@ async def _publish_event(
 def _session_live_event_publisher(
     session_broadcast: SessionBroadcast | None,
     session_id: int | None,
-):
+) -> object:
     if session_broadcast is None or session_id is None:
         return None
 

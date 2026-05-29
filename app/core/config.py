@@ -1,3 +1,5 @@
+from secrets import token_urlsafe
+
 from pydantic import BaseModel, Field
 from pydantic_settings import (
     BaseSettings,
@@ -28,14 +30,17 @@ class Settings(BaseSettings):
     )
 
     database_url: str = (
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/"
-        "change_quality_agent"
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/" "change_quality_agent"
     )
     log_level: str = "INFO"
     access_log_enabled: bool = True
     auth_enabled: bool = True
     auth_dev_mode: bool = False
     auth_session_cookie_name: str = "cqa_user"
+    auth_dev_common_refresh_token: str = Field(
+        default_factory=lambda: token_urlsafe(32)
+    )
+    auth_dev_admin_refresh_token: str = Field(default_factory=lambda: token_urlsafe(32))
     environments: list[EnvironmentConfig] = Field(
         default_factory=lambda: [
             EnvironmentConfig(

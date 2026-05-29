@@ -59,7 +59,7 @@ class FakeRepository:
         self.id = uuid4()
         self.status = "pending"
 
-    async def get_active_check(self, *, sop_id: str, env_key: str):
+    async def get_active_check(self, *, sop_id: str, env_key: str) -> object:
         self.order.append("get_active_check")
         if self.active_check_id is None:
             return None
@@ -68,14 +68,14 @@ class FakeRepository:
         active.status = "running"
         return active
 
-    async def create_check(self, **kwargs):
+    async def create_check(self, **kwargs: object) -> object:
         self.order.append("create_check")
         self.created_kwargs = kwargs
         if self.active_check_id is not None:
             raise ActiveSopQualityCheckExistsError(self.active_check_id)
         return self
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         if self.active_check_id == check_id:
             active = FakeRepository([])
             active.id = check_id
@@ -83,7 +83,7 @@ class FakeRepository:
             return active
         return None
 
-    async def append_event(self, check_id, **kwargs):
+    async def append_event(self, check_id: object, **kwargs: object) -> None:
         self.order.append(kwargs["event_type"])
         return None
 
@@ -163,7 +163,10 @@ async def test_start_check_uses_graph_constants_and_writes_created_event(
     ]
     assert repository.created_kwargs["sop_snapshot"] == {}
     assert repository.created_kwargs["session_id"] == session_repository.created[0].id
-    assert repository.created_kwargs["thread_id"] == session_repository.created[0].thread_id
+    assert (
+        repository.created_kwargs["thread_id"]
+        == session_repository.created[0].thread_id
+    )
 
 
 @pytest.mark.asyncio
@@ -247,7 +250,7 @@ class StreamingRepository:
     def __init__(self, check_id: UUID) -> None:
         self.check_id = check_id
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         if check_id != self.check_id:
             return None
         return type(
@@ -261,7 +264,7 @@ class StreamingRepository:
             },
         )()
 
-    async def get_events_after(self, check_id, after=0):
+    async def get_events_after(self, check_id: object, after: object = 0) -> object:
         if after >= 1:
             return []
         return [
@@ -283,13 +286,15 @@ class StreamingRepository:
 
 
 class FakeBroadcast:
-    def subscribe(self, check_id):
+    def subscribe(self, check_id: object) -> object:
         return FakeSubscription()
 
 
 class FakeSubscription:
-    async def __aenter__(self):
+    async def __aenter__(self) -> None:
         return None
 
-    async def __aexit__(self, exc_type, exc, traceback):
+    async def __aexit__(
+        self, exc_type: object, exc: object, traceback: object
+    ) -> object:
         return False

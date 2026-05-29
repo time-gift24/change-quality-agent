@@ -6,7 +6,7 @@ from app.agent.sop_quality.state import SopQualityState
 from app.core.agent_streaming import SessionMessageWriter
 
 
-def make_summarize_result(message_writer: SessionMessageWriter):
+def make_summarize_result(message_writer: SessionMessageWriter) -> object:
     async def summarize_result(state: SopQualityState) -> SopQualityState:
         result_state = _summarize_result_state(state)
         result = result_state.get("result")

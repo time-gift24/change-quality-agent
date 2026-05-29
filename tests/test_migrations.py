@@ -4,12 +4,8 @@ from pathlib import Path
 BASE_MIGRATION_PATH = Path(
     "migrations/versions/20260525_0001_create_sop_quality_checks.py"
 )
-MIGRATION_0008 = Path(
-    "migrations/versions/20260529_0008_create_sessions_messages.py"
-)
-MIGRATION_0009 = Path(
-    "migrations/versions/20260529_0009_add_sop_quality_session_id.py"
-)
+MIGRATION_0008 = Path("migrations/versions/20260529_0008_create_sessions_messages.py")
+MIGRATION_0009 = Path("migrations/versions/20260529_0009_add_sop_quality_session_id.py")
 
 
 def test_alembic_revision_ids_are_unique() -> None:
@@ -20,9 +16,9 @@ def test_alembic_revision_ids_are_unique() -> None:
         revision = _string_assignment(module, "revision")
 
         assert revision is not None, f"{path} does not define revision"
-        assert revision not in revisions, (
-            f"{path} duplicates revision {revision} from {revisions[revision]}"
-        )
+        assert (
+            revision not in revisions
+        ), f"{path} duplicates revision {revision} from {revisions[revision]}"
         revisions[revision] = path
 
 
@@ -65,7 +61,13 @@ def test_alembic_env_imports_sop_quality_models_for_metadata() -> None:
     module = ast.parse(Path("migrations/env.py").read_text())
     imported_models = _imported_names_from_module(module, "app.models")
 
-    assert {"agents", "mcp", "sessions", "sop_quality_checks", "users"} <= imported_models
+    assert {
+        "agents",
+        "mcp",
+        "sessions",
+        "sop_quality_checks",
+        "users",
+    } <= imported_models
     assert "runs" not in imported_models
 
 

@@ -7,7 +7,9 @@ from typing import Any
 
 class SessionBroadcast:
     def __init__(self) -> None:
-        self._subscribers: dict[int, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
+        self._subscribers: dict[int, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(
+            set
+        )
 
     @asynccontextmanager
     async def subscribe(

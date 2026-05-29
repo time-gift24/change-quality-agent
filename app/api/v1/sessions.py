@@ -56,7 +56,7 @@ async def stream_session(
     except SessionNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
 
-    async def event_stream():
+    async def event_stream() -> object:
         async for event in service.stream_events(
             session_id,
             after=after,
@@ -77,7 +77,7 @@ def format_session_sse(event: dict[str, object]) -> str:
     return f"event: {event.get('type', 'live')}\ndata: {data}\n\n"
 
 
-def _to_session_detail(runtime_session) -> SessionDetail:
+def _to_session_detail(runtime_session: object) -> SessionDetail:
     return SessionDetail(
         id=runtime_session.id,
         thread_id=runtime_session.thread_id,
@@ -90,3 +90,4 @@ def _to_session_detail(runtime_session) -> SessionDetail:
 
 
 _message_to_dict = message_to_dict
+_message_event_sequence = message_event_sequence

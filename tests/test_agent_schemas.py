@@ -75,7 +75,9 @@ def test_agent_draft_config_allows_codeagent_without_provider_id() -> None:
     assert draft.provider_id is None
 
 
-def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key() -> None:
+def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key() -> (
+    None
+):
     class AgentVersionRecord:
         id = uuid4()
         agent_id = uuid4()

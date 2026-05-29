@@ -1,12 +1,20 @@
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from time import perf_counter
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import get_mcp_runtime_manager
-from app.api.v1 import agents, auth, llm_providers, mcp, sessions, sop, sop_quality_checks
+from app.api.v1 import (
+    agents,
+    auth,
+    llm_providers,
+    mcp,
+    sessions,
+    sop,
+    sop_quality_checks,
+)
 from app.core.config import settings
 from app.core.database import async_session
 from app.core.logging import configure_logging
@@ -16,7 +24,11 @@ from app.core.security import (
     resolve_current_user,
 )
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
-from app.repositories.users import UserRepository, seed_dev_users
+from app.repositories.users import (
+    UserRepository,
+    dev_users_from_settings,
+    seed_dev_users,
+)
 
 configure_logging(settings)
 access_logger = logging.getLogger("app.access")
@@ -32,12 +44,12 @@ async def interrupt_leftover_sop_quality_checks() -> None:
 async def seed_dev_users_on_startup() -> None:
     async with async_session() as session:
         repository = UserRepository(session)
-        await seed_dev_users(repository)
+        await seed_dev_users(repository, dev_users_from_settings(settings))
         await session.commit()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> object:
     await interrupt_leftover_sop_quality_checks()
     if settings.auth_dev_mode:
         await seed_dev_users_on_startup()
@@ -53,7 +65,7 @@ app = FastAPI(title="Change Quality Agent", lifespan=lifespan)
 
 
 @app.middleware("http")
-async def require_api_auth(request: Request, call_next):
+async def require_api_auth(request: Request, call_next: object) -> object:
     path = request.url.path
     if not settings.auth_enabled or is_auth_bypass_path(path):
         return await call_next(request)
@@ -84,7 +96,7 @@ app.include_router(sop_quality_checks.router)
 
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_requests(request: Request, call_next: object) -> object:
     if not settings.access_log_enabled:
         return await call_next(request)
 

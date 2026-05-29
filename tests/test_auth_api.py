@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api import deps
 from app.core.config import settings
@@ -28,12 +28,12 @@ class FakeUserRepository:
             ),
         }
 
-    async def get_by_account(self, account: str):
+    async def get_by_account(self, account: str) -> object:
         return self.users.get(account)
 
 
 @pytest.fixture(autouse=True)
-def restore_overrides():
+def restore_overrides() -> object:
     previous_overrides = dict(app.dependency_overrides)
     yield
     app.dependency_overrides.clear()
@@ -47,7 +47,7 @@ def override_user_repository(repository: FakeUserRepository) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dev_login_sets_cookie_when_dev_mode_enabled(monkeypatch) -> None:
+async def test_dev_login_sets_cookie_when_dev_mode_enabled(monkeypatch: object) -> None:
     monkeypatch.setattr(settings, "auth_dev_mode", True)
     repository = FakeUserRepository()
     override_user_repository(repository)
@@ -72,7 +72,7 @@ async def test_dev_login_sets_cookie_when_dev_mode_enabled(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dev_login_rejects_when_dev_mode_disabled(monkeypatch) -> None:
+async def test_dev_login_rejects_when_dev_mode_disabled(monkeypatch: object) -> None:
     monkeypatch.setattr(settings, "auth_dev_mode", False)
     override_user_repository(FakeUserRepository())
 
@@ -89,7 +89,7 @@ async def test_dev_login_rejects_when_dev_mode_disabled(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_dev_login_rejects_unknown_account(monkeypatch) -> None:
+async def test_dev_login_rejects_unknown_account(monkeypatch: object) -> None:
     monkeypatch.setattr(settings, "auth_dev_mode", True)
     override_user_repository(FakeUserRepository())
 

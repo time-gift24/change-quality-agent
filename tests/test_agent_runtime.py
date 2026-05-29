@@ -6,8 +6,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from app.core.agent_runtime import AgentRuntime
-from app.core.llm_models import LlmProviderRuntimeConfig
-from app.core.llm_models import create_chat_model
+from app.core.llm_models import LlmProviderRuntimeConfig, create_chat_model
 
 
 class FakeVersion:
@@ -26,13 +25,13 @@ class FakeResolver:
         self.calls: list[tuple[list[str], list[str]]] = []
         self.tools = [lambda: "resolved"]
 
-    def resolve(self, tool_allowlist, mcp_server_ids):
+    def resolve(self, tool_allowlist: object, mcp_server_ids: object) -> object:
         self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
         return self.tools
 
 
 class AsyncFakeResolver(FakeResolver):
-    async def resolve(self, tool_allowlist, mcp_server_ids):
+    async def resolve(self, tool_allowlist: object, mcp_server_ids: object) -> object:
         self.calls.append((list(tool_allowlist), list(mcp_server_ids)))
         return self.tools
 
@@ -50,17 +49,17 @@ class FakeProviderResolver:
             enabled=True,
         )
 
-    async def resolve(self, provider_id) -> LlmProviderRuntimeConfig:
+    async def resolve(self, provider_id: object) -> LlmProviderRuntimeConfig:
         self.calls.append(provider_id)
         return self.provider
 
 
 class FakeAgent:
-    def __init__(self, output):
+    def __init__(self, output: object) -> None:
         self.output = output
         self.inputs: list[dict[str, object]] = []
 
-    async def ainvoke(self, payload):
+    async def ainvoke(self, payload: object) -> object:
         self.inputs.append(payload)
         return self.output
 
@@ -89,7 +88,9 @@ async def test_runtime_creates_agent_with_version_config_and_invokes_messages() 
     }
     agent = FakeAgent(raw_output)
 
-    def fake_create_agent(*, model, tools, system_prompt):
+    def fake_create_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         created["model"] = model
         created["tools"] = tools
         created["system_prompt"] = system_prompt
@@ -123,11 +124,13 @@ async def test_runtime_passes_model_config_to_model_factory_boundary() -> None:
     model_factory_calls: list[tuple[str, dict[str, object]]] = []
     created: dict[str, object] = {}
 
-    def fake_model_factory(model: str, **model_config):
+    def fake_model_factory(model: str, **model_config: object) -> object:
         model_factory_calls.append((model, dict(model_config)))
         return configured_model
 
-    def fake_create_agent(*, model, tools, system_prompt):
+    def fake_create_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         created["model"] = model
         created["tools"] = tools
         created["system_prompt"] = system_prompt
@@ -157,14 +160,20 @@ async def test_runtime_uses_provider_resolver_when_provider_id_is_set() -> None:
     provider_resolver = FakeProviderResolver()
     provider_model = object()
     default_factory_calls: list[str] = []
-    provider_factory_calls: list[tuple[str, LlmProviderRuntimeConfig, dict[str, object]]] = []
+    provider_factory_calls: list[
+        tuple[str, LlmProviderRuntimeConfig, dict[str, object]]
+    ] = []
     created: dict[str, object] = {}
 
-    def fake_provider_model_factory(model: str, provider, **model_config):
+    def fake_provider_model_factory(
+        model: str, provider: object, **model_config: object
+    ) -> object:
         provider_factory_calls.append((model, provider, dict(model_config)))
         return provider_model
 
-    def fake_create_agent(*, model, tools, system_prompt):
+    def fake_create_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         created["model"] = model
         return FakeAgent({"messages": []})
 
@@ -204,7 +213,9 @@ async def test_runtime_awaits_async_tool_resolver() -> None:
     resolver = AsyncFakeResolver()
     created: dict[str, object] = {}
 
-    def fake_create_agent(*, model, tools, system_prompt):
+    def fake_create_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         created["tools"] = tools
         return FakeAgent({"messages": []})
 
@@ -224,7 +235,7 @@ async def test_runtime_awaits_async_tool_resolver() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_returns_json_serializable_raw_output_for_langchain_messages() -> None:
+async def test_runtime_json_serializes_langchain_messages() -> None:
     raw_output = {
         "messages": [AIMessage(content="Review passed.")],
         "nested": {"message": AIMessage(content="Nested review details.")},
@@ -252,7 +263,7 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
         def __init__(self) -> None:
             self.payload = None
 
-        def invoke(self, payload):
+        def invoke(self, payload: object) -> object:
             self.payload = payload
             return {"messages": [{"role": "assistant", "content": "Done."}]}
 
@@ -273,7 +284,7 @@ async def test_runtime_supports_agents_with_sync_invoke_only() -> None:
 @pytest.mark.asyncio
 async def test_agent_runtime_stream_yields_message_deltas() -> None:
     class StreamingAgent:
-        async def astream(self, payload, stream_mode=None):
+        async def astream(self, payload: object, stream_mode: object = None) -> object:
             yield ("messages", ("alpha", {"langgraph_node": "agent"}))
             yield ("messages", ("beta", {"langgraph_node": "agent"}))
 
@@ -283,8 +294,7 @@ async def test_agent_runtime_stream_yields_message_deltas() -> None:
     )
 
     chunks = [
-        chunk
-        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+        chunk async for chunk in runtime.stream(version=FakeVersion(), messages=[])
     ]
 
     assert [chunk["type"] for chunk in chunks] == ["messages", "messages"]
@@ -295,7 +305,7 @@ async def test_agent_runtime_stream_yields_message_deltas() -> None:
 @pytest.mark.asyncio
 async def test_agent_runtime_stream_extracts_content_block_message_deltas() -> None:
     class StreamingAgent:
-        async def astream(self, payload, stream_mode=None):
+        async def astream(self, payload: object, stream_mode: object = None) -> object:
             yield (
                 "messages",
                 (
@@ -310,8 +320,7 @@ async def test_agent_runtime_stream_extracts_content_block_message_deltas() -> N
     )
 
     chunks = [
-        chunk
-        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+        chunk async for chunk in runtime.stream(version=FakeVersion(), messages=[])
     ]
 
     assert chunks[0]["payload"]["delta"] == "hello"
@@ -320,7 +329,7 @@ async def test_agent_runtime_stream_extracts_content_block_message_deltas() -> N
 @pytest.mark.asyncio
 async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
     class NonStreamingAgent:
-        async def ainvoke(self, payload):
+        async def ainvoke(self, payload: object) -> object:
             return {"messages": [{"role": "assistant", "content": "done"}]}
 
     runtime = AgentRuntime(
@@ -329,8 +338,7 @@ async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
     )
 
     chunks = [
-        chunk
-        async for chunk in runtime.stream(version=FakeVersion(), messages=[])
+        chunk async for chunk in runtime.stream(version=FakeVersion(), messages=[])
     ]
 
     assert chunks == [

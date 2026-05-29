@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import (
     get_session_repository,
@@ -16,7 +16,7 @@ class FakeEvent:
     def __init__(
         self,
         sequence: int,
-        check_id,
+        check_id: object,
         event_type: str = "checkpoint",
         message: str | None = None,
     ) -> None:
@@ -38,7 +38,13 @@ class FakeCheck:
 
 
 class FakeMessage:
-    def __init__(self, sequence, step, content, role="assistant") -> None:
+    def __init__(
+        self,
+        sequence: object,
+        step: object,
+        content: object,
+        role: object = "assistant",
+    ) -> None:
         self.id = uuid4()
         self.session_id = 42
         self.sequence = sequence
@@ -56,10 +62,12 @@ class FakeRepository:
             FakeEvent(2, check.id, "completed", "done"),
         ]
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         return self.check if check_id == self.check.id else None
 
-    async def get_events_after(self, check_id, *, after=0, limit=100):
+    async def get_events_after(
+        self, check_id: object, *, after: object = 0, limit: object = 100
+    ) -> object:
         assert check_id == self.check.id
         return [event for event in self.events if event.sequence > after]
 
@@ -71,7 +79,9 @@ class FakeSessionRepository:
     def add_message(self, message: FakeMessage) -> None:
         self.messages.append(message)
 
-    async def get_messages_after(self, session_id, after=0, limit=100):
+    async def get_messages_after(
+        self, session_id: object, after: object = 0, limit: object = 100
+    ) -> object:
         return [
             message
             for message in self.messages
@@ -85,10 +95,12 @@ class PollingRepository:
         self.polls = 0
         self.event = FakeEvent(1, check.id, "completed", "done")
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         return self.check if check_id == self.check.id else None
 
-    async def get_events_after(self, check_id, *, after=0, limit=100):
+    async def get_events_after(
+        self, check_id: object, *, after: object = 0, limit: object = 100
+    ) -> object:
         assert check_id == self.check.id
         self.polls += 1
         if self.polls == 1:
@@ -97,7 +109,7 @@ class PollingRepository:
 
 
 @pytest.fixture(autouse=True)
-def override_repository():
+def override_repository() -> object:
     check = FakeCheck()
     repository = FakeRepository(check)
     session_repository = FakeSessionRepository()
@@ -108,7 +120,7 @@ def override_repository():
 
 
 @pytest.mark.asyncio
-async def test_events_replay_after_sequence(override_repository) -> None:
+async def test_events_replay_after_sequence(override_repository: object) -> None:
     check, _ = override_repository
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -126,7 +138,7 @@ async def test_events_replay_after_sequence(override_repository) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_replays_stored_events(override_repository) -> None:
+async def test_stream_replays_stored_events(override_repository: object) -> None:
     check, _ = override_repository
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -144,7 +156,7 @@ async def test_stream_replays_stored_events(override_repository) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_polls_until_terminal_event(monkeypatch) -> None:
+async def test_stream_polls_until_terminal_event(monkeypatch: object) -> None:
     monkeypatch.setattr(checks_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     check = FakeCheck()
     repository = PollingRepository(check)
@@ -156,7 +168,9 @@ async def test_stream_polls_until_terminal_event(monkeypatch) -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.get(f"/api/sop-quality-checks/{check.id}/stream?after=0")
+        response = await client.get(
+            f"/api/sop-quality-checks/{check.id}/stream?after=0"
+        )
 
     assert response.status_code == 200
     assert repository.polls == 2
@@ -165,8 +179,8 @@ async def test_stream_polls_until_terminal_event(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_stream_does_not_replay_session_messages_for_check(
-    monkeypatch,
-    override_repository,
+    monkeypatch: object,
+    override_repository: object,
 ) -> None:
     """SOP stream owns check lifecycle; session messages use /api/sessions."""
     monkeypatch.setattr(checks_api, "SSE_POLL_INTERVAL_SECONDS", 0)

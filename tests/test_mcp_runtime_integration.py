@@ -1,7 +1,7 @@
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-import sys
 from uuid import uuid4
 
 import pytest
@@ -16,23 +16,25 @@ class IntegrationRepository:
         self.tools: list[dict] = []
         self.commits = 0
 
-    async def require_server(self, server_id):
+    async def require_server(self, server_id: object) -> object:
         assert server_id == self.server.id
         return self.server
 
-    async def update_desired_state(self, server_id, desired_state):
+    async def update_desired_state(
+        self, server_id: object, desired_state: object
+    ) -> object:
         assert server_id == self.server.id
         self.server.desired_state = desired_state
         return self.server
 
     async def update_runtime_status(
         self,
-        server_id,
+        server_id: object,
         *,
-        runtime_status,
-        last_error=None,
-        checked=False,
-    ):
+        runtime_status: object,
+        last_error: object = None,
+        checked: object = False,
+    ) -> object:
         assert server_id == self.server.id
         self.server.runtime_status = runtime_status
         self.server.last_error = last_error
@@ -40,17 +42,17 @@ class IntegrationRepository:
             self.server.last_checked_at = datetime.now(UTC)
         return self.server
 
-    async def replace_tools(self, server_id, tools):
+    async def replace_tools(self, server_id: object, tools: object) -> object:
         assert server_id == self.server.id
         self.tools = tools
         self.server.tools = tools
         return []
 
-    async def tool_count(self, server_id):
+    async def tool_count(self, server_id: object) -> object:
         assert server_id == self.server.id
         return len(self.tools)
 
-    async def commit(self):
+    async def commit(self) -> None:
         self.commits += 1
 
 

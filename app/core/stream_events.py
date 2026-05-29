@@ -66,7 +66,11 @@ def _build_payload(
     node: str | None,
 ) -> dict[str, Any]:
     if event_type == "updates" and node and isinstance(chunk, Mapping):
-        return {"node": node, "update": _json_safe(chunk[node]), "raw": _json_safe(chunk)}
+        return {
+            "node": node,
+            "update": _json_safe(chunk[node]),
+            "raw": _json_safe(chunk),
+        }
     if event_type == "error":
         return {"error": _json_safe(chunk), "raw": _json_safe(chunk)}
     if event_type == "done":
@@ -138,7 +142,11 @@ def _text_block_delta(block: object) -> str | None:
 
 
 def _is_message_tuple(chunk: object) -> bool:
-    return isinstance(chunk, Sequence) and not isinstance(chunk, str | bytes) and len(chunk) >= 2
+    return (
+        isinstance(chunk, Sequence)
+        and not isinstance(chunk, str | bytes)
+        and len(chunk) >= 2
+    )
 
 
 def _string_or_none(value: object) -> str | None:

@@ -31,38 +31,40 @@ class FakeStartupRepository:
         self.tools = []
         self.commits = 0
 
-    async def list_startup_servers(self):
+    async def list_startup_servers(self) -> object:
         return self.servers
 
-    async def require_server(self, server_id):
+    async def require_server(self, server_id: object) -> object:
         return next(server for server in self.servers if server.id == server_id)
 
-    async def update_desired_state(self, server_id, desired_state):
+    async def update_desired_state(
+        self, server_id: object, desired_state: object
+    ) -> object:
         server = await self.require_server(server_id)
         server.desired_state = desired_state
         return server
 
     async def update_runtime_status(
         self,
-        server_id,
+        server_id: object,
         *,
-        runtime_status,
-        last_error=None,
-        checked=False,
-    ):
+        runtime_status: object,
+        last_error: object = None,
+        checked: object = False,
+    ) -> object:
         server = await self.require_server(server_id)
         server.runtime_status = runtime_status
         server.last_error = last_error
         return server
 
-    async def replace_tools(self, server_id, tools):
+    async def replace_tools(self, server_id: object, tools: object) -> object:
         self.tools = tools
         return []
 
-    async def tool_count(self, server_id):
+    async def tool_count(self, server_id: object) -> object:
         return len(self.tools)
 
-    async def commit(self):
+    async def commit(self) -> None:
         self.commits += 1
 
 
@@ -70,14 +72,14 @@ class FakeProbe:
     def __init__(self) -> None:
         self.started = []
 
-    async def start(self, server):
+    async def start(self, server: object) -> object:
         self.started.append(server.id)
         return object(), []
 
-    async def list_tools(self, handle):
+    async def list_tools(self, handle: object) -> object:
         return []
 
-    async def stop(self, handle):
+    async def stop(self, handle: object) -> None:
         return None
 
 
@@ -117,7 +119,7 @@ async def test_runtime_start_enabled_servers_starts_http_servers() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_start_enabled_servers_skips_without_single_instance_confirmation() -> None:
+async def test_runtime_start_skips_without_single_instance_confirmation() -> None:
     repository = FakeStartupRepository()
     probe = FakeProbe()
     manager = McpRuntimeManager(
@@ -137,17 +139,17 @@ async def test_runtime_start_enabled_servers_skips_without_single_instance_confi
 
 
 @pytest.mark.asyncio
-async def test_lifespan_starts_and_shuts_down_mcp_runtime(monkeypatch) -> None:
+async def test_lifespan_starts_and_shuts_down_mcp_runtime(monkeypatch: object) -> None:
     events = []
 
-    async def fake_interrupt_leftover_sop_quality_checks():
+    async def fake_interrupt_leftover_sop_quality_checks() -> None:
         events.append("interrupt")
 
     class FakeRuntime:
-        async def start_enabled_servers(self):
+        async def start_enabled_servers(self) -> None:
             events.append("mcp-start")
 
-        async def shutdown(self):
+        async def shutdown(self) -> None:
             events.append("mcp-shutdown")
 
     monkeypatch.setattr(

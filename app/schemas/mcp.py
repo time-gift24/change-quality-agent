@@ -13,7 +13,6 @@ from pydantic import (
     model_validator,
 )
 
-
 REDACTED = "********"
 _HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
 
@@ -58,7 +57,7 @@ class McpServerCreate(BaseModel):
     desired_state: McpDesiredState = McpDesiredState.stopped
 
     @model_validator(mode="after")
-    def validate_transport_fields(self):
+    def validate_transport_fields(self) -> object:
         if self.transport == McpTransport.stdio:
             if not self.command:
                 raise ValueError("stdio MCP servers require command")

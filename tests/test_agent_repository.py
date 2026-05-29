@@ -20,7 +20,7 @@ requires_test_database = pytest.mark.skipif(
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -99,7 +99,7 @@ def draft_config(
     *,
     system_prompt: str = "You are careful.",
     model: str = "openai:gpt-5-mini",
-    provider_id=None,
+    provider_id: object = None,
     temperature: float = 0,
 ) -> AgentDraftConfig:
     return AgentDraftConfig(
@@ -149,7 +149,7 @@ async def test_update_draft_returns_reloaded_agent_after_flush() -> None:
 
         async def _require_agent(
             self,
-            agent_id,
+            agent_id: object,
             *,
             include_deleted: bool = False,
             lock: bool = False,
@@ -161,7 +161,7 @@ async def test_update_draft_returns_reloaded_agent_after_flush() -> None:
 
         async def _require_active_agent(
             self,
-            agent_id,
+            agent_id: object,
             *,
             lock: bool = False,
         ) -> FakeAgent:
@@ -195,7 +195,7 @@ async def test_soft_delete_returns_reloaded_deleted_agent_after_flush() -> None:
 
         async def _require_agent(
             self,
-            agent_id,
+            agent_id: object,
             *,
             include_deleted: bool = False,
             lock: bool = False,
@@ -207,7 +207,7 @@ async def test_soft_delete_returns_reloaded_deleted_agent_after_flush() -> None:
 
         async def _require_active_agent(
             self,
-            agent_id,
+            agent_id: object,
             *,
             lock: bool = False,
         ) -> FakeAgent:
@@ -230,7 +230,9 @@ async def test_soft_delete_returns_reloaded_deleted_agent_after_flush() -> None:
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_create_agent_stores_draft_with_external_model_config_key(session) -> None:
+async def test_create_agent_stores_draft_with_external_model_config_key(
+    session: object,
+) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
 
@@ -250,7 +252,7 @@ async def test_create_agent_stores_draft_with_external_model_config_key(session)
 @pytest.mark.db
 @requires_test_database
 async def test_update_draft_updates_only_provided_fields_and_can_clear_description(
-    session,
+    session: object,
 ) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
@@ -279,7 +281,7 @@ async def test_update_draft_updates_only_provided_fields_and_can_clear_descripti
 @pytest.mark.db
 @requires_test_database
 async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
-    session,
+    session: object,
 ) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
@@ -325,7 +327,7 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_publish_agent_copies_provider_id_to_version(session) -> None:
+async def test_publish_agent_copies_provider_id_to_version(session: object) -> None:
     agents = repository_types()
     from app.repositories.llm_providers import LlmProviderRepository
 
@@ -349,7 +351,7 @@ async def test_publish_agent_copies_provider_id_to_version(session) -> None:
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_publish_agent_rejects_invalid_draft(session) -> None:
+async def test_publish_agent_rejects_invalid_draft(session: object) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
     agent = await repository.create_agent(
@@ -371,7 +373,9 @@ async def test_publish_agent_rejects_invalid_draft(session) -> None:
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_soft_delete_hides_agent_by_default_and_preserves_versions(session) -> None:
+async def test_soft_delete_hides_agent_by_default_and_preserves_versions(
+    session: object,
+) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
     agent = await repository.create_agent(
@@ -403,7 +407,9 @@ async def test_soft_delete_hides_agent_by_default_and_preserves_versions(session
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_update_and_delete_missing_agents_raise_not_found(session) -> None:
+async def test_update_and_delete_missing_agents_raise_not_found(
+    session: object,
+) -> None:
     agents = repository_types()
     repository = agents.AgentRepository(session)
 

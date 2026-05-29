@@ -47,7 +47,7 @@ class FakeMessageWriter:
         role: str,
         content: str,
         additional_kwargs: dict[str, Any] | None = None,
-    ):
+    ) -> object:
         self.calls.append(
             {
                 "step": step,
@@ -79,7 +79,7 @@ class FakeStreamRunner:
         return DeepAgentRunResult(final_text=self.final_text)
 
 
-async def fake_submit_quality_result(payload):
+async def fake_submit_quality_result(payload: object) -> object:
     return {
         "external_status": "submitted",
         "quality_result": payload["quality_result"],

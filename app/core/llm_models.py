@@ -1,6 +1,6 @@
-from typing import Any
 from dataclasses import dataclass
 from types import MethodType
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -56,7 +56,9 @@ def create_chat_model(model: str, **model_config: Any) -> BaseChatModel:
         )
 
     token_provider = get_token_provider()
-    http_client, http_async_client = _build_token_refreshing_http_clients(token_provider)
+    http_client, http_async_client = _build_token_refreshing_http_clients(
+        token_provider
+    )
     chat_model = ChatDeepSeek(
         model=codeagent_model,
         api_key=CODEAGENT_INTERNAL_API_KEY,
@@ -126,7 +128,9 @@ def _copy_reasoning_content_to_payload(
     if not isinstance(payload_messages, list):
         return
 
-    for source_message, payload_message in zip(messages, payload_messages, strict=False):
+    for source_message, payload_message in zip(
+        messages, payload_messages, strict=False
+    ):
         if not isinstance(source_message, AIMessage):
             continue
         if not isinstance(payload_message, dict):

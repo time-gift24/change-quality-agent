@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api import deps
 from app.core.database import get_session
@@ -24,7 +24,7 @@ class FakeProvider:
     def __init__(
         self,
         *,
-        provider_id=None,
+        provider_id: object = None,
         display_name: str = "OpenAI Main",
         provider_type: str = "openai",
         api_key: str | None = "sk-secret",
@@ -56,13 +56,13 @@ class FakeRepository:
         self.updated_values: dict[str, object] | None = None
         self.deleted_id = None
 
-    async def list(self):
+    async def list(self) -> object:
         return list(self.providers.values())
 
-    async def get_by_id(self, provider_id):
+    async def get_by_id(self, provider_id: object) -> object:
         return self.providers.get(provider_id)
 
-    async def create(self, **values):
+    async def create(self, **values: object) -> object:
         self.created_values = values
         provider = FakeProvider(
             display_name=values["display_name"],
@@ -74,7 +74,7 @@ class FakeRepository:
         self.providers[provider.id] = provider
         return provider
 
-    async def update(self, provider_id, **values):
+    async def update(self, provider_id: object, **values: object) -> object:
         provider = self.providers.get(provider_id)
         if provider is None:
             raise LlmProviderNotFoundError(provider_id)
@@ -83,7 +83,7 @@ class FakeRepository:
             setattr(provider, field, value)
         return provider
 
-    async def soft_delete(self, provider_id):
+    async def soft_delete(self, provider_id: object) -> object:
         provider = self.providers.get(provider_id)
         if provider is None:
             raise LlmProviderNotFoundError(provider_id)
@@ -93,20 +93,20 @@ class FakeRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides() -> object:
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
 
 
-def make_session_override(session: FakeSession):
-    async def override_session():
+def make_session_override(session: FakeSession) -> object:
+    async def override_session() -> object:
         yield session
 
     return override_session
 
 
-def override_dependencies(repository: FakeRepository, session: FakeSession):
+def override_dependencies(repository: FakeRepository, session: FakeSession) -> None:
     app.dependency_overrides[get_session] = make_session_override(session)
     get_llm_provider_repository = getattr(deps, "get_llm_provider_repository", None)
     if get_llm_provider_repository is not None:
@@ -267,13 +267,31 @@ async def test_update_provider_clears_headers_and_query_when_null() -> None:
     assert response.json()["default_query"] == {}
 
 
+def _expected_model_test_response() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "latency_ms": 12.5,
+        "message": "pong",
+        "error": None,
+        "request": {
+            "model": "gpt-5-mini",
+            "messages": [{"role": "user", "content": "ping"}],
+            "provider_type": "openai",
+        },
+        "response": {
+            "content": "pong",
+            "raw": {"type": "ai", "content": "pong"},
+        },
+    }
+
+
 @pytest.mark.asyncio
-async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
+async def test_test_provider_model_uses_selected_model(monkeypatch: object) -> None:
     repository = FakeRepository()
     override_dependencies(repository, FakeSession())
     calls: list[tuple[object, str]] = []
 
-    async def fake_test_provider_model(provider, model):
+    async def fake_test_provider_model(provider: object, model: object) -> object:
         calls.append((provider, model))
         return LlmProviderModelTestResponse(
             status="ok",
@@ -307,21 +325,7 @@ async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
         )
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "latency_ms": 12.5,
-        "message": "pong",
-        "error": None,
-        "request": {
-            "model": "gpt-5-mini",
-            "messages": [{"role": "user", "content": "ping"}],
-            "provider_type": "openai",
-        },
-        "response": {
-            "content": "pong",
-            "raw": {"type": "ai", "content": "pong"},
-        },
-    }
+    assert response.json() == _expected_model_test_response()
     assert len(calls) == 1
     provider_config, model = calls[0]
     assert provider_config.id == repository.provider_id
@@ -348,11 +352,11 @@ async def test_test_provider_model_rejects_model_not_in_provider_models() -> Non
 
 
 @pytest.mark.asyncio
-async def test_test_provider_model_returns_502_on_failure(monkeypatch) -> None:
+async def test_test_provider_model_returns_502_on_failure(monkeypatch: object) -> None:
     repository = FakeRepository()
     override_dependencies(repository, FakeSession())
 
-    async def fake_test_provider_model(provider, model):
+    async def fake_test_provider_model(provider: object, model: object) -> object:
         return LlmProviderModelTestResponse(
             status="failed",
             latency_ms=3.0,

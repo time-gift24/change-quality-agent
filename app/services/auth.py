@@ -1,8 +1,8 @@
 from app.core.config import Settings
-from app.repositories.users import DEV_USERS, UserRepository
+from app.repositories.users import DEV_USER_ACCOUNTS, UserRepository
 from app.schemas.users import UserPublic
 
-DEV_LOGIN_ACCOUNTS = frozenset(user["account"] for user in DEV_USERS)
+DEV_LOGIN_ACCOUNTS = frozenset(DEV_USER_ACCOUNTS)
 
 
 class AuthRequiredError(PermissionError):
@@ -31,7 +31,7 @@ class AuthService:
     def session_cookie_name(self) -> str:
         return self._settings.auth_session_cookie_name
 
-    def current_user_public(self, current_user) -> UserPublic:
+    def current_user_public(self, current_user: object) -> UserPublic:
         if current_user is None:
             raise AuthRequiredError()
         return user_to_public(current_user)
@@ -51,7 +51,7 @@ class AuthService:
         return user_to_public(user)
 
 
-def user_to_public(user) -> UserPublic:
+def user_to_public(user: object) -> UserPublic:
     return UserPublic(
         id=user.id,
         account=user.account,

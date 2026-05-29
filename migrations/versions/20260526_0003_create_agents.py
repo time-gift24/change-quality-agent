@@ -8,8 +8,8 @@ Create Date: 2026-05-26
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "20260526_0003"
@@ -19,6 +19,13 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    _create_agents_table()
+    _create_agent_versions_table()
+    _create_agent_versions_indexes()
+    _create_agents_latest_version_foreign_key()
+
+
+def _create_agents_table() -> None:
     op.create_table(
         "agents",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -54,6 +61,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
 
+
+def _create_agent_versions_table() -> None:
     op.create_table(
         "agent_versions",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -95,6 +104,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["agent_id"], ["agents.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+
+
+def _create_agent_versions_indexes() -> None:
     op.create_index(
         "uq_agent_versions_agent_version",
         "agent_versions",
@@ -106,6 +118,9 @@ def upgrade() -> None:
         "agent_versions",
         ["agent_id", "published_at"],
     )
+
+
+def _create_agents_latest_version_foreign_key() -> None:
     op.create_foreign_key(
         "fk_agents_latest_version_id_agent_versions",
         "agents",

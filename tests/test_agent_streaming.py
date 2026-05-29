@@ -21,7 +21,7 @@ class RecordingWriter:
         role: str,
         content: str,
         additional_kwargs: dict[str, Any] | None = None,
-    ):
+    ) -> object:
         record = {
             "step": step,
             "role": role,
@@ -57,7 +57,7 @@ class StreamingAgent:
         self.chunks = chunks
         self.astream_called_with: tuple[dict[str, Any], list[str]] | None = None
 
-    async def astream(self, payload, *, stream_mode=None):
+    async def astream(self, payload: object, *, stream_mode: object = None) -> object:
         self.astream_called_with = (payload, list(stream_mode or []))
         for chunk in self.chunks:
             yield chunk
@@ -72,13 +72,21 @@ class InvokeOnlyAgent:
 @pytest.mark.asyncio
 async def test_runner_prefers_astream_and_aggregates_content() -> None:
     chunks = [
-        ("messages", (_FakeMessageWithDelta(content="Hello "), {"langgraph_node": "review_sop"})),
-        ("messages", (_FakeMessageWithDelta(content="World"), {"langgraph_node": "review_sop"})),
+        (
+            "messages",
+            (_FakeMessageWithDelta(content="Hello "), {"langgraph_node": "review_sop"}),
+        ),
+        (
+            "messages",
+            (_FakeMessageWithDelta(content="World"), {"langgraph_node": "review_sop"}),
+        ),
     ]
     agent = StreamingAgent(chunks)
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     result = await runner.run_step(
         agent=agent,
@@ -97,12 +105,17 @@ async def test_runner_prefers_astream_and_aggregates_content() -> None:
 @pytest.mark.asyncio
 async def test_runner_broadcasts_live_message_delta() -> None:
     chunks = [
-        ("messages", (_FakeMessageWithDelta(content="abc"), {"langgraph_node": "review_sop"})),
+        (
+            "messages",
+            (_FakeMessageWithDelta(content="abc"), {"langgraph_node": "review_sop"}),
+        ),
     ]
     agent = StreamingAgent(chunks)
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     await runner.run_step(
         agent=agent,
@@ -120,13 +133,27 @@ async def test_runner_broadcasts_live_message_delta() -> None:
 @pytest.mark.asyncio
 async def test_runner_emits_thinking_status_without_text() -> None:
     chunks = [
-        ("messages", (_FakeMessageWithDelta(reasoning="private thoughts"), {"langgraph_node": "review_sop"})),
-        ("messages", (_FakeMessageWithDelta(content="visible"), {"langgraph_node": "review_sop"})),
+        (
+            "messages",
+            (
+                _FakeMessageWithDelta(reasoning="private thoughts"),
+                {"langgraph_node": "review_sop"},
+            ),
+        ),
+        (
+            "messages",
+            (
+                _FakeMessageWithDelta(content="visible"),
+                {"langgraph_node": "review_sop"},
+            ),
+        ),
     ]
     agent = StreamingAgent(chunks)
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     await runner.run_step(
         agent=agent,
@@ -135,7 +162,8 @@ async def test_runner_emits_thinking_status_without_text() -> None:
     )
 
     thinking_events = [
-        e for e in publisher.events
+        e
+        for e in publisher.events
         if e.get("type") == "message_delta"
         and e.get("additional_kwargs", {}).get("channel") == "thinking"
     ]
@@ -147,13 +175,21 @@ async def test_runner_emits_thinking_status_without_text() -> None:
 @pytest.mark.asyncio
 async def test_runner_persists_exactly_one_final_assistant_message() -> None:
     chunks = [
-        ("messages", (_FakeMessageWithDelta(content="hello"), {"langgraph_node": "review_sop"})),
-        ("messages", (_FakeMessageWithDelta(content=" world"), {"langgraph_node": "review_sop"})),
+        (
+            "messages",
+            (_FakeMessageWithDelta(content="hello"), {"langgraph_node": "review_sop"}),
+        ),
+        (
+            "messages",
+            (_FakeMessageWithDelta(content=" world"), {"langgraph_node": "review_sop"}),
+        ),
     ]
     agent = StreamingAgent(chunks)
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     await runner.run_step(
         agent=agent,
@@ -162,7 +198,8 @@ async def test_runner_persists_exactly_one_final_assistant_message() -> None:
     )
 
     assistant_messages = [
-        c for c in writer.calls
+        c
+        for c in writer.calls
         if c["role"] == "assistant"
         and c["additional_kwargs"].get("kind") == "final_message"
     ]
@@ -174,10 +211,14 @@ async def test_runner_persists_exactly_one_final_assistant_message() -> None:
 
 @pytest.mark.asyncio
 async def test_runner_falls_back_to_ainvoke_when_no_astream() -> None:
-    agent = InvokeOnlyAgent({"messages": [{"role": "assistant", "content": "fallback text"}]})
+    agent = InvokeOnlyAgent(
+        {"messages": [{"role": "assistant", "content": "fallback text"}]}
+    )
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     result = await runner.run_step(
         agent=agent,
@@ -191,10 +232,14 @@ async def test_runner_falls_back_to_ainvoke_when_no_astream() -> None:
 
 @pytest.mark.asyncio
 async def test_runner_writes_final_message_for_ainvoke_path() -> None:
-    agent = InvokeOnlyAgent({"messages": [{"role": "assistant", "content": "fallback"}]})
+    agent = InvokeOnlyAgent(
+        {"messages": [{"role": "assistant", "content": "fallback"}]}
+    )
     writer = RecordingWriter()
     publisher = RecordingPublisher()
-    runner = DeepAgentStreamRunner(message_writer=writer, live_event_publisher=publisher)
+    runner = DeepAgentStreamRunner(
+        message_writer=writer, live_event_publisher=publisher
+    )
 
     await runner.run_step(
         agent=agent,

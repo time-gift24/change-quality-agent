@@ -41,10 +41,10 @@ class McpServerService:
         self._repository = repository
         self._runtime = runtime
 
-    async def list_servers(self):
+    async def list_servers(self) -> object:
         return await self._repository.list_servers()
 
-    async def create_server(self, payload: McpServerCreate):
+    async def create_server(self, payload: McpServerCreate) -> object:
         try:
             server = await self._repository.create_server(
                 **payload.model_dump(mode="json")
@@ -61,13 +61,13 @@ class McpServerService:
 
         return server
 
-    async def get_server(self, server_id: UUID):
+    async def get_server(self, server_id: UUID) -> object:
         server = await self._repository.get_server(server_id)
         if server is None:
             raise McpServerNotFoundError(server_id)
         return server
 
-    async def update_server(self, server_id: UUID, payload: McpServerUpdate):
+    async def update_server(self, server_id: UUID, payload: McpServerUpdate) -> object:
         async with self._runtime.server_operation_lock(server_id):
             server = await self._repository.get_server(server_id)
             if server is None:
@@ -121,7 +121,9 @@ class McpServerService:
         return await _run_lifecycle(self._runtime.check, server_id)
 
 
-def _validated_update_values(server, values: dict[str, object]) -> dict[str, object]:
+def _validated_update_values(
+    server: object, values: dict[str, object]
+) -> dict[str, object]:
     merged = {
         "name": server.name,
         "transport": server.transport,
@@ -141,7 +143,7 @@ def _validated_update_values(server, values: dict[str, object]) -> dict[str, obj
     return {key: validated[key] for key in values}
 
 
-def _should_start_after_save(server) -> bool:
+def _should_start_after_save(server: object) -> bool:
     return bool(server.enabled) and server.desired_state == "running"
 
 

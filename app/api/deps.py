@@ -12,13 +12,13 @@ from app.repositories.mcp_servers import McpServerRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
-from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.agents import AgentService
 from app.services.auth import AuthService
 from app.services.llm_providers import LlmProviderService
+from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.mcp_servers import McpServerService
-from app.services.sessions import SessionService
 from app.services.session_streaming import SessionBroadcast
+from app.services.sessions import SessionService
 from app.services.sop_client import MockSopClient, SopClient
 from app.services.sop_quality import SopQualityService
 from app.services.sop_quality_runner import run_sop_quality_check_with_new_session
@@ -144,7 +144,7 @@ def require_admin_user(request: Request) -> None:
 
 
 @asynccontextmanager
-async def mcp_runtime_repository_context():
+async def mcp_runtime_repository_context() -> object:
     async with async_session() as session:
         yield McpServerRepository(session)
 
@@ -220,7 +220,7 @@ def get_sop_quality_service(
     session_broadcast: SessionBroadcastDep,
     broadcast: SopQualityBroadcastDep,
 ) -> SopQualityService:
-    def schedule_check(check_id) -> None:
+    def schedule_check(check_id: object) -> None:
         executor = getattr(request.app.state, "sop_quality_check_executor", None)
         if executor is not None:
             background_tasks.add_task(executor, check_id)

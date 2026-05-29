@@ -20,7 +20,7 @@ class FakeSessionContext:
     async def __aenter__(self) -> FakeSession:
         return self.session
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
 
@@ -29,7 +29,7 @@ class FakeRepository:
         self.session = session
         self.interrupted = False
 
-    async def interrupt_active_checks_on_startup(self):
+    async def interrupt_active_checks_on_startup(self) -> object:
         self.interrupted = True
         return []
 
@@ -42,7 +42,7 @@ class FakeUserRepository:
 
 @pytest.mark.asyncio
 async def test_startup_cleanup_interrupts_leftover_sop_quality_checks(
-    monkeypatch,
+    monkeypatch: object,
 ) -> None:
     session = FakeSession()
     repository = FakeRepository(session)
@@ -61,11 +61,14 @@ async def test_startup_cleanup_interrupts_leftover_sop_quality_checks(
 
 
 @pytest.mark.asyncio
-async def test_seed_dev_users_on_startup_seeds_and_commits(monkeypatch) -> None:
+async def test_seed_dev_users_on_startup_seeds_and_commits(monkeypatch: object) -> None:
     session = FakeSession()
     repository = FakeUserRepository(session)
 
-    async def fake_seed_dev_users(user_repository: FakeUserRepository) -> None:
+    async def fake_seed_dev_users(
+        user_repository: FakeUserRepository,
+        users: object,
+    ) -> None:
         user_repository.seeded = True
 
     monkeypatch.setattr(main, "async_session", lambda: FakeSessionContext(session))
@@ -80,7 +83,7 @@ async def test_seed_dev_users_on_startup_seeds_and_commits(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_lifespan_seeds_dev_users_before_mcp_startup(monkeypatch) -> None:
+async def test_lifespan_seeds_dev_users_before_mcp_startup(monkeypatch: object) -> None:
     events = []
 
     async def fake_interrupt_leftover_sop_quality_checks() -> None:
@@ -102,7 +105,9 @@ async def test_lifespan_seeds_dev_users_before_mcp_startup(monkeypatch) -> None:
         "interrupt_leftover_sop_quality_checks",
         fake_interrupt_leftover_sop_quality_checks,
     )
-    monkeypatch.setattr(main, "seed_dev_users_on_startup", fake_seed_dev_users_on_startup)
+    monkeypatch.setattr(
+        main, "seed_dev_users_on_startup", fake_seed_dev_users_on_startup
+    )
     monkeypatch.setattr(main, "get_mcp_runtime_manager", lambda: FakeRuntime())
 
     async with main.lifespan(main.app):

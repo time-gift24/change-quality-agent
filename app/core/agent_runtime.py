@@ -38,12 +38,12 @@ class LlmProviderResolver(Protocol):
 class AgentRuntime:
     def __init__(
         self,
-        create_agent=langchain_create_agent,
+        create_agent: object = langchain_create_agent,
         tool_resolver: StaticToolResolver | None = None,
         *,
-        model_factory=create_chat_model,
+        model_factory: object = create_chat_model,
         provider_resolver: LlmProviderResolver | None = None,
-        provider_model_factory=create_provider_chat_model,
+        provider_model_factory: object = create_provider_chat_model,
     ) -> None:
         self._create_agent = create_agent
         self._tool_resolver = tool_resolver or StaticToolResolver()
@@ -70,7 +70,7 @@ class AgentRuntime:
         *,
         version: Any,
         messages: list[dict[str, Any]],
-    ):
+    ) -> object:
         agent = await self._build_agent(version)
         payload = {"messages": messages}
 

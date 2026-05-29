@@ -1,5 +1,5 @@
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_sop_client
 from app.main import app
@@ -18,7 +18,7 @@ class FakeSopClient:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides() -> object:
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()

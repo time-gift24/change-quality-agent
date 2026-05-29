@@ -14,17 +14,17 @@ from app.schemas.mcp import (
     McpServerSummary,
     McpServerUpdate,
 )
-from app.services.mcp_servers import (
-    McpServerNameConflictError,
-    McpServerNotFoundError,
-    McpServerUpdateConflictError,
-    McpServerValidationError,
-)
 from app.services.mcp_runtime import (
     McpCommandNotAllowedError,
     McpRuntimeNotEnabledError,
     UnsupportedMcpTransportError,
     sanitize_mcp_error,
+)
+from app.services.mcp_servers import (
+    McpServerNameConflictError,
+    McpServerNotFoundError,
+    McpServerUpdateConflictError,
+    McpServerValidationError,
 )
 
 router = APIRouter(
@@ -112,17 +112,17 @@ async def check_mcp_server(
     return await _run_service(lambda: service.check_server(server_id))
 
 
-def _server_summary(server) -> McpServerSummary:
+def _server_summary(server: object) -> McpServerSummary:
     return McpServerSummary.model_validate(server).model_copy(
         update={"tool_count": len(getattr(server, "tools", []) or [])}
     )
 
 
-def _server_detail(server) -> McpServerDetail:
+def _server_detail(server: object) -> McpServerDetail:
     return McpServerDetail.model_validate(server)
 
 
-async def _run_service(operation: Callable[[], Awaitable[object]]):
+async def _run_service(operation: Callable[[], Awaitable[object]]) -> object:
     try:
         return await operation()
     except McpServerNotFoundError as exc:

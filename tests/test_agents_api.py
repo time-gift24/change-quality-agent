@@ -1,15 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api import deps
 from app.core.database import get_session
 from app.main import app
 from app.repositories.agents import AgentDraftInvalidError, AgentNotFoundError
 from app.schemas.agents import AgentDraftConfig
-
 
 BASE_TIME = datetime(2026, 5, 26, 12, 0, tzinfo=UTC)
 
@@ -26,7 +25,7 @@ class FakeVersion:
     def __init__(
         self,
         *,
-        agent_id,
+        agent_id: object,
         version_number: int = 1,
         published_at: datetime = BASE_TIME,
     ) -> None:
@@ -67,7 +66,7 @@ class FakeAgentRepository:
         self,
         *,
         agents: list[FakeAgent] | None = None,
-        invalid_publish_id=None,
+        invalid_publish_id: object = None,
     ) -> None:
         self.agents = {agent.id: agent for agent in agents or []}
         self.versions: dict[object, list[FakeVersion]] = {
@@ -79,7 +78,7 @@ class FakeAgentRepository:
         self.updated_kwargs: dict[str, object] | None = None
         self.deleted_id = None
 
-    async def create_agent(self, **kwargs):
+    async def create_agent(self, **kwargs: object) -> object:
         agent = FakeAgent(
             display_name=kwargs["display_name"],
             description=kwargs["description"],
@@ -89,14 +88,16 @@ class FakeAgentRepository:
         self.versions[agent.id] = []
         return agent
 
-    async def list_agents(self, *, include_deleted: bool = False):
+    async def list_agents(self, *, include_deleted: bool = False) -> object:
         self.list_include_deleted.append(include_deleted)
         agents = list(self.agents.values())
         if not include_deleted:
             agents = [agent for agent in agents if agent.deleted_at is None]
         return agents
 
-    async def get_agent(self, agent_id, *, include_deleted: bool = False):
+    async def get_agent(
+        self, agent_id: object, *, include_deleted: bool = False
+    ) -> object:
         agent = self.agents.get(agent_id)
         if agent is None:
             return None
@@ -104,7 +105,7 @@ class FakeAgentRepository:
             return None
         return agent
 
-    async def update_draft(self, agent_id, **kwargs):
+    async def update_draft(self, agent_id: object, **kwargs: object) -> object:
         agent = self.agents.get(agent_id)
         if agent is None:
             raise AgentNotFoundError(agent_id)
@@ -120,7 +121,7 @@ class FakeAgentRepository:
             agent.draft_config = to_draft_payload(kwargs["draft"])
         return agent
 
-    async def publish_agent(self, agent_id):
+    async def publish_agent(self, agent_id: object) -> object:
         agent = self.agents.get(agent_id)
         if agent is None:
             raise AgentNotFoundError(agent_id)
@@ -134,20 +135,22 @@ class FakeAgentRepository:
         agent.latest_version = version
         return version
 
-    async def list_versions(self, agent_id):
+    async def list_versions(self, agent_id: object) -> object:
         return sorted(
             self.versions.get(agent_id, []),
             key=lambda version: version.version_number,
             reverse=True,
         )
 
-    async def get_version_by_number(self, agent_id, version_number: int):
+    async def get_version_by_number(
+        self, agent_id: object, version_number: int
+    ) -> object:
         for version in self.versions.get(agent_id, []):
             if version.version_number == version_number:
                 return version
         return None
 
-    async def soft_delete(self, agent_id):
+    async def soft_delete(self, agent_id: object) -> object:
         agent = self.agents.get(agent_id)
         if agent is None:
             raise AgentNotFoundError(agent_id)
@@ -157,7 +160,7 @@ class FakeAgentRepository:
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides() -> object:
     app.dependency_overrides.clear()
     yield
     app.dependency_overrides.clear()
@@ -188,14 +191,16 @@ def create_payload() -> dict[str, object]:
     }
 
 
-def make_session_override(session: FakeSession):
-    async def override_session():
+def make_session_override(session: FakeSession) -> object:
+    async def override_session() -> object:
         yield session
 
     return override_session
 
 
-def override_dependencies(repository: FakeAgentRepository, session: FakeSession):
+def override_dependencies(
+    repository: FakeAgentRepository, session: FakeSession
+) -> None:
     app.dependency_overrides[get_session] = make_session_override(session)
     get_agent_repository = getattr(deps, "get_agent_repository", None)
     if get_agent_repository is not None:
@@ -304,7 +309,9 @@ async def test_patch_draft_preserves_explicit_body_fields() -> None:
         transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
-        response = await client.patch(f"/api/agents/{agent.id}/draft", json=patch_payload)
+        response = await client.patch(
+            f"/api/agents/{agent.id}/draft", json=patch_payload
+        )
 
     assert response.status_code == 200
     body = response.json()

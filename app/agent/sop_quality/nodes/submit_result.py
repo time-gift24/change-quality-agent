@@ -18,7 +18,7 @@ async def mock_submit_quality_result(payload: dict[str, Any]) -> dict[str, Any]:
 def make_submit_result(
     submit_quality_result: SubmitQualityResult,
     message_writer: SessionMessageWriter,
-):
+) -> object:
     async def submit_result(state: SopQualityState) -> SopQualityState:
         result = state.get("result")
         if not isinstance(result, dict):
@@ -58,7 +58,9 @@ def make_submit_result(
 
 def _submission_text(submission_result: Any) -> str:
     if isinstance(submission_result, dict):
-        status = submission_result.get("external_status") or submission_result.get("status")
+        status = submission_result.get("external_status") or submission_result.get(
+            "status"
+        )
         return f"External submission: {status or 'completed'}."
     return "External submission completed."
 

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 API_V1_DIR = Path(__file__).resolve().parents[1] / "app" / "api" / "v1"
 
 

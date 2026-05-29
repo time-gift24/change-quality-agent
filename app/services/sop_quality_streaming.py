@@ -8,9 +8,9 @@ from uuid import UUID
 
 class SopQualityBroadcast:
     def __init__(self) -> None:
-        self._subscribers: dict[
-            UUID, set[asyncio.Queue[dict[str, Any]]]
-        ] = defaultdict(set)
+        self._subscribers: dict[UUID, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(
+            set
+        )
 
     @asynccontextmanager
     async def subscribe(

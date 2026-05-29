@@ -4,10 +4,6 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Path, Response, status
 
 from app.api.deps import LlmProviderServiceDep
-from app.services.llm_providers import (
-    LlmProviderModelNotConfiguredError,
-    LlmProviderNotFoundError,
-)
 from app.schemas.llm_providers import (
     LlmProviderCreate,
     LlmProviderDetail,
@@ -15,6 +11,10 @@ from app.schemas.llm_providers import (
     LlmProviderModelTestResponse,
     LlmProviderSummary,
     LlmProviderUpdate,
+)
+from app.services.llm_providers import (
+    LlmProviderModelNotConfiguredError,
+    LlmProviderNotFoundError,
 )
 
 router = APIRouter(prefix="/api/v1/llm-providers", tags=["llm-providers"])

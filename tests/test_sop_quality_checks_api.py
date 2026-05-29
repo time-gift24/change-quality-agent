@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import (
     get_session,
@@ -43,12 +43,19 @@ class FakeSessionRepository:
         self.created.append(runtime_session)
         return runtime_session
 
-    async def get_messages_after(self, session_id, after=0, limit=100):
-        return [m for m in self.messages if getattr(m, "session_id", None) == session_id and getattr(m, "sequence", 0) > after]
+    async def get_messages_after(
+        self, session_id: object, after: object = 0, limit: object = 100
+    ) -> object:
+        return [
+            m
+            for m in self.messages
+            if getattr(m, "session_id", None) == session_id
+            and getattr(m, "sequence", 0) > after
+        ]
 
 
 class FakeCheck:
-    def __init__(self, check_id=None, session_id: int | None = 99) -> None:
+    def __init__(self, check_id: object = None, session_id: int | None = 99) -> None:
         self.id = check_id or uuid4()
         self.sop_id = "release-checklist"
         self.env_key = "dev"
@@ -74,18 +81,18 @@ class FakeRepository:
         self.events = []
         self.last_create_kwargs: dict = {}
 
-    async def create_check(self, **kwargs):
+    async def create_check(self, **kwargs: object) -> object:
         self.last_create_kwargs = kwargs
         self.check.session_id = kwargs.get("session_id")
         return self.check
 
-    async def get_active_check(self, *, sop_id, env_key):
+    async def get_active_check(self, *, sop_id: object, env_key: object) -> None:
         return None
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         return self.check if check_id == self.check.id else None
 
-    async def append_event(self, check_id, **kwargs):
+    async def append_event(self, check_id: object, **kwargs: object) -> object:
         event = type(
             "Event",
             (),
@@ -99,26 +106,28 @@ class FakeRepository:
         self.events.append(event)
         return event
 
-    async def get_events_after(self, check_id, *, after=0, limit=100):
+    async def get_events_after(
+        self, check_id: object, *, after: object = 0, limit: object = 100
+    ) -> object:
         return [event for event in self.events if event.sequence > after]
 
-    async def list_checks(self, **kwargs):
+    async def list_checks(self, **kwargs: object) -> object:
         return [self.check]
 
 
-def make_session_override(session: FakeSession):
-    async def override_session():
+def make_session_override(session: FakeSession) -> object:
+    async def override_session() -> object:
         yield session
 
     return override_session
 
 
 @pytest.fixture(autouse=True)
-def clear_overrides():
+def clear_overrides() -> object:
     app.dependency_overrides.clear()
     app.state.scheduled_check_ids = []
 
-    async def fake_executor(check_id):
+    async def fake_executor(check_id: object) -> None:
         app.state.scheduled_check_ids.append(str(check_id))
 
     app.state.sop_quality_check_executor = fake_executor
@@ -151,7 +160,9 @@ async def test_start_check_returns_accepted_and_schedules_runner() -> None:
     assert body["created"] is True
     assert app.state.scheduled_check_ids == [str(repository.check.id)]
     assert session_repository.created, "session should be created before check"
-    assert repository.last_create_kwargs["session_id"] == session_repository.created[0].id
+    assert (
+        repository.last_create_kwargs["session_id"] == session_repository.created[0].id
+    )
 
 
 @pytest.mark.asyncio

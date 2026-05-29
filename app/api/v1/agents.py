@@ -11,10 +11,6 @@ from fastapi import (
 )
 
 from app.api.deps import AgentServiceDep
-from app.services.agents import (
-    AgentDraftInvalidError,
-    AgentNotFoundError,
-)
 from app.schemas.agents import (
     AgentCreate,
     AgentDetail,
@@ -23,6 +19,10 @@ from app.schemas.agents import (
     AgentSummary,
     AgentVersionDetail,
     AgentVersionSummary,
+)
+from app.services.agents import (
+    AgentDraftInvalidError,
+    AgentNotFoundError,
 )
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -123,7 +123,7 @@ async def delete_agent(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-def agent_to_summary(agent) -> AgentSummary:
+def agent_to_summary(agent: object) -> AgentSummary:
     draft = _draft_config_or_none(agent)
     return AgentSummary(
         id=agent.id,
@@ -131,15 +131,17 @@ def agent_to_summary(agent) -> AgentSummary:
         description=agent.description,
         enabled=agent.enabled,
         has_draft=draft is not None,
-        latest_version=version_to_summary(agent.latest_version)
-        if agent.latest_version is not None
-        else None,
+        latest_version=(
+            version_to_summary(agent.latest_version)
+            if agent.latest_version is not None
+            else None
+        ),
         created_at=agent.created_at,
         updated_at=agent.updated_at,
     )
 
 
-def agent_to_detail(agent) -> AgentDetail:
+def agent_to_detail(agent: object) -> AgentDetail:
     summary = agent_to_summary(agent)
     return AgentDetail(
         id=summary.id,
@@ -154,15 +156,15 @@ def agent_to_detail(agent) -> AgentDetail:
     )
 
 
-def version_to_summary(version) -> AgentVersionSummary:
+def version_to_summary(version: object) -> AgentVersionSummary:
     return AgentVersionSummary.model_validate(version)
 
 
-def version_to_detail(version) -> AgentVersionDetail:
+def version_to_detail(version: object) -> AgentVersionDetail:
     return AgentVersionDetail.model_validate(version)
 
 
-def _draft_config_or_none(agent) -> AgentDraftConfig | None:
+def _draft_config_or_none(agent: object) -> AgentDraftConfig | None:
     draft_config = agent.draft_config
     if draft_config is None:
         return None

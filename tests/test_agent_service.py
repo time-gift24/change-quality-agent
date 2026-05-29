@@ -1,10 +1,11 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from app.schemas.agents import AgentCreate, AgentDraftConfig, AgentDraftUpdate
 
 
-def service_type():
+def service_type() -> object:
     try:
         from app.services.agents import AgentService
     except ModuleNotFoundError as exc:
@@ -34,20 +35,20 @@ class FakeRepository:
         self.published_version = object()
         self.deleted_agent = object()
 
-    async def create_agent(self, **kwargs):
+    async def create_agent(self, **kwargs: object) -> object:
         self.created_kwargs = kwargs
         return self.created_agent
 
-    async def update_draft(self, agent_id, **kwargs):
+    async def update_draft(self, agent_id: object, **kwargs: object) -> object:
         self.updated_id = agent_id
         self.updated_kwargs = kwargs
         return self.updated_agent
 
-    async def publish_agent(self, agent_id):
+    async def publish_agent(self, agent_id: object) -> object:
         self.published_id = agent_id
         return self.published_version
 
-    async def soft_delete(self, agent_id):
+    async def soft_delete(self, agent_id: object) -> object:
         self.deleted_id = agent_id
         return self.deleted_agent
 
