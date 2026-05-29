@@ -1945,6 +1945,13 @@ components:
             additionalProperties: true
           display_state:
             $ref: '#/components/schemas/SopQualityDisplayState'
+          session_id:
+            type: integer
+            nullable: true
+            description: >-
+              When set, the SOP check writes its messages to this shared
+              session. Frontends should prefer the generic session stream
+              endpoint over the legacy SOP stream for these checks.
     SopQualityCheckEvent:
       type: object
       required:

@@ -197,6 +197,20 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
     assert "payload" not in schemas["SopQualityCheckEvent"]["properties"]
     assert "channel" in schemas["SopQualityCheckEvent"]["properties"]
 
+    detail_properties: dict = {}
+    for fragment in schemas["SopQualityCheckDetail"].get("allOf", []):
+        detail_properties.update(fragment.get("properties", {}))
+    detail_properties.update(
+        schemas["SopQualityCheckDetail"].get("properties", {})
+    )
+    summary_properties = schemas["SopQualityCheckSummary"].get(
+        "properties", {}
+    )
+    has_session_id = (
+        "session_id" in detail_properties or "session_id" in summary_properties
+    )
+    assert has_session_id, "SopQualityCheckDetail should expose session_id"
+
 
 def test_openapi_includes_session_routes() -> None:
     contract = load_contract()

@@ -288,6 +288,55 @@ API payloads:
 Authorization mirrors MCP: `ProtectedRoute` + `useAuthz()` gate the routes,
 and non-admin users receive the 403 state without leaving the workspace shell.
 
+## Session Streaming Architecture
+
+SOP quality checks and future agent playground sessions share a single transcript
+substrate backed by the `sessions` and `messages` tables.
+
+Frontend contract:
+
+- `frontend/src/features/sessions/` owns the generic session feature.
+  - `api.ts` exposes `getSession`, `getSessionMessages`, and
+    `buildSessionStreamUrl(sessionId, after)`.
+  - `reducer.ts` keeps a `SessionViewState` with persisted `messages`,
+    per-step `liveBuffers`, and `thinking` flags. Persisted `message` events
+    advance `latestSequence`; live `message_delta` events do not.
+  - `hooks.ts` exposes `useSessionStream(sessionId)`. It hydrates persisted
+    messages, opens an SSE connection at
+    `/api/sessions/{id}/stream?after={cursor}`, and reconnects with the latest
+    persisted sequence as the cursor.
+- SOP UI is now a projection over session messages. When
+  `SopQualityCheckDetail.session_id` is set, `useSopQualityCheck` subscribes to
+  the session stream and calls `projectSessionStateToSopView` to group messages
+  by `additional_kwargs.step` into the existing SOP node view.
+- Older SOP checks without `session_id` continue to use the legacy SOP stream
+  endpoint as a compatibility fallback.
+
+Streaming guarantees:
+
+- Token deltas are live-only. They never become durable transcript content; the
+  reducer keeps them in `liveBuffers[step:<step>]` and discards them when the
+  matching persisted message arrives.
+- Thinking deltas only flip a per-step `thinking` flag. The reasoning text is
+  never displayed.
+- The durable transcript lives in `messages`. Reconnection always replays from
+  `after=latest_sequence`, so refreshes recover the full conversation without
+  the agent re-running.
+
+Step grouping:
+
+- SOP graph node outputs are grouped by `additional_kwargs.step`. The current
+  step labels are `load_sop`, `review_sop`, `summarize_result`, and
+  `submit_result`.
+- DeepAgent is an implementation detail of the `review_sop` node. The frontend
+  must not parse DeepAgent chunk formats; it only consumes session messages and
+  deltas.
+
+Future work:
+
+- The agent playground UI will reuse `sessions/messages` directly through
+  `useSessionStream`. New surfaces should not invent another transcript model.
+
 ## Local MCP HTTP Echo Server
 
 For local streamable HTTP MCP testing, use:

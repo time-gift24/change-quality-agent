@@ -711,3 +711,28 @@ Frontend tests:
   store a product-facing user message and keep full SOP payloads in
   `sop_quality_checks.sop_snapshot` to avoid duplicating large content.
 
+## Implementation Notes
+
+The first landing differs from the design above in the following places:
+
+- `GET /api/sop-quality-checks/{check_id}/stream` was kept as the SOP
+  compatibility surface. Instead of proxying the generic session stream byte
+  for byte, the SOP route interleaves the legacy `sop_quality_events`
+  (lifecycle: `created`, `started`, `checkpoint`, `completed`, `failed`,
+  `interrupted`) with the SOP-relevant session `messages` written by the
+  graph nodes. Each emission is keyed by its own sequence so the frontend
+  cursor advances monotonically. This avoids breaking older clients that
+  still consume SOP lifecycle events.
+- `SopQualityCheckDetail.display_state` is now derived from session messages
+  for checks that have a `session_id`. The legacy SOP event aggregator stays
+  in place for backfill from old checks that predate the migration.
+- The frontend session reducer collapses live `message_delta` events into a
+  per-step `liveBuffers[step:<step>]` slot and discards the slot when the
+  corresponding persisted `message` arrives. Thinking deltas only flip a
+  boolean per step; reasoning text is never displayed.
+- `useSopQualityCheck` keeps its existing public shape. When detail carries a
+  `session_id`, it subscribes to `useSessionStream(sessionId)` and runs
+  `projectSessionStateToSopView` over the session state to build the SOP
+  node view. Older checks without `session_id` keep the legacy SOP SSE
+  fallback.
+
