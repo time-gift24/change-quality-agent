@@ -18,7 +18,7 @@ pytestmark = [
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -31,7 +31,7 @@ async def session():
     await engine.dispose()
 
 
-async def test_create_session_sets_status_active(session) -> None:
+async def test_create_session_sets_status_active(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
@@ -40,14 +40,14 @@ async def test_create_session_sets_status_active(session) -> None:
     assert runtime_session.id is not None
 
 
-async def test_create_session_accepts_custom_thread_id(session) -> None:
+async def test_create_session_accepts_custom_thread_id(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session(thread_id="custom-thread-123")
 
     assert runtime_session.thread_id == "custom-thread-123"
 
 
-async def test_append_message_assigns_session_local_sequence(session) -> None:
+async def test_append_message_assigns_session_local_sequence(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
@@ -66,12 +66,14 @@ async def test_append_message_assigns_session_local_sequence(session) -> None:
     assert second.sequence == 2
 
 
-async def test_get_messages_after_returns_only_later_messages(session) -> None:
+async def test_get_messages_after_returns_only_later_messages(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
     await repository.append_message(runtime_session.id, role="user", content="first")
-    await repository.append_message(runtime_session.id, role="assistant", content="second")
+    await repository.append_message(
+        runtime_session.id, role="assistant", content="second"
+    )
     await repository.append_message(runtime_session.id, role="user", content="third")
 
     messages = await repository.get_messages_after(runtime_session.id, after=1)
@@ -79,24 +81,26 @@ async def test_get_messages_after_returns_only_later_messages(session) -> None:
     assert [m.sequence for m in messages] == [2, 3]
 
 
-async def test_latest_sequence_returns_zero_when_no_messages(session) -> None:
+async def test_latest_sequence_returns_zero_when_no_messages(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
     assert await repository.latest_sequence(runtime_session.id) == 0
 
 
-async def test_latest_sequence_returns_max_sequence(session) -> None:
+async def test_latest_sequence_returns_max_sequence(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
     await repository.append_message(runtime_session.id, role="user", content="hello")
-    await repository.append_message(runtime_session.id, role="assistant", content="world")
+    await repository.append_message(
+        runtime_session.id, role="assistant", content="world"
+    )
 
     assert await repository.latest_sequence(runtime_session.id) == 2
 
 
-async def test_set_status_updates_session(session) -> None:
+async def test_set_status_updates_session(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
@@ -105,7 +109,7 @@ async def test_set_status_updates_session(session) -> None:
     assert updated.status == "completed"
 
 
-async def test_get_session_returns_latest_sequence(session) -> None:
+async def test_get_session_returns_latest_sequence(session: object) -> None:
     repository = SessionRepository(session)
     runtime_session = await repository.create_session()
 
@@ -117,7 +121,7 @@ async def test_get_session_returns_latest_sequence(session) -> None:
     assert fetched.latest_sequence == 1
 
 
-async def test_get_session_by_thread_id(session) -> None:
+async def test_get_session_by_thread_id(session: object) -> None:
     repository = SessionRepository(session)
     await repository.create_session(thread_id="thread-abc")
 

@@ -79,7 +79,7 @@ async def stream_sop_quality_check(
     except SopQualityCheckNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
 
-    async def event_stream():
+    async def event_stream() -> object:
         async for event in service.stream_events(
             check_id,
             after=after,
@@ -107,5 +107,5 @@ def format_live_sse(event: dict[str, object]) -> str:
     return format_sse_event(event)
 
 
-def format_message_sse(message, check_id: UUID) -> str:
+def format_message_sse(message: object, check_id: UUID) -> str:
     return format_sse_event(message_to_event(message, check_id))

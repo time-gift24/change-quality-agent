@@ -4,8 +4,10 @@ from pathlib import Path
 import pytest
 
 
-def _load_script_module():
-    script_path = Path(__file__).resolve().parents[1] / "scripts" / "mcp_http_echo_server.py"
+def _load_script_module() -> object:
+    script_path = (
+        Path(__file__).resolve().parents[1] / "scripts" / "mcp_http_echo_server.py"
+    )
     spec = importlib.util.spec_from_file_location("mcp_http_echo_server", script_path)
     assert spec is not None
     assert spec.loader is not None

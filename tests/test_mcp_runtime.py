@@ -4,12 +4,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.schemas.mcp import McpDesiredState, McpServerRuntimeStatus
 import app.services.mcp_runtime as mcp_runtime_module
+from app.schemas.mcp import McpDesiredState, McpServerRuntimeStatus
 from app.services.mcp_runtime import (
     McpCommandNotAllowedError,
-    McpRuntimeNotEnabledError,
     McpRuntimeManager,
+    McpRuntimeNotEnabledError,
     StdioMcpProbe,
     StreamableHttpMcpProbe,
     TransportMcpProbe,
@@ -40,23 +40,25 @@ class FakeRepository:
         self.tools = []
         self.commits = 0
 
-    async def require_server(self, server_id):
+    async def require_server(self, server_id: object) -> object:
         assert server_id == self.server.id
         return self.server
 
-    async def update_desired_state(self, server_id, desired_state):
+    async def update_desired_state(
+        self, server_id: object, desired_state: object
+    ) -> object:
         assert server_id == self.server.id
         self.server.desired_state = desired_state
         return self.server
 
     async def update_runtime_status(
         self,
-        server_id,
+        server_id: object,
         *,
-        runtime_status,
-        last_error=None,
-        checked=False,
-    ):
+        runtime_status: object,
+        last_error: object = None,
+        checked: object = False,
+    ) -> object:
         assert server_id == self.server.id
         self.server.runtime_status = runtime_status
         self.server.last_error = last_error
@@ -64,17 +66,17 @@ class FakeRepository:
             self.server.last_checked_at = datetime.now(UTC)
         return self.server
 
-    async def replace_tools(self, server_id, tools):
+    async def replace_tools(self, server_id: object, tools: object) -> object:
         assert server_id == self.server.id
         self.tools = tools
         self.server.tools = tools
         return []
 
-    async def tool_count(self, server_id):
+    async def tool_count(self, server_id: object) -> object:
         assert server_id == self.server.id
         return len(self.tools)
 
-    async def commit(self):
+    async def commit(self) -> None:
         self.commits += 1
 
 
@@ -84,11 +86,11 @@ class FakeRepositoryContext:
         self.entered = False
         self.exited = False
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> object:
         self.entered = True
         return self.repository
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         self.exited = True
 
 
@@ -98,37 +100,35 @@ class FakeProbe:
         self.stopped = 0
         self.listed = 0
 
-    async def start(self, server):
+    async def start(self, server: object) -> object:
         self.started += 1
         return (
             object(),
             [{"name": "search", "description": "Search", "input_schema": {}}],
         )
 
-    async def list_tools(self, handle):
+    async def list_tools(self, handle: object) -> object:
         self.listed += 1
-        return [
-            {"name": "search", "description": "Search", "input_schema": {}}
-        ]
+        return [{"name": "search", "description": "Search", "input_schema": {}}]
 
-    async def stop(self, handle):
+    async def stop(self, handle: object) -> None:
         self.stopped += 1
 
 
 class FailingProbe(FakeProbe):
-    async def start(self, server):
+    async def start(self, server: object) -> None:
         raise RuntimeError("boom")
 
 
 class SecretFailingProbe(FakeProbe):
-    async def start(self, server):
+    async def start(self, server: object) -> None:
         raise RuntimeError(
             "startup failed token=super-secret Authorization: Bearer header-secret"
         )
 
 
 class FailingListProbe(FakeProbe):
-    async def list_tools(self, handle):
+    async def list_tools(self, handle: object) -> None:
         raise RuntimeError("list failed")
 
 
@@ -137,7 +137,7 @@ class FlakyListProbe(FakeProbe):
         super().__init__()
         self.fail_next_list = True
 
-    async def list_tools(self, handle):
+    async def list_tools(self, handle: object) -> object:
         if self.fail_next_list:
             self.fail_next_list = False
             raise RuntimeError("list failed")
@@ -145,35 +145,33 @@ class FlakyListProbe(FakeProbe):
 
 
 class FailingStopProbe(FakeProbe):
-    async def stop(self, handle):
+    async def stop(self, handle: object) -> None:
         self.stopped += 1
         raise RuntimeError("stop failed")
 
 
 class TaskAffineProbe(FakeProbe):
-    async def start(self, server):
+    async def start(self, server: object) -> object:
         self.started += 1
         return (
             {"owner_task": asyncio.current_task()},
             [{"name": "search", "description": "Search", "input_schema": {}}],
         )
 
-    async def list_tools(self, handle):
+    async def list_tools(self, handle: object) -> object:
         self.listed += 1
         if handle["owner_task"] is not asyncio.current_task():
             raise RuntimeError("different task")
-        return [
-            {"name": "search", "description": "Search", "input_schema": {}}
-        ]
+        return [{"name": "search", "description": "Search", "input_schema": {}}]
 
-    async def stop(self, handle):
+    async def stop(self, handle: object) -> None:
         self.stopped += 1
         if handle["owner_task"] is not asyncio.current_task():
             raise RuntimeError("different task")
 
 
 class SecretFailingStopProbe(FakeProbe):
-    async def stop(self, handle):
+    async def stop(self, handle: object) -> None:
         self.stopped += 1
         raise RuntimeError(
             "stop failed token=super-secret Authorization: Bearer header-secret"
@@ -181,14 +179,14 @@ class SecretFailingStopProbe(FakeProbe):
 
 
 class SlowProbe(FakeProbe):
-    async def start(self, server):
+    async def start(self, server: object) -> object:
         self.started += 1
         await asyncio.sleep(0.01)
         return object(), []
 
 
 class HangingProbe(FakeProbe):
-    async def start(self, server):
+    async def start(self, server: object) -> object:
         await asyncio.sleep(1)
         return object(), []
 
@@ -282,7 +280,9 @@ async def test_start_supports_repository_context_factory() -> None:
 async def test_stop_is_idempotent_without_handle() -> None:
     server = FakeServer()
     repository = FakeRepository(server)
-    manager = McpRuntimeManager(repository_factory=lambda: repository, probe=FakeProbe())
+    manager = McpRuntimeManager(
+        repository_factory=lambda: repository, probe=FakeProbe()
+    )
 
     status = await manager.stop(server.id)
 
@@ -421,32 +421,34 @@ async def test_stdio_probe_requires_spec_allowlist() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stdio_probe_cleans_exit_stack_on_cancellation(monkeypatch) -> None:
+async def test_stdio_probe_cleans_exit_stack_on_cancellation(
+    monkeypatch: object,
+) -> None:
     events = []
     server = FakeServer()
     server.command = "python"
     server.args = ["server.py"]
 
     class FakeStdioContext:
-        async def __aenter__(self):
+        async def __aenter__(self) -> object:
             events.append("stdio-enter")
             return object(), object()
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
             events.append("stdio-exit")
 
     class FakeClientSession:
-        def __init__(self, read_stream, write_stream) -> None:
+        def __init__(self, read_stream: object, write_stream: object) -> None:
             pass
 
-        async def __aenter__(self):
+        async def __aenter__(self) -> object:
             events.append("session-enter")
             return self
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
             events.append("session-exit")
 
-        async def initialize(self):
+        async def initialize(self) -> None:
             raise asyncio.CancelledError()
 
     monkeypatch.setattr(
@@ -473,28 +475,28 @@ async def test_stdio_probe_cleans_exit_stack_on_cancellation(monkeypatch) -> Non
 
 @pytest.mark.asyncio
 async def test_http_probe_preserves_start_error_when_cleanup_is_cancelled(
-    monkeypatch,
+    monkeypatch: object,
 ) -> None:
     server = FakeServer(transport="http")
 
     class FakeHttpContext:
-        async def __aenter__(self):
+        async def __aenter__(self) -> object:
             return object(), object(), lambda: None
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
             raise asyncio.CancelledError()
 
     class FakeClientSession:
-        def __init__(self, read_stream, write_stream) -> None:
+        def __init__(self, read_stream: object, write_stream: object) -> None:
             pass
 
-        async def __aenter__(self):
+        async def __aenter__(self) -> object:
             return self
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
             return None
 
-        async def initialize(self):
+        async def initialize(self) -> None:
             raise RuntimeError("init failed")
 
     monkeypatch.setattr(

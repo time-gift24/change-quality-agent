@@ -33,8 +33,7 @@ class SessionMessageWriter(Protocol):
         role: str,
         content: str,
         additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 LiveEventPublisher = Callable[[dict[str, Any]], Awaitable[None]]

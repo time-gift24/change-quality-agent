@@ -3,7 +3,9 @@ import pytest
 from app.core.config import EnvironmentConfig, Settings
 
 
-def test_settings_load_config_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_settings_load_config_yaml(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: object
+) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     (tmp_path / "config.yaml").write_text(
@@ -38,12 +40,10 @@ def test_environment_config_has_no_sop_client_options() -> None:
 
 
 def test_environment_variables_override_config_yaml(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: object
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv(
-        "DATABASE_URL", "postgresql+asyncpg://env:env@db:5432/env_db"
-    )
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://env:env@db:5432/env_db")
     (tmp_path / "config.yaml").write_text(
         "database_url: postgresql+asyncpg://config:config@db:5432/config_db\n",
         encoding="utf-8",
@@ -67,11 +67,16 @@ def test_auth_settings_have_defaults() -> None:
     assert settings.auth_enabled is True
     assert settings.auth_dev_mode is False
     assert settings.auth_session_cookie_name == "cqa_user"
+    assert settings.auth_dev_common_refresh_token
+    assert settings.auth_dev_admin_refresh_token
+    assert (
+        settings.auth_dev_common_refresh_token != settings.auth_dev_admin_refresh_token
+    )
 
 
 def test_logging_settings_can_be_overridden_by_environment(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: object,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
@@ -85,7 +90,7 @@ def test_logging_settings_can_be_overridden_by_environment(
 
 def test_codeagent_settings_can_be_overridden_by_environment(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: object,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CODEAGENT_BASE_URL", "https://llm.internal/v1")

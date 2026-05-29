@@ -34,6 +34,24 @@ class FakeRepository:
         return self.providers
 
 
+def _assert_provider_model_call(
+    call: tuple[str, LlmProviderRuntimeConfig, dict],
+    first_provider: FakeProvider,
+) -> None:
+    model, provider_config, model_config = call
+    assert model == "deepseek-v4-pro"
+    assert provider_config == LlmProviderRuntimeConfig(
+        id=first_provider.id,
+        provider_type="deepseek",
+        base_url="https://llm.example.test/v1",
+        api_key="sk-test",
+        default_headers={"X-Tenant": "quality"},
+        default_query={"trace": "1"},
+        enabled=True,
+    )
+    assert model_config == {"temperature": 0}
+
+
 @pytest.mark.asyncio
 async def test_agent_factory_create_agent_uses_first_provider_and_model() -> None:
     first_provider = FakeProvider(models=["deepseek-v4-pro", "deepseek-chat"])
@@ -44,11 +62,15 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
     create_agent_calls: list[dict] = []
     tools = [lambda: "tool"]
 
-    def fake_provider_model_factory(model: str, provider, **model_config):
+    def fake_provider_model_factory(
+        model: str, provider: object, **model_config: object
+    ) -> object:
         provider_model_calls.append((model, provider, dict(model_config)))
         return configured_model
 
-    def fake_create_agent(*, model, tools, system_prompt):
+    def fake_create_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         create_agent_calls.append(
             {
                 "model": model,
@@ -71,17 +93,7 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
     )
 
     assert agent is created_agent
-    assert provider_model_calls[0][0] == "deepseek-v4-pro"
-    assert provider_model_calls[0][1] == LlmProviderRuntimeConfig(
-        id=first_provider.id,
-        provider_type="deepseek",
-        base_url="https://llm.example.test/v1",
-        api_key="sk-test",
-        default_headers={"X-Tenant": "quality"},
-        default_query={"trace": "1"},
-        enabled=True,
-    )
-    assert provider_model_calls[0][2] == {"temperature": 0}
+    _assert_provider_model_call(provider_model_calls[0], first_provider)
     assert create_agent_calls == [
         {
             "model": configured_model,
@@ -101,7 +113,9 @@ async def test_agent_factory_skips_disabled_providers() -> None:
     repository = FakeRepository([disabled_provider, enabled_provider])
     provider_model_calls: list[tuple[str, LlmProviderRuntimeConfig, dict]] = []
 
-    def fake_provider_model_factory(model: str, provider, **model_config):
+    def fake_provider_model_factory(
+        model: str, provider: object, **model_config: object
+    ) -> object:
         provider_model_calls.append((model, provider, dict(model_config)))
         return object()
 
@@ -124,10 +138,14 @@ async def test_agent_factory_create_deepagents_returns_fresh_agent_each_call() -
     created_agents = [object(), object()]
     create_deep_agent_calls: list[dict] = []
 
-    def fake_provider_model_factory(model: str, provider, **model_config):
+    def fake_provider_model_factory(
+        model: str, provider: object, **model_config: object
+    ) -> object:
         return {"model": model, "temperature": model_config.get("temperature")}
 
-    def fake_create_deep_agent(*, model, tools, system_prompt):
+    def fake_create_deep_agent(
+        *, model: object, tools: object, system_prompt: object
+    ) -> object:
         create_deep_agent_calls.append(
             {
                 "model": model,
@@ -171,7 +189,9 @@ async def test_agent_factory_fails_without_provider() -> None:
 async def test_agent_factory_fails_without_provider_model() -> None:
     factory = AgentFactory(FakeRepository([FakeProvider(models=[])]))
 
-    with pytest.raises(LlmProviderAgentConfigurationError, match="does not list models"):
+    with pytest.raises(
+        LlmProviderAgentConfigurationError, match="does not list models"
+    ):
         await factory.create_deepagents()
 
 

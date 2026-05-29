@@ -2,7 +2,7 @@ import asyncio
 import inspect
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 from uuid import UUID
 
 from app.agent.sop_quality.display import (
@@ -36,14 +36,14 @@ class _SessionRepositoryLike(Protocol):
         self,
         title: str | None = None,
         thread_id: str | None = None,
-    ): ...
+    ) -> object: ...
 
     async def get_messages_after(
         self,
         session_id: int,
         after: int = 0,
         limit: int = 100,
-    ): ...
+    ) -> object: ...
 
 
 @dataclass(frozen=True)
@@ -171,7 +171,7 @@ class SopQualityService:
         after: int = 0,
         poll_interval_seconds: float = 0.5,
     ) -> AsyncIterator[dict[str, object]]:
-        check = await self._require_check(check_id)
+        await self._require_check(check_id)
         cursor = after
         broadcast = self._broadcast
         if broadcast is None:
@@ -219,7 +219,7 @@ class SopQualityService:
         if inspect.isawaitable(result):
             await result
 
-    async def _require_check(self, check_id: UUID):
+    async def _require_check(self, check_id: UUID) -> object:
         check = await self._repository.get_check(check_id)
         if check is None:
             raise SopQualityCheckNotFoundError(check_id)
@@ -241,7 +241,7 @@ class SopQualityService:
         )
 
 
-def _status_from_check(check) -> SopQualityCheckStatus:
+def _status_from_check(check: object) -> SopQualityCheckStatus:
     if check is None:
         return SopQualityCheckStatus.running
     try:
@@ -250,7 +250,7 @@ def _status_from_check(check) -> SopQualityCheckStatus:
         return SopQualityCheckStatus.running
 
 
-def check_to_summary(check) -> SopQualityCheckSummary:
+def check_to_summary(check: object) -> SopQualityCheckSummary:
     return SopQualityCheckSummary(
         check_id=check.id,
         sop_id=check.sop_id,
@@ -265,7 +265,7 @@ def check_to_summary(check) -> SopQualityCheckSummary:
     )
 
 
-def check_to_detail(check, messages=None) -> SopQualityCheckDetail:
+def check_to_detail(check: object, messages: object = None) -> SopQualityCheckDetail:
     summary = check_to_summary(check)
     message_dicts = [message_to_display_dict(m) for m in (messages or [])]
     if message_dicts:
@@ -295,7 +295,7 @@ def check_to_detail(check, messages=None) -> SopQualityCheckDetail:
     )
 
 
-def event_to_dict(event) -> dict[str, object]:
+def event_to_dict(event: object) -> dict[str, object]:
     return {
         "check_id": event.check_id,
         "sequence": event.sequence,
@@ -308,7 +308,7 @@ def event_to_dict(event) -> dict[str, object]:
     }
 
 
-def message_to_event(message, check_id: UUID) -> dict[str, object]:
+def message_to_event(message: object, check_id: UUID) -> dict[str, object]:
     return {
         "check_id": str(check_id),
         "session_id": getattr(message, "session_id", None),
@@ -321,7 +321,7 @@ def message_to_event(message, check_id: UUID) -> dict[str, object]:
     }
 
 
-def message_to_display_dict(message) -> dict[str, object]:
+def message_to_display_dict(message: object) -> dict[str, object]:
     return {
         "step": step_from_message(message),
         "role": getattr(message, "role", None),
@@ -330,7 +330,7 @@ def message_to_display_dict(message) -> dict[str, object]:
     }
 
 
-def step_from_message(message) -> str | None:
+def step_from_message(message: object) -> str | None:
     kwargs = getattr(message, "additional_kwargs", None)
     if isinstance(kwargs, dict):
         step = kwargs.get("step")
@@ -339,7 +339,7 @@ def step_from_message(message) -> str | None:
     return None
 
 
-def graph_values_from_check(check) -> dict[str, object]:
+def graph_values_from_check(check: object) -> dict[str, object]:
     values: dict[str, object] = {"sop_snapshot": getattr(check, "sop_snapshot", {})}
     if isinstance(check.result, dict):
         values["result"] = check.result
@@ -354,7 +354,7 @@ def graph_values_from_check(check) -> dict[str, object]:
     return values
 
 
-def latest_sequence(check) -> int:
+def latest_sequence(check: object) -> int:
     explicit_sequence = getattr(check, "latest_sequence", None)
     if isinstance(explicit_sequence, int):
         return explicit_sequence

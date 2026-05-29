@@ -241,11 +241,9 @@ class AgentRepository:
         return await self._require_agent(agent_id, lock=lock)
 
     async def _next_version_number(self, agent_id: UUID) -> int:
-        statement = (
-            select(func.coalesce(func.max(AgentVersion.version_number), 0)).where(
-                AgentVersion.agent_id == agent_id
-            )
-        )
+        statement = select(
+            func.coalesce(func.max(AgentVersion.version_number), 0)
+        ).where(AgentVersion.agent_id == agent_id)
         latest_version_number = await self._session.scalar(statement)
         return int(latest_version_number or 0) + 1
 

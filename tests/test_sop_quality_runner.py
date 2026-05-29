@@ -28,14 +28,14 @@ class FakeRepository:
         self.events: list[dict] = []
         self.terminal = None
 
-    async def get_check(self, check_id):
+    async def get_check(self, check_id: object) -> object:
         return self.check if check_id == self.check.id else None
 
-    async def mark_running(self, check_id):
+    async def mark_running(self, check_id: object) -> object:
         self.events.append({"type": "mark_running"})
         return self.check
 
-    async def append_event(self, check_id, **kwargs):
+    async def append_event(self, check_id: object, **kwargs: object) -> object:
         self.events.append(kwargs)
         return type(
             "Event",
@@ -52,15 +52,19 @@ class FakeRepository:
             },
         )()
 
-    async def set_current_checkpoint(self, check_id, checkpoint_id):
+    async def set_current_checkpoint(
+        self, check_id: object, checkpoint_id: object
+    ) -> object:
         self.check.current_checkpoint_id = checkpoint_id
         return self.check
 
-    async def mark_terminal(self, check_id, status, **kwargs):
+    async def mark_terminal(
+        self, check_id: object, status: object, **kwargs: object
+    ) -> object:
         self.terminal = {"status": status, **kwargs}
         return self.check
 
-    async def commit(self):
+    async def commit(self) -> None:
         return None
 
 
@@ -70,7 +74,14 @@ class FakeSessionRepository:
         self.statuses: list[tuple[int, str]] = []
         self.commits = 0
 
-    async def append_message(self, session_id, *, role, content, additional_kwargs=None):
+    async def append_message(
+        self,
+        session_id: object,
+        *,
+        role: object,
+        content: object,
+        additional_kwargs: object = None,
+    ) -> object:
         record = {
             "session_id": session_id,
             "role": role,
@@ -81,11 +92,11 @@ class FakeSessionRepository:
         self.appended.append(record)
         return type("Msg", (), record)()
 
-    async def set_status(self, session_id, status):
+    async def set_status(self, session_id: object, status: object) -> object:
         self.statuses.append((session_id, status))
         return type("Session", (), {"id": session_id, "status": status})()
 
-    async def commit(self):
+    async def commit(self) -> None:
         self.commits += 1
 
 
@@ -94,7 +105,7 @@ class FakeLlmProviderRepository:
 
 
 class FakeAgentFactory:
-    def __init__(self, repository) -> None:
+    def __init__(self, repository: object) -> None:
         self.repository = repository
 
 
@@ -106,7 +117,7 @@ class FakeBroadcast:
     def __init__(self) -> None:
         self.messages: list[dict] = []
 
-    async def publish(self, check_id, message):
+    async def publish(self, check_id: object, message: object) -> None:
         self.messages.append(message)
 
 
@@ -114,23 +125,27 @@ class FakeSessionBroadcast:
     def __init__(self) -> None:
         self.messages: list[tuple[int, dict]] = []
 
-    async def publish(self, session_id, message):
+    async def publish(self, session_id: object, message: object) -> None:
         self.messages.append((session_id, message))
 
 
 class FakeSessionContext:
-    async def __aenter__(self):
+    async def __aenter__(self) -> object:
         return object()
 
-    async def __aexit__(self, exc_type, exc, traceback):
+    async def __aexit__(
+        self, exc_type: object, exc: object, traceback: object
+    ) -> object:
         return False
 
 
 class FailingCheckpointerContext:
-    async def __aenter__(self):
+    async def __aenter__(self) -> None:
         raise RuntimeError("checkpoint setup failed")
 
-    async def __aexit__(self, exc_type, exc, traceback):
+    async def __aexit__(
+        self, exc_type: object, exc: object, traceback: object
+    ) -> object:
         return False
 
 
@@ -139,7 +154,7 @@ class FakeSnapshot:
 
 
 class FakeGraph:
-    async def ainvoke(self, initial_state, *, config):
+    async def ainvoke(self, initial_state: object, *, config: object) -> object:
         return {
             "quality_result": "warn",
             "result": {
@@ -150,7 +165,7 @@ class FakeGraph:
             },
         }
 
-    async def aget_state(self, config):
+    async def aget_state(self, config: object) -> object:
         return FakeSnapshot()
 
 
@@ -158,7 +173,7 @@ class RuntimePublishingGraph:
     def __init__(self, build_kwargs: dict) -> None:
         self._build_kwargs = build_kwargs
 
-    async def ainvoke(self, initial_state, *, config):
+    async def ainvoke(self, initial_state: object, *, config: object) -> object:
         await self._build_kwargs["message_writer"].append_step_message(
             step="review_sop",
             role="assistant",
@@ -183,16 +198,18 @@ class RuntimePublishingGraph:
             },
         }
 
-    async def aget_state(self, config):
+    async def aget_state(self, config: object) -> object:
         return FakeSnapshot()
 
 
-async def fake_submit_quality_result(payload):
+async def fake_submit_quality_result(payload: object) -> object:
     return {"external_status": "submitted", "payload": payload}
 
 
 @pytest.mark.asyncio
-async def test_runner_marks_success_and_writes_lifecycle_events(monkeypatch) -> None:
+async def test_runner_marks_success_and_writes_lifecycle_events(
+    monkeypatch: object,
+) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
@@ -219,13 +236,15 @@ async def test_runner_marks_success_and_writes_lifecycle_events(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
-async def test_runner_skips_check_that_cannot_transition_to_running(monkeypatch) -> None:
+async def test_runner_skips_check_that_cannot_transition_to_running(
+    monkeypatch: object,
+) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
     build_calls: list[dict] = []
 
-    async def mark_running_skipped(check_id):
+    async def mark_running_skipped(check_id: object) -> None:
         repository.events.append({"type": "mark_running_skipped"})
         return None
 
@@ -252,7 +271,7 @@ async def test_runner_skips_check_that_cannot_transition_to_running(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_runner_broadcasts_persisted_event_envelopes(monkeypatch) -> None:
+async def test_runner_broadcasts_persisted_event_envelopes(monkeypatch: object) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     broadcast = FakeBroadcast()
@@ -282,7 +301,7 @@ async def test_runner_broadcasts_persisted_event_envelopes(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_reads_latest_top_level_checkpoint(monkeypatch) -> None:
+async def test_runner_reads_latest_top_level_checkpoint(monkeypatch: object) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
@@ -307,14 +326,14 @@ async def test_runner_reads_latest_top_level_checkpoint(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_passes_runtime_dependencies_to_graph(monkeypatch) -> None:
+async def test_runner_passes_runtime_dependencies_to_graph(monkeypatch: object) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     session_repository = FakeSessionRepository()
     llm_provider_repository = FakeLlmProviderRepository()
     build_calls: list[dict] = []
 
-    def fake_build_sop_quality_graph(**kwargs):
+    def fake_build_sop_quality_graph(**kwargs: object) -> object:
         build_calls.append(kwargs)
         return FakeGraph()
 
@@ -345,7 +364,7 @@ async def test_runner_passes_runtime_dependencies_to_graph(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_runner_publishes_session_messages_and_deltas_to_session_broadcast(
-    monkeypatch,
+    monkeypatch: object,
 ) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
@@ -353,7 +372,7 @@ async def test_runner_publishes_session_messages_and_deltas_to_session_broadcast
     session_broadcast = FakeSessionBroadcast()
     llm_provider_repository = FakeLlmProviderRepository()
 
-    def fake_build_sop_quality_graph(**kwargs):
+    def fake_build_sop_quality_graph(**kwargs: object) -> object:
         return RuntimePublishingGraph(kwargs)
 
     monkeypatch.setattr(
@@ -381,7 +400,7 @@ async def test_runner_publishes_session_messages_and_deltas_to_session_broadcast
 
 
 @pytest.mark.asyncio
-async def test_runner_marks_session_completed_on_success(monkeypatch) -> None:
+async def test_runner_marks_session_completed_on_success(monkeypatch: object) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     session_repository = FakeSessionRepository()
@@ -408,7 +427,7 @@ async def test_runner_marks_session_completed_on_success(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_runner_broadcasts_live_graph_events_to_session_broadcast(
-    monkeypatch,
+    monkeypatch: object,
 ) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
@@ -416,7 +435,7 @@ async def test_runner_broadcasts_live_graph_events_to_session_broadcast(
     llm_provider_repository = FakeLlmProviderRepository()
 
     class LiveGraph(FakeGraph):
-        async def ainvoke(self, initial_state, *, config):
+        async def ainvoke(self, initial_state: object, *, config: object) -> object:
             await build_calls[0]["live_event_publisher"](
                 {
                     "type": "messages",
@@ -428,7 +447,7 @@ async def test_runner_broadcasts_live_graph_events_to_session_broadcast(
 
     build_calls: list[dict] = []
 
-    def fake_build_sop_quality_graph(**kwargs):
+    def fake_build_sop_quality_graph(**kwargs: object) -> object:
         build_calls.append(kwargs)
         return LiveGraph()
 
@@ -457,12 +476,12 @@ async def test_runner_broadcasts_live_graph_events_to_session_broadcast(
 
 
 @pytest.mark.asyncio
-async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
+async def test_runner_marks_failed_when_graph_build_fails(monkeypatch: object) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
 
-    def fail_build(**kwargs):
+    def fail_build(**kwargs: object) -> None:
         raise RuntimeError("graph unavailable")
 
     monkeypatch.setattr(sop_quality_runner, "build_sop_quality_graph", fail_build)
@@ -483,13 +502,15 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_marks_session_failed_when_graph_fails(monkeypatch) -> None:
+async def test_runner_marks_session_failed_when_graph_fails(
+    monkeypatch: object,
+) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
     session_repository = FakeSessionRepository()
     llm_provider_repository = FakeLlmProviderRepository()
 
-    def fail_build(**kwargs):
+    def fail_build(**kwargs: object) -> None:
         raise RuntimeError("graph unavailable")
 
     monkeypatch.setattr(sop_quality_runner, "build_sop_quality_graph", fail_build)
@@ -510,12 +531,14 @@ async def test_runner_marks_session_failed_when_graph_fails(monkeypatch) -> None
 
 @pytest.mark.asyncio
 async def test_new_session_runner_marks_failed_when_checkpoint_setup_fails(
-    monkeypatch,
+    monkeypatch: object,
 ) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
 
-    monkeypatch.setattr(sop_quality_runner, "async_session", lambda: FakeSessionContext())
+    monkeypatch.setattr(
+        sop_quality_runner, "async_session", lambda: FakeSessionContext()
+    )
     monkeypatch.setattr(
         sop_quality_runner,
         "SopQualityCheckRepository",

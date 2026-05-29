@@ -17,7 +17,7 @@ requires_test_database = pytest.mark.skipif(
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -42,7 +42,8 @@ def test_user_repository_module_defines_expected_public_api() -> None:
     users = repository_types()
 
     assert users.UserRepository is not None
-    assert users.DEV_USERS is not None
+    assert users.DEV_USER_ACCOUNTS is not None
+    assert users.dev_users_from_settings is not None
     assert users.seed_dev_users is not None
 
 
@@ -101,26 +102,30 @@ async def test_seed_dev_users_upserts_expected_users() -> None:
     users = repository_types()
     session = RecordingSession()
     repository = users.UserRepository(session)
+    settings = SimpleNamespace(
+        auth_dev_common_refresh_token="common-refresh-token",
+        auth_dev_admin_refresh_token="admin-refresh-token",
+    )
 
-    await users.seed_dev_users(repository)
+    await users.seed_dev_users(repository, users.dev_users_from_settings(settings))
 
     assert [params["account"] for params in session.params] == ["common", "admin"]
     assert [params["refresh_token"] for params in session.params] == [
-        "dev-common-refresh-token",
-        "dev-admin-refresh-token",
+        "common-refresh-token",
+        "admin-refresh-token",
     ]
     assert [params["is_admin"] for params in session.params] == [False, True]
     assert [params["meta"] for params in session.params] == [
         {"source": "dev"},
         {"source": "dev"},
     ]
-    assert session.flushes == len(users.DEV_USERS)
+    assert session.flushes == len(users.DEV_USER_ACCOUNTS)
 
 
 @pytest.mark.asyncio
 @pytest.mark.db
 @requires_test_database
-async def test_upsert_user_creates_and_updates_user(session) -> None:
+async def test_upsert_user_creates_and_updates_user(session: object) -> None:
     users = repository_types()
     repository = users.UserRepository(session)
 

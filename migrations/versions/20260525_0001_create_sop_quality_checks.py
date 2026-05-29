@@ -8,8 +8,8 @@ Create Date: 2026-05-25
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "20260525_0001"
@@ -19,6 +19,13 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    _create_sop_quality_checks_table()
+    _create_sop_quality_checks_indexes()
+    _create_sop_quality_events_table()
+    _create_sop_quality_events_indexes()
+
+
+def _create_sop_quality_checks_table() -> None:
     op.create_table(
         "sop_quality_checks",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -55,6 +62,9 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
+
+
+def _create_sop_quality_checks_indexes() -> None:
     op.create_index(
         "uq_sop_quality_checks_active_subject_env",
         "sop_quality_checks",
@@ -78,6 +88,8 @@ def upgrade() -> None:
         ["status", "updated_at"],
     )
 
+
+def _create_sop_quality_events_table() -> None:
     op.create_table(
         "sop_quality_events",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
@@ -97,6 +109,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["check_id"], ["sop_quality_checks.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+
+
+def _create_sop_quality_events_indexes() -> None:
     op.create_index(
         "uq_sop_quality_events_check_sequence",
         "sop_quality_events",

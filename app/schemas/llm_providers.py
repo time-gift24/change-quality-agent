@@ -13,7 +13,6 @@ from pydantic import (
 
 from app.core.llm_provider_types import LlmProviderType
 
-
 REDACTED = "********"
 _SECRET_KEY_PARTS = (
     "key",

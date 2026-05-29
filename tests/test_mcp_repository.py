@@ -21,7 +21,7 @@ pytestmark = [
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -34,7 +34,7 @@ async def session():
     await engine.dispose()
 
 
-async def test_create_and_get_mcp_server(session) -> None:
+async def test_create_and_get_mcp_server(session: object) -> None:
     repository = McpServerRepository(session)
 
     server = await repository.create_server(
@@ -56,7 +56,9 @@ async def test_create_and_get_mcp_server(session) -> None:
     assert fetched.command == "uvx"
 
 
-async def test_list_startup_servers_returns_enabled_running_servers(session) -> None:
+async def test_list_startup_servers_returns_enabled_running_servers(
+    session: object,
+) -> None:
     repository = McpServerRepository(session)
     startup_server = await repository.create_server(
         name="enabled-running",
@@ -86,7 +88,7 @@ async def test_list_startup_servers_returns_enabled_running_servers(session) -> 
     assert [server.id for server in servers] == [startup_server.id]
 
 
-async def test_replace_tools_replaces_existing_snapshot(session) -> None:
+async def test_replace_tools_replaces_existing_snapshot(session: object) -> None:
     repository = McpServerRepository(session)
     server = await repository.create_server(
         name="filesystem",
@@ -123,7 +125,7 @@ async def test_replace_tools_replaces_existing_snapshot(session) -> None:
     assert await repository.tool_count(server.id) == 1
 
 
-async def test_update_runtime_status(session) -> None:
+async def test_update_runtime_status(session: object) -> None:
     repository = McpServerRepository(session)
     server = await repository.create_server(
         name="filesystem",
@@ -149,7 +151,7 @@ async def test_update_runtime_status(session) -> None:
     assert updated.last_checked_at is not None
 
 
-async def test_delete_server_cascades_tools(session) -> None:
+async def test_delete_server_cascades_tools(session: object) -> None:
     repository = McpServerRepository(session)
     server = await repository.create_server(
         name="filesystem",

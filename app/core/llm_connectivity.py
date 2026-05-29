@@ -3,7 +3,7 @@ from typing import Any
 
 from app.core.agent_runtime import to_jsonable
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
-from app.schemas.llm_providers import LlmProviderModelTestResponse, REDACTED
+from app.schemas.llm_providers import REDACTED, LlmProviderModelTestResponse
 
 TEST_MESSAGES = [{"role": "user", "content": "ping"}]
 TEST_MODEL_CONFIG = {"temperature": 0}
@@ -83,10 +83,7 @@ def _sanitize_mapping(
     values: dict[str, str],
     provider: LlmProviderRuntimeConfig,
 ) -> dict[str, str]:
-    return {
-        key: _sanitize_error(value, provider)
-        for key, value in values.items()
-    }
+    return {key: _sanitize_error(value, provider) for key, value in values.items()}
 
 
 def _sanitize_value(value: Any, provider: LlmProviderRuntimeConfig) -> Any:
@@ -96,8 +93,7 @@ def _sanitize_value(value: Any, provider: LlmProviderRuntimeConfig) -> Any:
         return [_sanitize_value(item, provider) for item in value]
     if isinstance(value, dict):
         return {
-            str(key): _sanitize_value(item, provider)
-            for key, item in value.items()
+            str(key): _sanitize_value(item, provider) for key, item in value.items()
         }
     return value
 

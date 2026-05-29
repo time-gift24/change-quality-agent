@@ -5,22 +5,27 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings
 from app.models.users import User
 
-DEV_USERS: tuple[dict[str, Any], ...] = (
-    {
-        "account": "common",
-        "refresh_token": "dev-common-refresh-token",
-        "is_admin": False,
-        "meta": {"source": "dev"},
-    },
-    {
-        "account": "admin",
-        "refresh_token": "dev-admin-refresh-token",
-        "is_admin": True,
-        "meta": {"source": "dev"},
-    },
-)
+DEV_USER_ACCOUNTS = ("common", "admin")
+
+
+def dev_users_from_settings(settings: Settings) -> tuple[dict[str, Any], ...]:
+    return (
+        {
+            "account": "common",
+            "refresh_token": settings.auth_dev_common_refresh_token,
+            "is_admin": False,
+            "meta": {"source": "dev"},
+        },
+        {
+            "account": "admin",
+            "refresh_token": settings.auth_dev_admin_refresh_token,
+            "is_admin": True,
+            "meta": {"source": "dev"},
+        },
+    )
 
 
 class UserRepository:
@@ -63,6 +68,9 @@ class UserRepository:
         return result.scalar_one()
 
 
-async def seed_dev_users(repository: UserRepository) -> None:
-    for user in DEV_USERS:
+async def seed_dev_users(
+    repository: UserRepository,
+    users: tuple[dict[str, Any], ...],
+) -> None:
+    for user in users:
         await repository.upsert_user(**user)

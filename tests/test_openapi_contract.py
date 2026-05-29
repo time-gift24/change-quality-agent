@@ -2,7 +2,6 @@ from pathlib import Path
 
 import yaml
 
-
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / "api" / "openapi.yml"
 HTTP_METHODS = {"delete", "get", "patch", "post", "put"}
 
@@ -11,7 +10,7 @@ def load_contract() -> dict:
     return yaml.safe_load(CONTRACT_PATH.read_text())
 
 
-def iter_path_operations(paths: dict):
+def iter_path_operations(paths: dict) -> object:
     for path, path_item in paths.items():
         for method, operation in path_item.items():
             if method in HTTP_METHODS:
@@ -49,9 +48,9 @@ def test_protected_non_auth_operations_document_401() -> None:
         if path.startswith("/api/auth/"):
             continue
 
-        assert "401" in operation["responses"], (
-            f"{method.upper()} {path} is protected but does not document 401"
-        )
+        assert (
+            "401" in operation["responses"]
+        ), f"{method.upper()} {path} is protected but does not document 401"
 
 
 def test_openapi_includes_mcp_server_routes() -> None:
@@ -140,7 +139,13 @@ def test_llm_provider_tag_and_paths_are_documented() -> None:
         ("/api/v1/llm-providers/{provider_id}", "get"): {"200", "404", "422"},
         ("/api/v1/llm-providers/{provider_id}", "patch"): {"200", "404", "422"},
         ("/api/v1/llm-providers/{provider_id}", "delete"): {"204", "404", "422"},
-        ("/api/v1/llm-providers/{provider_id}/test", "post"): {"200", "400", "404", "502", "422"},
+        ("/api/v1/llm-providers/{provider_id}/test", "post"): {
+            "200",
+            "400",
+            "404",
+            "502",
+            "422",
+        },
     }
 
     for (path, method), statuses in expected_operations.items():
@@ -200,12 +205,8 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
     detail_properties: dict = {}
     for fragment in schemas["SopQualityCheckDetail"].get("allOf", []):
         detail_properties.update(fragment.get("properties", {}))
-    detail_properties.update(
-        schemas["SopQualityCheckDetail"].get("properties", {})
-    )
-    summary_properties = schemas["SopQualityCheckSummary"].get(
-        "properties", {}
-    )
+    detail_properties.update(schemas["SopQualityCheckDetail"].get("properties", {}))
+    summary_properties = schemas["SopQualityCheckSummary"].get("properties", {})
     has_session_id = (
         "session_id" in detail_properties or "session_id" in summary_properties
     )
@@ -275,16 +276,18 @@ def test_agents_parameters_are_reusable_and_referenced() -> None:
     agent_id_ref = {"$ref": "#/components/parameters/AgentId"}
     version_ref = {"$ref": "#/components/parameters/AgentVersionNumber"}
     assert agent_id_ref in paths["/api/agents/{agent_id}"]["get"]["parameters"]
-    assert agent_id_ref in paths["/api/agents/{agent_id}/draft"]["patch"][
-        "parameters"
-    ]
-    assert version_ref in paths["/api/agents/{agent_id}/versions/{version_number}"][
-        "get"
-    ]["parameters"]
+    assert agent_id_ref in paths["/api/agents/{agent_id}/draft"]["patch"]["parameters"]
+    assert (
+        version_ref
+        in paths["/api/agents/{agent_id}/versions/{version_number}"]["get"][
+            "parameters"
+        ]
+    )
     provider_ref = {"$ref": "#/components/parameters/LlmProviderId"}
-    assert provider_ref in paths["/api/v1/llm-providers/{provider_id}"]["get"][
-        "parameters"
-    ]
+    assert (
+        provider_ref
+        in paths["/api/v1/llm-providers/{provider_id}"]["get"]["parameters"]
+    )
 
 
 def test_agent_schemas_use_api_json_field_names() -> None:
@@ -308,7 +311,10 @@ def test_agent_schemas_use_api_json_field_names() -> None:
         "type": "string",
         "format": "uuid",
         "nullable": True,
-        "description": "Stored provider id. When set, model must be a bare model name without a provider prefix.",
+        "description": (
+            "Stored provider id. When set, model must be a bare model name "
+            "without a provider prefix."
+        ),
     }
     assert schemas["AgentCreate"]["properties"]["draft"] == {
         "$ref": "#/components/schemas/AgentDraftConfig"
@@ -322,6 +328,12 @@ def test_agent_schemas_use_api_json_field_names() -> None:
 def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None:
     schemas = load_contract()["components"]["schemas"]
 
+    _assert_llm_provider_base_schemas(schemas)
+    _assert_llm_provider_model_test_schemas(schemas)
+    _assert_llm_provider_type_enum(schemas)
+
+
+def _assert_llm_provider_base_schemas(schemas: dict) -> None:
     for schema_name in (
         "LlmProviderCreate",
         "LlmProviderUpdate",
@@ -344,6 +356,9 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
         "description": "Model names this provider can serve.",
     }
     assert "models" in schemas["LlmProviderSummary"]["properties"]
+
+
+def _assert_llm_provider_model_test_schemas(schemas: dict) -> None:
     assert schemas["LlmProviderModelTestRequest"]["properties"]["model"] == {
         "type": "string",
         "minLength": 1,
@@ -358,6 +373,9 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
         "additionalProperties": True,
         "nullable": True,
     }
+
+
+def _assert_llm_provider_type_enum(schemas: dict) -> None:
     provider_type_schema = schemas["LlmProviderCreate"]["properties"]["provider_type"]
     assert provider_type_schema["enum"] == [
         "openai",

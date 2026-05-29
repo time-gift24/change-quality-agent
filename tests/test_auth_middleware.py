@@ -1,11 +1,11 @@
 from types import SimpleNamespace
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
-from app.core.config import settings
 from app.core import security
+from app.core.config import settings
 from app.main import app
 
 
@@ -20,24 +20,24 @@ class FakeSessionContext:
     async def __aenter__(self) -> FakeSession:
         return self.session
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
         return None
 
 
 class FakeUserRepository:
-    def __init__(self, session: FakeSession, user=None) -> None:
+    def __init__(self, session: FakeSession, user: object = None) -> None:
         self.session = session
         self.user = user
         self.account = None
 
-    async def get_by_account(self, account: str):
+    async def get_by_account(self, account: str) -> object:
         self.account = account
         if self.user is not None and self.user.account == account:
             return self.user
         return None
 
 
-def patch_user_repository(monkeypatch, repository: FakeUserRepository) -> None:
+def patch_user_repository(monkeypatch: object, repository: FakeUserRepository) -> None:
     monkeypatch.setattr(
         security,
         "async_session",
@@ -47,7 +47,7 @@ def patch_user_repository(monkeypatch, repository: FakeUserRepository) -> None:
 
 
 @pytest.mark.asyncio
-async def test_api_request_without_user_returns_401(monkeypatch) -> None:
+async def test_api_request_without_user_returns_401(monkeypatch: object) -> None:
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "auth_dev_mode", True)
 
@@ -63,7 +63,7 @@ async def test_api_request_without_user_returns_401(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_health_bypasses_auth(monkeypatch) -> None:
+async def test_health_bypasses_auth(monkeypatch: object) -> None:
     monkeypatch.setattr(settings, "auth_enabled", True)
 
     async with AsyncClient(
@@ -84,7 +84,7 @@ async def test_health_bypasses_auth(monkeypatch) -> None:
     ],
 )
 async def test_auth_routes_with_trailing_slash_bypass_auth(
-    monkeypatch,
+    monkeypatch: object,
     method: str,
     path: str,
 ) -> None:
@@ -100,7 +100,7 @@ async def test_auth_routes_with_trailing_slash_bypass_auth(
 
 
 @pytest.mark.asyncio
-async def test_resolve_current_user_loads_dev_cookie_user(monkeypatch) -> None:
+async def test_resolve_current_user_loads_dev_cookie_user(monkeypatch: object) -> None:
     user = SimpleNamespace(
         id=uuid4(),
         account="common",
@@ -126,7 +126,7 @@ async def test_resolve_current_user_loads_dev_cookie_user(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_api_request_with_cookie_sets_current_user(monkeypatch) -> None:
+async def test_api_request_with_cookie_sets_current_user(monkeypatch: object) -> None:
     user = SimpleNamespace(
         id=uuid4(),
         account="common",
@@ -155,7 +155,7 @@ async def test_api_request_with_cookie_sets_current_user(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_api_request_with_stale_cookie_clears_cookie(monkeypatch) -> None:
+async def test_api_request_with_stale_cookie_clears_cookie(monkeypatch: object) -> None:
     patch_user_repository(monkeypatch, FakeUserRepository(FakeSession()))
     monkeypatch.setattr(settings, "auth_enabled", True)
     monkeypatch.setattr(settings, "auth_dev_mode", True)

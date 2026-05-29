@@ -8,8 +8,8 @@ Create Date: 2026-05-29
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "20260529_0008"
@@ -19,6 +19,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    _create_sessions_table()
+    _create_messages_table()
+    _create_messages_indexes()
+
+
+def _create_sessions_table() -> None:
     op.create_table(
         "sessions",
         sa.Column(
@@ -46,6 +52,8 @@ def upgrade() -> None:
         sa.UniqueConstraint("thread_id"),
     )
 
+
+def _create_messages_table() -> None:
     op.create_table(
         "messages",
         sa.Column(
@@ -72,6 +80,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["session_id"], ["sessions.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
+
+
+def _create_messages_indexes() -> None:
     op.create_index(
         "uq_messages_session_sequence",
         "messages",

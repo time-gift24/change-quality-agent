@@ -13,13 +13,11 @@ class _SessionRepositoryLike(Protocol):
         role: str,
         content: str,
         additional_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
-        ...
+    ) -> Any: ...
 
 
 class _BroadcastLike(Protocol):
-    async def publish(self, session_id: int, message: dict[str, Any]) -> None:
-        ...
+    async def publish(self, session_id: int, message: dict[str, Any]) -> None: ...
 
 
 class RepositorySessionMessageWriter:
@@ -79,7 +77,7 @@ def _message_to_dict(message: Any) -> dict[str, Any]:
         "role": getattr(message, "role", None),
         "content": getattr(message, "content", None),
         "additional_kwargs": dict(getattr(message, "additional_kwargs", {}) or {}),
-        "created_at": created_at.isoformat()
-        if hasattr(created_at, "isoformat")
-        else created_at,
+        "created_at": (
+            created_at.isoformat() if hasattr(created_at, "isoformat") else created_at
+        ),
     }

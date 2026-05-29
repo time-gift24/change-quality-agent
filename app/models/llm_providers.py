@@ -2,7 +2,8 @@ from datetime import datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Index, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -10,9 +11,7 @@ from app.core.database import Base
 
 class LlmProvider(Base):
     __tablename__ = "llm_providers"
-    __table_args__ = (
-        Index("ix_llm_providers_deleted_at", "deleted_at"),
-    )
+    __table_args__ = (Index("ix_llm_providers_deleted_at", "deleted_at"),)
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),

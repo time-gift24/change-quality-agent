@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_session_repository
 from app.main import app
@@ -38,17 +38,19 @@ class FakeSession:
 
 
 class FakeRepository:
-    def __init__(self, session: FakeSession, messages: list[FakeMessage] | None = None) -> None:
+    def __init__(
+        self, session: FakeSession, messages: list[FakeMessage] | None = None
+    ) -> None:
         self.session = session
         self.messages = messages or []
-        session.latest_sequence = max(
-            (m.sequence for m in self.messages), default=0
-        )
+        session.latest_sequence = max((m.sequence for m in self.messages), default=0)
 
-    async def get_session(self, session_id: int):
+    async def get_session(self, session_id: int) -> object:
         return self.session if session_id == self.session.id else None
 
-    async def get_messages_after(self, session_id: int, after: int = 0, limit: int = 100):
+    async def get_messages_after(
+        self, session_id: int, after: int = 0, limit: int = 100
+    ) -> object:
         assert session_id == self.session.id
         return [m for m in self.messages if m.sequence > after][:limit]
 
@@ -59,7 +61,7 @@ class FakeRepository:
 
 
 @pytest.fixture
-def fake_repository():
+def fake_repository() -> object:
     session = FakeSession()
     messages = [
         FakeMessage(1, content="hello"),
@@ -87,7 +89,9 @@ async def test_get_session_returns_detail(fake_repository: FakeRepository) -> No
 
 
 @pytest.mark.asyncio
-async def test_get_session_not_found_returns_404(fake_repository: FakeRepository) -> None:
+async def test_get_session_not_found_returns_404(
+    fake_repository: FakeRepository,
+) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -97,7 +101,9 @@ async def test_get_session_not_found_returns_404(fake_repository: FakeRepository
 
 
 @pytest.mark.asyncio
-async def test_list_messages_returns_messages_after(fake_repository: FakeRepository) -> None:
+async def test_list_messages_returns_messages_after(
+    fake_repository: FakeRepository,
+) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -114,7 +120,9 @@ async def test_list_messages_returns_messages_after(fake_repository: FakeReposit
 
 
 @pytest.mark.asyncio
-async def test_list_messages_not_found_returns_404(fake_repository: FakeRepository) -> None:
+async def test_list_messages_not_found_returns_404(
+    fake_repository: FakeRepository,
+) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:

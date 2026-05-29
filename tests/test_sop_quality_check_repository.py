@@ -22,7 +22,7 @@ pytestmark = [
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -35,7 +35,7 @@ async def session():
     await engine.dispose()
 
 
-async def test_create_check_persists_business_fields(session) -> None:
+async def test_create_check_persists_business_fields(session: object) -> None:
     repository = SopQualityCheckRepository(session)
 
     check = await repository.create_check(
@@ -53,7 +53,7 @@ async def test_create_check_persists_business_fields(session) -> None:
     assert check.checkpoint_ns == ""
 
 
-async def test_duplicate_active_check_returns_active_id(session) -> None:
+async def test_duplicate_active_check_returns_active_id(session: object) -> None:
     repository = SopQualityCheckRepository(session)
     first = await repository.create_check(
         sop_id="release-checklist",
@@ -75,7 +75,7 @@ async def test_duplicate_active_check_returns_active_id(session) -> None:
     assert exc_info.value.active_check_id == first.id
 
 
-async def test_terminal_check_does_not_block_new_check(session) -> None:
+async def test_terminal_check_does_not_block_new_check(session: object) -> None:
     repository = SopQualityCheckRepository(session)
     first = await repository.create_check(
         sop_id="release-checklist",
@@ -84,7 +84,9 @@ async def test_terminal_check_does_not_block_new_check(session) -> None:
         graph_version="sop-quality@1",
         sop_snapshot={"sop_id": "release-checklist"},
     )
-    await repository.mark_terminal(first.id, "succeeded", quality_result="pass", result={})
+    await repository.mark_terminal(
+        first.id, "succeeded", quality_result="pass", result={}
+    )
 
     second = await repository.create_check(
         sop_id="release-checklist",
@@ -97,7 +99,7 @@ async def test_terminal_check_does_not_block_new_check(session) -> None:
     assert second.id != first.id
 
 
-async def test_mark_running_does_not_revive_terminal_check(session) -> None:
+async def test_mark_running_does_not_revive_terminal_check(session: object) -> None:
     repository = SopQualityCheckRepository(session)
     check = await repository.create_check(
         sop_id="release-checklist",
@@ -115,7 +117,9 @@ async def test_mark_running_does_not_revive_terminal_check(session) -> None:
     assert refreshed.status == "interrupted"
 
 
-async def test_append_event_increments_sequence_without_payload(session) -> None:
+async def test_append_event_increments_sequence_without_payload(
+    session: object,
+) -> None:
     repository = SopQualityCheckRepository(session)
     check = await repository.create_check(
         sop_id="release-checklist",
@@ -139,7 +143,7 @@ async def test_append_event_increments_sequence_without_payload(session) -> None
     assert not hasattr(second, "payload")
 
 
-async def test_interrupt_active_checks_on_startup(session) -> None:
+async def test_interrupt_active_checks_on_startup(session: object) -> None:
     repository = SopQualityCheckRepository(session)
     check = await repository.create_check(
         sop_id="release-checklist",
@@ -158,7 +162,7 @@ async def test_interrupt_active_checks_on_startup(session) -> None:
     assert events[-1].type == "interrupted"
 
 
-async def test_create_check_accepts_session_id_and_thread_id(session) -> None:
+async def test_create_check_accepts_session_id_and_thread_id(session: object) -> None:
     session_repo = SessionRepository(session)
     runtime_session = await session_repo.create_session(thread_id="thread-fixed")
 

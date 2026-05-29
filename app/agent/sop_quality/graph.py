@@ -4,11 +4,11 @@ from langgraph.graph import END, StateGraph
 
 from app.agent.sop_quality.nodes.load_sop import make_load_sop
 from app.agent.sop_quality.nodes.review_sop import make_review_sop
-from app.agent.sop_quality.nodes.summarize_result import make_summarize_result
 from app.agent.sop_quality.nodes.submit_result import (
     make_submit_result,
     mock_submit_quality_result,
 )
+from app.agent.sop_quality.nodes.summarize_result import make_summarize_result
 from app.agent.sop_quality.state import SopQualityState
 from app.core.agent_streaming import DeepAgentStreamRunner
 from app.services.sop_client import MockSopClient
@@ -34,11 +34,11 @@ def build_sop_quality_graph(
     *,
     sop_client: Any | None = None,
     agent_factory: Any,
-    submit_quality_result=mock_submit_quality_result,
+    submit_quality_result: object = mock_submit_quality_result,
     message_writer: Any | None = None,
     deepagent_stream_runner: Any | None = None,
     live_event_publisher: Any | None = None,
-):
+) -> object:
     writer = message_writer or _NoopMessageWriter()
     runner = deepagent_stream_runner or DeepAgentStreamRunner(
         message_writer=writer,

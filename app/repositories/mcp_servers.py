@@ -118,8 +118,10 @@ class McpServerRepository:
         return tool_models
 
     async def tool_count(self, server_id: UUID) -> int:
-        statement = select(func.count()).select_from(McpServerTool).where(
-            McpServerTool.server_id == server_id
+        statement = (
+            select(func.count())
+            .select_from(McpServerTool)
+            .where(McpServerTool.server_id == server_id)
         )
         return int((await self._session.scalar(statement)) or 0)
 

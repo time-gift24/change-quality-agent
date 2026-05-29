@@ -12,8 +12,7 @@ class SopClientError(Exception):
 
 
 class SopClient(Protocol):
-    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot:
-        ...
+    async def get_sop(self, sop_id: str, env_key: str) -> SopSnapshot: ...
 
 
 class MockSopClient:

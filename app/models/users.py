@@ -3,7 +3,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, Index, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm import Mapped, mapped_column
 

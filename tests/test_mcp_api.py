@@ -4,13 +4,13 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import IntegrityError
 
+from app import main as main_module
 from app.api.deps import get_mcp_repository, get_mcp_runtime_manager
 from app.core.config import settings
-from app import main as main_module
 from app.schemas.mcp import McpLifecycleResponse
 from app.services.mcp_runtime import McpRuntimeNotEnabledError
 
@@ -50,16 +50,16 @@ class FakeRepository:
         self.raise_integrity_on_create = False
         self.raise_integrity_on_update = False
 
-    async def list_servers(self):
+    async def list_servers(self) -> object:
         return [self.server]
 
-    async def get_server(self, server_id):
+    async def get_server(self, server_id: object) -> object:
         return self.server if server_id == self.server.id else None
 
-    async def reload_server(self, server_id):
+    async def reload_server(self, server_id: object) -> object:
         return self.server if server_id == self.server.id else None
 
-    async def create_server(self, **values):
+    async def create_server(self, **values: object) -> object:
         if self.raise_integrity_on_create:
             raise IntegrityError("insert", {}, Exception("duplicate"))
         for key, value in values.items():
@@ -68,17 +68,17 @@ class FakeRepository:
         self.server.tools = []
         return self.server
 
-    async def update_server(self, server_id, **values):
+    async def update_server(self, server_id: object, **values: object) -> object:
         if self.raise_integrity_on_update:
             raise IntegrityError("update", {}, Exception("duplicate"))
         for key, value in values.items():
             setattr(self.server, key, value)
         return self.server
 
-    async def delete_server(self, server_id):
+    async def delete_server(self, server_id: object) -> None:
         self.deleted = True
 
-    async def commit(self):
+    async def commit(self) -> None:
         self.committed = True
 
 
@@ -92,7 +92,7 @@ class FakeRuntimeManager:
         self._lock = asyncio.Lock()
         self.lock_entries = 0
 
-    async def start(self, server_id):
+    async def start(self, server_id: object) -> object:
         if self.start_error is not None:
             raise self.start_error
         self.started.append(server_id)
@@ -103,32 +103,32 @@ class FakeRuntimeManager:
         self.repository.server.tools = [FakeTool()]
         return _lifecycle_response(server_id)
 
-    async def stop(self, server_id):
+    async def stop(self, server_id: object) -> object:
         self.stopped.append(server_id)
         self.running_ids.discard(server_id)
         return _lifecycle_response(server_id, desired_state="stopped")
 
-    async def stop_locked(self, server_id):
+    async def stop_locked(self, server_id: object) -> object:
         return await self.stop(server_id)
 
-    async def restart(self, server_id):
+    async def restart(self, server_id: object) -> object:
         return _lifecycle_response(server_id)
 
-    async def check(self, server_id):
+    async def check(self, server_id: object) -> object:
         return _lifecycle_response(server_id)
 
-    def is_running(self, server_id):
+    def is_running(self, server_id: object) -> object:
         return server_id in self.running_ids
 
     @asynccontextmanager
-    async def server_operation_lock(self, server_id):
+    async def server_operation_lock(self, server_id: object) -> object:
         self.lock_entries += 1
         async with self._lock:
             yield
 
 
 def _lifecycle_response(
-    server_id,
+    server_id: object,
     *,
     desired_state: str = "running",
 ) -> McpLifecycleResponse:
@@ -143,7 +143,7 @@ def _lifecycle_response(
 
 
 @pytest.fixture(autouse=True)
-def overrides():
+def overrides() -> object:
     server = FakeServer()
     repository = FakeRepository(server)
     runtime = FakeRuntimeManager(repository)
@@ -154,8 +154,10 @@ def overrides():
 
 
 @pytest.mark.asyncio
-async def test_mcp_routes_reject_normal_user(monkeypatch, overrides) -> None:
-    async def resolve_common_user(_request):
+async def test_mcp_routes_reject_normal_user(
+    monkeypatch: object, overrides: object
+) -> None:
+    async def resolve_common_user(_request: object) -> object:
         return SimpleNamespace(account="common", is_admin=False)
 
     monkeypatch.setattr(settings, "auth_enabled", True)
@@ -173,10 +175,10 @@ async def test_mcp_routes_reject_normal_user(monkeypatch, overrides) -> None:
 
 @pytest.mark.asyncio
 async def test_mcp_routes_allow_admin_user_without_token(
-    monkeypatch,
-    overrides,
+    monkeypatch: object,
+    overrides: object,
 ) -> None:
-    async def resolve_admin_user(_request):
+    async def resolve_admin_user(_request: object) -> object:
         return SimpleNamespace(account="admin", is_admin=True)
 
     monkeypatch.setattr(settings, "auth_enabled", True)
@@ -192,7 +194,7 @@ async def test_mcp_routes_allow_admin_user_without_token(
 
 
 @pytest.mark.asyncio
-async def test_list_mcp_servers_redacts_env_and_counts_tools(overrides) -> None:
+async def test_list_mcp_servers_redacts_env_and_counts_tools(overrides: object) -> None:
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
@@ -207,7 +209,7 @@ async def test_list_mcp_servers_redacts_env_and_counts_tools(overrides) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_mcp_server_returns_tools(overrides) -> None:
+async def test_get_mcp_server_returns_tools(overrides: object) -> None:
     server, _, _ = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -224,7 +226,9 @@ async def test_get_mcp_server_returns_tools(overrides) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_mcp_server_persists_and_redacts_response(overrides) -> None:
+async def test_create_mcp_server_persists_and_redacts_response(
+    overrides: object,
+) -> None:
     _, repository, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -253,7 +257,9 @@ async def test_create_mcp_server_persists_and_redacts_response(overrides) -> Non
 
 
 @pytest.mark.asyncio
-async def test_create_running_mcp_server_starts_and_returns_tools(overrides) -> None:
+async def test_create_running_mcp_server_starts_and_returns_tools(
+    overrides: object,
+) -> None:
     server, _, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -282,7 +288,9 @@ async def test_create_running_mcp_server_starts_and_returns_tools(overrides) -> 
 
 
 @pytest.mark.asyncio
-async def test_create_duplicate_mcp_server_name_returns_conflict(overrides) -> None:
+async def test_create_duplicate_mcp_server_name_returns_conflict(
+    overrides: object,
+) -> None:
     _, repository, _ = overrides
     repository.raise_integrity_on_create = True
     async with AsyncClient(
@@ -302,7 +310,7 @@ async def test_create_duplicate_mcp_server_name_returns_conflict(overrides) -> N
 
 
 @pytest.mark.asyncio
-async def test_update_running_mcp_server_returns_conflict(overrides) -> None:
+async def test_update_running_mcp_server_returns_conflict(overrides: object) -> None:
     server, _, _ = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -318,7 +326,7 @@ async def test_update_running_mcp_server_returns_conflict(overrides) -> None:
 
 @pytest.mark.asyncio
 async def test_update_live_handle_returns_conflict_even_when_status_is_error(
-    overrides,
+    overrides: object,
 ) -> None:
     server, _, runtime = overrides
     server.runtime_status = "error"
@@ -336,7 +344,9 @@ async def test_update_live_handle_returns_conflict_even_when_status_is_error(
 
 
 @pytest.mark.asyncio
-async def test_update_stopped_mcp_server_validates_merged_config(overrides) -> None:
+async def test_update_stopped_mcp_server_validates_merged_config(
+    overrides: object,
+) -> None:
     server, _, _ = overrides
     server.runtime_status = "stopped"
     async with AsyncClient(
@@ -352,7 +362,7 @@ async def test_update_stopped_mcp_server_validates_merged_config(overrides) -> N
 
 
 @pytest.mark.asyncio
-async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
+async def test_update_stopped_mcp_server_normalizes_config(overrides: object) -> None:
     server, repository, runtime = overrides
     server.runtime_status = "stopped"
     async with AsyncClient(
@@ -372,7 +382,7 @@ async def test_update_stopped_mcp_server_normalizes_config(overrides) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_waits_for_mcp_lifecycle_lock(overrides) -> None:
+async def test_update_waits_for_mcp_lifecycle_lock(overrides: object) -> None:
     server, _, runtime = overrides
     server.runtime_status = "stopped"
     await runtime._lock.acquire()
@@ -399,7 +409,7 @@ async def test_update_waits_for_mcp_lifecycle_lock(overrides) -> None:
 
 @pytest.mark.asyncio
 async def test_update_stopped_mcp_server_can_clear_nullable_config(
-    overrides,
+    overrides: object,
 ) -> None:
     server, repository, _ = overrides
     server.runtime_status = "stopped"
@@ -420,7 +430,7 @@ async def test_update_stopped_mcp_server_can_clear_nullable_config(
 
 
 @pytest.mark.asyncio
-async def test_start_mcp_server_returns_runtime_status(overrides) -> None:
+async def test_start_mcp_server_returns_runtime_status(overrides: object) -> None:
     server, _, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -436,7 +446,7 @@ async def test_start_mcp_server_returns_runtime_status(overrides) -> None:
 
 
 @pytest.mark.asyncio
-async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
+async def test_start_mcp_server_failure_returns_bad_gateway(overrides: object) -> None:
     server, _, runtime = overrides
     runtime.start_error = RuntimeError("token=secret")
     async with AsyncClient(
@@ -448,13 +458,15 @@ async def test_start_mcp_server_failure_returns_bad_gateway(overrides) -> None:
         )
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "MCP lifecycle operation failed: token=[redacted]"
+    assert (
+        response.json()["detail"] == "MCP lifecycle operation failed: token=[redacted]"
+    )
     assert "secret" not in response.text
 
 
 @pytest.mark.asyncio
 async def test_start_mcp_server_without_runtime_confirmation_returns_unavailable(
-    overrides,
+    overrides: object,
 ) -> None:
     server, _, runtime = overrides
     runtime.start_error = McpRuntimeNotEnabledError()
@@ -470,7 +482,7 @@ async def test_start_mcp_server_without_runtime_confirmation_returns_unavailable
 
 
 @pytest.mark.asyncio
-async def test_delete_running_mcp_server_stops_then_deletes(overrides) -> None:
+async def test_delete_running_mcp_server_stops_then_deletes(overrides: object) -> None:
     server, repository, runtime = overrides
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -486,7 +498,9 @@ async def test_delete_running_mcp_server_stops_then_deletes(overrides) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_live_handle_stops_even_when_status_is_error(overrides) -> None:
+async def test_delete_live_handle_stops_even_when_status_is_error(
+    overrides: object,
+) -> None:
     server, repository, runtime = overrides
     server.runtime_status = "error"
     runtime.running_ids.add(server.id)
@@ -504,7 +518,7 @@ async def test_delete_live_handle_stops_even_when_status_is_error(overrides) -> 
 
 
 @pytest.mark.asyncio
-async def test_delete_waits_for_mcp_lifecycle_lock(overrides) -> None:
+async def test_delete_waits_for_mcp_lifecycle_lock(overrides: object) -> None:
     server, repository, runtime = overrides
     server.runtime_status = "stopped"
     await runtime._lock.acquire()

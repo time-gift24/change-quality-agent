@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from httpx import ASGITransport, AsyncClient
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.api.deps import get_session_repository
 from app.api.v1 import sessions as sessions_api
@@ -42,14 +42,14 @@ class FakeRepository:
     def __init__(self, session: FakeSession, messages: list[FakeMessage]) -> None:
         self.session = session
         self.messages = messages
-        self.session.latest_sequence = max(
-            (m.sequence for m in messages), default=0
-        )
+        self.session.latest_sequence = max((m.sequence for m in messages), default=0)
 
-    async def get_session(self, session_id: int):
+    async def get_session(self, session_id: int) -> object:
         return self.session if session_id == self.session.id else None
 
-    async def get_messages_after(self, session_id: int, after: int = 0, limit: int = 100):
+    async def get_messages_after(
+        self, session_id: int, after: int = 0, limit: int = 100
+    ) -> object:
         return [m for m in self.messages if m.sequence > after][:limit]
 
     async def latest_sequence(self, session_id: int) -> int:
@@ -57,7 +57,9 @@ class FakeRepository:
 
 
 @pytest.mark.asyncio
-async def test_stream_replays_persisted_messages_after_cursor(monkeypatch) -> None:
+async def test_stream_replays_persisted_messages_after_cursor(
+    monkeypatch: object,
+) -> None:
     monkeypatch.setattr(sessions_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     session = FakeSession()
     messages = [
@@ -83,7 +85,9 @@ async def test_stream_replays_persisted_messages_after_cursor(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_stream_emits_terminal_event_for_completed_session(monkeypatch) -> None:
+async def test_stream_emits_terminal_event_for_completed_session(
+    monkeypatch: object,
+) -> None:
     monkeypatch.setattr(sessions_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     session = FakeSession()
     session.status = "completed"
@@ -104,7 +108,7 @@ async def test_stream_emits_terminal_event_for_completed_session(monkeypatch) ->
 
 
 @pytest.mark.asyncio
-async def test_stream_returns_404_for_unknown_session(monkeypatch) -> None:
+async def test_stream_returns_404_for_unknown_session(monkeypatch: object) -> None:
     monkeypatch.setattr(sessions_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     session = FakeSession()
     repository = FakeRepository(session, [])

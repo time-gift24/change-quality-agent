@@ -23,7 +23,7 @@ pytestmark = [
 
 
 @pytest_asyncio.fixture
-async def session():
+async def session() -> object:
     engine = create_async_engine(os.environ["TEST_DATABASE_URL"])
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.drop_all)
@@ -36,7 +36,7 @@ async def session():
     await engine.dispose()
 
 
-async def test_create_and_get_provider_by_id(session) -> None:
+async def test_create_and_get_provider_by_id(session: object) -> None:
     repository = LlmProviderRepository(session)
 
     provider = await repository.create(
@@ -63,7 +63,7 @@ async def test_create_and_get_provider_by_id(session) -> None:
     assert fetched.enabled is True
 
 
-async def test_list_excludes_soft_deleted_providers(session) -> None:
+async def test_list_excludes_soft_deleted_providers(session: object) -> None:
     repository = LlmProviderRepository(session)
     openai = await repository.create(
         display_name="OpenAI",
@@ -82,7 +82,9 @@ async def test_list_excludes_soft_deleted_providers(session) -> None:
     assert providers[0].enabled is False
 
 
-async def test_get_by_id_returns_disabled_but_not_deleted_provider(session) -> None:
+async def test_get_by_id_returns_disabled_but_not_deleted_provider(
+    session: object,
+) -> None:
     repository = LlmProviderRepository(session)
     disabled_provider = await repository.create(
         display_name="Anthropic",
@@ -103,7 +105,7 @@ async def test_get_by_id_returns_disabled_but_not_deleted_provider(session) -> N
     assert deleted is None
 
 
-async def test_soft_delete_sets_deleted_at(session) -> None:
+async def test_soft_delete_sets_deleted_at(session: object) -> None:
     repository = LlmProviderRepository(session)
     provider = await repository.create(display_name="OpenAI", provider_type="openai")
 
@@ -113,7 +115,7 @@ async def test_soft_delete_sets_deleted_at(session) -> None:
     assert await repository.get_by_id(provider.id) is None
 
 
-async def test_soft_delete_missing_provider_raises(session) -> None:
+async def test_soft_delete_missing_provider_raises(session: object) -> None:
     repository = LlmProviderRepository(session)
     provider_id = uuid4()
 
@@ -121,7 +123,7 @@ async def test_soft_delete_missing_provider_raises(session) -> None:
         await repository.soft_delete(provider_id)
 
 
-async def test_update_api_key_preserve_clear_and_replace(session) -> None:
+async def test_update_api_key_preserve_clear_and_replace(session: object) -> None:
     repository = LlmProviderRepository(session)
     provider = await repository.create(
         display_name="OpenAI",
@@ -139,7 +141,9 @@ async def test_update_api_key_preserve_clear_and_replace(session) -> None:
     assert replaced.api_key == "sk-replaced"
 
 
-async def test_update_returns_serializable_provider_after_commit(session) -> None:
+async def test_update_returns_serializable_provider_after_commit(
+    session: object,
+) -> None:
     repository = LlmProviderRepository(session)
     provider = await repository.create(
         display_name="OpenAI",

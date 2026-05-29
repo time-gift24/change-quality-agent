@@ -1,6 +1,5 @@
 from typing import Literal, TypeAlias
 
-
 SUPPORTED_LLM_PROVIDER_TYPES = (
     "openai",
     "anthropic",

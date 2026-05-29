@@ -31,9 +31,9 @@ class AgentFactory:
         self,
         repository: LlmProviderRepositoryLike,
         *,
-        provider_model_factory=create_provider_chat_model,
-        create_agent_factory=langchain_create_agent,
-        create_deep_agent_factory=deepagents_create_deep_agent,
+        provider_model_factory: object = create_provider_chat_model,
+        create_agent_factory: object = langchain_create_agent,
+        create_deep_agent_factory: object = deepagents_create_deep_agent,
     ) -> None:
         self._repository = repository
         self._provider_model_factory = provider_model_factory

@@ -102,9 +102,7 @@ class SessionRepository:
         return await self.latest_sequence(session_id) + 1
 
     async def _lock_session(self, session_id: int) -> None:
-        statement = (
-            select(Session.id).where(Session.id == session_id).with_for_update()
-        )
+        statement = select(Session.id).where(Session.id == session_id).with_for_update()
         locked_session_id = await self._session.scalar(statement)
         if locked_session_id is None:
             raise KeyError(session_id)

@@ -33,7 +33,7 @@ async def get_sop_preview(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY) from exc
 
 
-def _get_environment_or_404(env_key: str):
+def _get_environment_or_404(env_key: str) -> object:
     try:
         return settings.get_environment(env_key)
     except KeyError as exc:
