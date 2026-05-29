@@ -96,9 +96,7 @@ def test_agents_tag_and_paths_are_documented() -> None:
     contract = load_contract()
 
     tag_descriptions = {tag["name"]: tag["description"] for tag in contract["tags"]}
-    assert tag_descriptions["agents"] == (
-        "ReAct agent definitions, versions, and test runs."
-    )
+    assert tag_descriptions["agents"] == "Agent definitions and published versions."
 
     paths = contract["paths"]
     expected_operations = {
@@ -119,7 +117,6 @@ def test_agents_tag_and_paths_are_documented() -> None:
             "404",
             "422",
         },
-        ("/api/agents/{agent_id}/test-runs", "post"): {"202", "400", "404", "422"},
     }
 
     for (path, method), statuses in expected_operations.items():
@@ -150,6 +147,104 @@ def test_llm_provider_tag_and_paths_are_documented() -> None:
         operation = paths[path][method]
         assert operation["tags"] == ["llm-providers"]
         assert statuses <= set(operation["responses"])
+
+
+def test_openapi_does_not_document_generic_runs() -> None:
+    paths = load_contract()["paths"]
+    legacy_runs_prefix = "/api/" + "runs"
+    legacy_agent_path = "/api/agents/{agent_key}/" + "test-" + "runs"
+
+    assert not any(path.startswith(legacy_runs_prefix) for path in paths)
+    assert legacy_agent_path not in paths
+    assert "/api/agents/{agent_id}/test-runs" not in paths
+
+
+def test_openapi_includes_sop_quality_check_routes() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    schemas = contract["components"]["schemas"]
+
+    expected_operations = {
+        ("/api/sop-quality-checks", "get"): {"200", "401", "422"},
+        ("/api/sop-quality-checks", "post"): {"200", "202", "401", "422"},
+        ("/api/sop-quality-checks/{check_id}", "get"): {"200", "401", "404", "422"},
+        ("/api/sop-quality-checks/{check_id}/events", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+        ("/api/sop-quality-checks/{check_id}/stream", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["tags"] == ["sop-quality-checks"]
+        assert statuses <= set(operation["responses"])
+
+    assert {
+        "SopQualityCheckStartResponse",
+        "SopQualityCheckSummary",
+        "SopQualityCheckDetail",
+        "SopQualityDisplayState",
+        "SopQualityCheckEvent",
+    } <= set(schemas)
+    assert "payload" not in schemas["SopQualityCheckEvent"]["properties"]
+    assert "channel" in schemas["SopQualityCheckEvent"]["properties"]
+
+    detail_properties: dict = {}
+    for fragment in schemas["SopQualityCheckDetail"].get("allOf", []):
+        detail_properties.update(fragment.get("properties", {}))
+    detail_properties.update(
+        schemas["SopQualityCheckDetail"].get("properties", {})
+    )
+    summary_properties = schemas["SopQualityCheckSummary"].get(
+        "properties", {}
+    )
+    has_session_id = (
+        "session_id" in detail_properties or "session_id" in summary_properties
+    )
+    assert has_session_id, "SopQualityCheckDetail should expose session_id"
+
+
+def test_openapi_includes_session_routes() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    schemas = contract["components"]["schemas"]
+
+    expected_operations = {
+        ("/api/sessions/{session_id}", "get"): {"200", "401", "404", "422"},
+        ("/api/sessions/{session_id}/messages", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+        ("/api/sessions/{session_id}/stream", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["tags"] == ["sessions"]
+        assert statuses <= set(operation["responses"])
+
+    assert {"SessionDetail", "SessionMessage"} <= set(schemas)
+    session_props = schemas["SessionDetail"]["properties"]
+    assert "latest_sequence" in session_props
+    assert "thread_id" in session_props
+    message_props = schemas["SessionMessage"]["properties"]
+    assert "sequence" in message_props
+    assert "additional_kwargs" in message_props
 
 
 def test_agents_parameters_are_reusable_and_referenced() -> None:
@@ -203,8 +298,6 @@ def test_agent_schemas_use_api_json_field_names() -> None:
         "AgentDetail",
         "AgentVersionSummary",
         "AgentVersionDetail",
-        "AgentMessage",
-        "AgentTestRunCreate",
     ):
         assert schema_name in schemas
 
@@ -220,10 +313,6 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     assert schemas["AgentCreate"]["properties"]["draft"] == {
         "$ref": "#/components/schemas/AgentDraftConfig"
     }
-    assert schemas["AgentTestRunCreate"]["properties"]["messages"]["items"] == {
-        "$ref": "#/components/schemas/AgentMessage"
-    }
-
     version_properties = schemas["AgentVersionDetail"]["properties"]
     assert "model_config" in version_properties
     assert "model_parameters" not in version_properties
@@ -300,17 +389,4 @@ def test_llm_provider_schemas_are_documented_without_plaintext_api_key() -> None
     ]
     assert schemas["LlmProviderUpdate"]["properties"]["provider_type"]["enum"] == (
         provider_type_schema["enum"]
-    )
-
-
-def test_agent_test_runs_response_reuses_run_start_response() -> None:
-    contract = load_contract()
-
-    responses = contract["paths"]["/api/agents/{agent_id}/test-runs"]["post"][
-        "responses"
-    ]
-    response_schema = responses["202"]["content"]["application/json"]["schema"]
-    assert response_schema == {"$ref": "#/components/schemas/RunStartResponse"}
-    assert responses["400"]["description"] == (
-        "Agent is disabled or requested agent version was not found."
     )

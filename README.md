@@ -1,18 +1,20 @@
 # Change Quality Agent
 
 Change Quality Agent provides the backend substrate for running SOP quality
-checks, managing ReAct agent definitions, and observing long-running work.
+checks, managing agent definitions, and observing SOP quality check progress.
 
 ## Capabilities
 
-- Starts SOP quality runs from a mocked SOP source in v1.
+- Starts or joins global SOP quality checks from a mocked SOP source in v1.
 - Manages draft and published ReAct agent definitions for dynamically created
   agent nodes.
-- Starts ReAct agent test runs through the shared run and event substrate.
-- Persists run history and durable run events in Postgres.
-- Exposes generic run observation so clients can inspect status without
-  depending on subject-specific fields.
-- Streams persisted run events for replay and progress observation.
+- Persists SOP quality check history and lightweight lifecycle events in
+  Postgres.
+- Stores graph state and resume data in LangGraph Postgres checkpoints.
+- Stores shared agent transcripts in `sessions` and `messages`, with reconnectable
+  SSE streams documented in `docs/streaming.md`.
+- Streams SOP quality check lifecycle events for reconnectable progress
+  observation.
 - Manages MCP server configuration and stdio runtime lifecycle for admin users.
   Allow commands with `mcp_allowed_stdio_commands`, pin launchable
   command/first-arg pairs with `mcp_allowed_stdio_specs` such as
@@ -22,13 +24,32 @@ checks, managing ReAct agent definitions, and observing long-running work.
   model factory. Configure `CODEAGENT_BASE_URL` and
   `CODEAGENT_TOKEN_PROVIDER=codeagent` on the API process; token headers are
   refreshed before each model HTTP request by the CodeAgent token provider.
-- Uses in-process v1 runners while worker leases, checkpoint resume, tool/MCP
+- Uses in-process v1 check runners while worker leases, checkpoint resume, tool/MCP
   resolution, LLM provider UI, and the real SOP client remain future integration
   points.
 
+## SOP Quality Check API
+
+`POST /api/sop-quality-checks?sop_id=<sop_id>&env=<env_key>` starts a new
+check or joins the active check for the same SOP and environment. New checks
+return `202` with `created: true`; joined active checks return `200` with
+`created: false`.
+
+Clients observe progress through the stream endpoint:
+`GET /api/sop-quality-checks/{check_id}/stream?after=<sequence>`. The API also
+exposes `GET /api/sop-quality-checks/{check_id}` for the current business
+snapshot and `GET /api/sop-quality-checks/{check_id}/events?after=<sequence>`
+for lightweight reconnect replay.
+
+LangGraph Postgres checkpoints are the durable source for graph state,
+and resume data. The `sop_quality_events` table intentionally stores only
+lightweight SSE cursors: sequence, event type, node, checkpoint id, task id,
+message, and timestamp. Durable transcript content lives in the shared
+`messages` table; see `docs/streaming.md` for the full stream contract.
+
 ## Full-Stack SOP Debugging
 
-Use Postgres 13 for local end-to-end SOP run debugging.
+Use Postgres 13 for local end-to-end SOP quality check debugging.
 
 Database and migrations:
 

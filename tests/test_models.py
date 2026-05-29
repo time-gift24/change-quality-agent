@@ -4,24 +4,56 @@ from sqlalchemy.ext.mutable import MutableDict
 from sqlalchemy.orm.attributes import set_committed_value
 
 from app.models.mcp import McpServer, McpServerTool
-from app.models.runs import Run, RunEvent
+from app.models.sop_quality_checks import SopQualityCheck, SopQualityEvent
 from app.models.users import User
 
 
-def test_run_model_table_name() -> None:
-    assert Run.__tablename__ == "runs"
+def test_sop_quality_check_model_table_name() -> None:
+    assert SopQualityCheck.__tablename__ == "sop_quality_checks"
 
 
-def test_run_model_has_queryable_subject_columns() -> None:
-    columns = Run.__table__.columns
+def test_sop_quality_check_has_subject_environment_columns() -> None:
+    columns = SopQualityCheck.__table__.columns
 
-    assert "subject_type" in columns
-    assert "subject_id" in columns
-    assert "env_key" in columns
+    assert columns["sop_id"].nullable is False
+    assert columns["env_key"].nullable is False
+    assert columns["thread_id"].nullable is False
+    assert columns["checkpoint_ns"].nullable is False
+    assert columns["sop_snapshot"].nullable is False
+    assert "env_snapshot" not in columns
+    assert "input_snapshot" not in columns
 
 
-def test_run_event_model_table_name() -> None:
-    assert RunEvent.__tablename__ == "run_events"
+def test_sop_quality_check_active_unique_index() -> None:
+    index = next(
+        index
+        for index in SopQualityCheck.__table__.indexes
+        if index.name == "uq_sop_quality_checks_active_subject_env"
+    )
+
+    assert index.unique is True
+    assert [column.name for column in index.columns] == ["sop_id", "env_key"]
+    where = str(index.dialect_options["postgresql"]["where"])
+    assert "pending" in where
+    assert "running" in where
+
+
+def test_sop_quality_check_links_to_session() -> None:
+    columns = SopQualityCheck.__table__.columns
+
+    assert "session_id" in columns
+    assert columns["session_id"].nullable is True
+    foreign_keys = columns["session_id"].foreign_keys
+    assert {fk.target_fullname for fk in foreign_keys} == {"sessions.id"}
+
+
+def test_sop_quality_event_model_has_no_payload_column() -> None:
+    columns = SopQualityEvent.__table__.columns
+
+    assert SopQualityEvent.__tablename__ == "sop_quality_events"
+    assert "payload" not in columns
+    assert columns["check_id"].nullable is False
+    assert columns["sequence"].nullable is False
 
 
 def test_mcp_server_model_table_name() -> None:

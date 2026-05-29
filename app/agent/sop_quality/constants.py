@@ -1,0 +1,2 @@
+SOP_QUALITY_GRAPH_NAME = "sop_quality"
+SOP_QUALITY_GRAPH_VERSION = "sop-quality@1"

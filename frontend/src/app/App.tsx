@@ -119,7 +119,8 @@ function WorkspaceFrame() {
 
   const layoutContext = useMemo(
     () => ({
-      refreshRecentSopRuns: () => setRecentRefreshKey((value) => value + 1),
+      refreshRecentSopQualityChecks: () =>
+        setRecentRefreshKey((value) => value + 1),
       setNewConversationHandler: registerNewConversationHandler,
       setSidebarContent,
     }),

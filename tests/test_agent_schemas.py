@@ -7,7 +7,6 @@ from pydantic import ValidationError
 from app.schemas.agents import (
     AgentCreate,
     AgentDraftConfig,
-    AgentTestRunCreate,
     AgentVersionDetail,
 )
 
@@ -27,15 +26,6 @@ def test_agent_create_accepts_initial_draft() -> None:
 
     assert request.display_name == "Release Reviewer"
     assert request.draft.model == "openai:gpt-5-mini"
-
-
-def test_agent_test_run_requires_messages() -> None:
-    request = AgentTestRunCreate(
-        messages=[{"role": "user", "content": "Review this change."}]
-    )
-
-    assert request.messages[0].role == "user"
-    assert request.version_number is None
 
 
 def test_agent_draft_config_dumps_external_model_config_key() -> None:
@@ -106,17 +96,3 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
     assert detail.provider_id == AgentVersionRecord.provider_id
     assert payload["model_config"] == {"temperature": 0}
     assert "model_parameters" not in payload
-
-
-def test_agent_test_run_rejects_empty_messages() -> None:
-    with pytest.raises(ValidationError):
-        AgentTestRunCreate(messages=[])
-
-
-def test_agent_test_run_rejects_version_id_and_version_number_together() -> None:
-    with pytest.raises(ValidationError):
-        AgentTestRunCreate(
-            version_id=uuid4(),
-            version_number=1,
-            messages=[{"role": "user", "content": "Review this change."}],
-        )

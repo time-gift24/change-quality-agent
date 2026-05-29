@@ -2,7 +2,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 
 import { Button } from "../../../components/ui/button";
-import { StreamMarkdown } from "../../runs/components/StreamMarkdown";
+import { StreamMarkdown } from "../../sop-quality-checks/components/StreamMarkdown";
 import { LlmProviderForm } from "../components/LlmProviderForm";
 import { useLlmProviderDetail, useLlmProviderMutations } from "../hooks";
 import type { LlmProviderDetail, LlmProviderModelTestResponse } from "../types";

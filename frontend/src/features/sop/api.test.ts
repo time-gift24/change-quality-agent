@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "../../lib/apiClient";
-import { startSopQualityRun } from "./api";
+import { getSopQualityCheckHistory } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("SOP API", () => {
-  it("includes FastAPI error details when starting a SOP run fails", async () => {
+  it("includes FastAPI error details when loading check history fails", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -20,7 +20,7 @@ describe("SOP API", () => {
       ),
     );
 
-    await expect(startSopQualityRun("missing", "dev")).rejects.toMatchObject({
+    await expect(getSopQualityCheckHistory("missing", "dev")).rejects.toMatchObject({
       detail: "SOP not found",
       message: "API request failed: 404 Not Found: SOP not found",
       status: 404,

@@ -97,6 +97,7 @@ class AgentRepository:
             select(Agent)
             .options(selectinload(Agent.latest_version))
             .order_by(Agent.created_at.desc(), Agent.id)
+            .execution_options(populate_existing=True)
         )
         if not include_deleted:
             statement = statement.where(Agent.deleted_at.is_(None))

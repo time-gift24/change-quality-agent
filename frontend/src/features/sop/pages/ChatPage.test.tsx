@@ -179,6 +179,38 @@ describe("ChatPage", () => {
       await screen.findByRole("heading", { name: "MCP 管理" }),
     ).toBeInTheDocument();
   });
+
+  it("starts a SOP quality check and navigates to the check page", async () => {
+    const fetchMock = fetchByRequest();
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderAppAt();
+
+    fireEvent.change(await screen.findByLabelText("SOP ID"), {
+      target: { value: "release-checklist" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "确认并发起运行" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/sop-quality-checks?sop_id=release-checklist&env=dev",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+    expect(window.location.search).toBe("?checkId=check-1");
+  });
+
+  it("renders an observer for route checkId", async () => {
+    vi.stubGlobal("fetch", fetchByRequest());
+
+    renderAppAt("/sop?checkId=check-1");
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("SOP quality check observer"),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 function fetchByRequest() {
@@ -204,21 +236,57 @@ function fetchByRequest() {
       );
     }
 
-    if (url === "/api/sop/recent/runs?env=dev&limit=50") {
+    if (url === "/api/sop-quality-checks?env=dev&limit=50") {
       return Promise.resolve(
         jsonResponse([
           {
-            run_id: "run-1",
-            subject_id: "release-checklist",
-            status: "success",
+            check_id: "check-1",
+            sop_id: "release-checklist",
+            status: "succeeded",
             created_at: "2026-05-26T00:00:00Z",
           },
         ]),
       );
     }
 
-    if (url.startsWith("/api/sop/") && url.endsWith("/runs?env=dev")) {
+    if (
+      url ===
+      "/api/sop-quality-checks?sop_id=release-checklist&env=dev&limit=20"
+    ) {
       return Promise.resolve(jsonResponse([]));
+    }
+
+    if (url === "/api/sop-quality-checks?sop_id=release-checklist&env=dev") {
+      return Promise.resolve(
+        jsonResponse({
+          check_id: "check-1",
+          status: "pending",
+          created: true,
+          status_url: "/api/sop-quality-checks/check-1",
+          stream_url: "/api/sop-quality-checks/check-1/stream",
+        }, 202),
+      );
+    }
+
+    if (url === "/api/sop-quality-checks/check-1") {
+      return Promise.resolve(
+        jsonResponse({
+          check_id: "check-1",
+          sop_id: "release-checklist",
+          env_key: "dev",
+          status: "succeeded",
+          quality_result: "pass",
+          latest_sequence: 1,
+          current_checkpoint_id: "checkpoint-1",
+          result: null,
+          error: null,
+          display_state: {
+            latest_sequence: 1,
+            nodes: {},
+            is_running: false,
+          },
+        }),
+      );
     }
 
     if (url === "/api/mcp/servers") {
@@ -229,9 +297,9 @@ function fetchByRequest() {
   });
 }
 
-function jsonResponse(body: unknown): Response {
+function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     headers: { "Content-Type": "application/json" },
-    status: 200,
+    status,
   });
 }

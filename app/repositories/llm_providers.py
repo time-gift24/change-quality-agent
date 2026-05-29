@@ -48,6 +48,7 @@ class LlmProviderRepository:
             setattr(provider, field, value)
         await self._session.flush()
         await self._session.refresh(provider)
+        self._session.expunge(provider)
         return provider
 
     async def soft_delete(self, provider_id: UUID) -> LlmProvider:
