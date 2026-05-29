@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol, TypeAlias
 from uuid import UUID
 
@@ -7,6 +7,10 @@ from langchain.agents import create_agent as langchain_create_agent
 from langchain_core.tools import BaseTool
 
 from app.core.json_types import JsonObject
+from app.core.llm_model_config import (
+    LlmModelParameters,
+    dump_llm_model_parameters,
+)
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 
 
@@ -52,7 +56,7 @@ class AgentFactory:
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
         tools: Sequence[AgentTool] | None = None,
-        model_config: JsonObject | None = None,
+        model_config: LlmModelParameters | Mapping[str, object] | None = None,
     ) -> object:
         configured_model = await self._configured_model(model_config)
         return self._create_agent_factory(
@@ -66,7 +70,7 @@ class AgentFactory:
         *,
         system_prompt: str = "You are a careful SOP quality reviewer.",
         tools: Sequence[AgentTool] | None = None,
-        model_config: JsonObject | None = None,
+        model_config: LlmModelParameters | Mapping[str, object] | None = None,
     ) -> object:
         configured_model = await self._configured_model(model_config)
         return self._create_deep_agent_factory(
@@ -75,12 +79,15 @@ class AgentFactory:
             system_prompt=system_prompt,
         )
 
-    async def _configured_model(self, model_config: JsonObject | None) -> object:
+    async def _configured_model(
+        self,
+        model_config: LlmModelParameters | Mapping[str, object] | None,
+    ) -> object:
         provider = await self._first_provider()
         return self._provider_model_factory(
             _first_model(provider),
             _runtime_config(provider),
-            **dict(model_config or {}),
+            **dump_llm_model_parameters(model_config),
         )
 
     async def _first_provider(self) -> LlmProviderLike:

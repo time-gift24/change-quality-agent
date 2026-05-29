@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import app.models.agents  # noqa: F401
 from app.core.database import Base
+from app.core.llm_model_config import LlmModelParameters
 from app.schemas.agents import AgentDraftConfig
 
 requires_test_database = pytest.mark.skipif(
@@ -63,9 +64,19 @@ def test_update_draft_uses_public_sentinel_for_optional_fields() -> None:
 def test_dump_draft_config_uses_external_model_config_key() -> None:
     agents = repository_types()
 
-    payload = agents.dump_draft_config(draft_config(temperature=0.1))
+    payload = agents.dump_draft_config(
+        draft_config(
+            model_parameters=LlmModelParameters(
+                temperature=0.1,
+                reasoning_effort="high",
+            ),
+        ),
+    )
 
-    assert payload["model_config"] == {"temperature": 0.1}
+    assert payload["model_config"] == {
+        "temperature": 0.1,
+        "reasoning_effort": "high",
+    }
     assert "model_parameters" not in payload
 
 
@@ -100,12 +111,13 @@ def draft_config(
     model: str = "openai:gpt-5-mini",
     provider_id=None,
     temperature: float = 0,
+    model_parameters: LlmModelParameters | None = None,
 ) -> AgentDraftConfig:
     return AgentDraftConfig(
         system_prompt=system_prompt,
         model=model,
         provider_id=provider_id,
-        model_config={"temperature": temperature},
+        model_config=model_parameters or {"temperature": temperature},
         tool_allowlist=["search_sop"],
         mcp_server_ids=["change-docs"],
     )

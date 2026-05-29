@@ -2,11 +2,12 @@ from time import perf_counter
 
 from app.core.agent_runtime import to_jsonable
 from app.core.json_types import JsonObject, JsonValue
+from app.core.llm_model_config import LlmModelParameters, dump_llm_model_parameters
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 from app.schemas.llm_providers import LlmProviderModelTestResponse, REDACTED
 
 TEST_MESSAGES = [{"role": "user", "content": "ping"}]
-TEST_MODEL_CONFIG = {"temperature": 0}
+TEST_MODEL_CONFIG = LlmModelParameters(temperature=0)
 
 
 async def test_provider_model_connectivity(
@@ -16,7 +17,8 @@ async def test_provider_model_connectivity(
     started = perf_counter()
     request_trace = _request_trace(provider, model)
     try:
-        chat_model = create_provider_chat_model(model, provider, **TEST_MODEL_CONFIG)
+        model_config = dump_llm_model_parameters(TEST_MODEL_CONFIG)
+        chat_model = create_provider_chat_model(model, provider, **model_config)
         result = await chat_model.ainvoke(TEST_MESSAGES)
         return LlmProviderModelTestResponse(
             status="ok",
@@ -62,7 +64,7 @@ def _request_trace(provider: LlmProviderRuntimeConfig, model: str) -> JsonObject
         "default_headers": _sanitize_mapping(provider.default_headers, provider),
         "default_query": _sanitize_mapping(provider.default_query, provider),
         "messages": TEST_MESSAGES,
-        "model_config": TEST_MODEL_CONFIG,
+        "model_config": dump_llm_model_parameters(TEST_MODEL_CONFIG),
     }
 
 

@@ -2,9 +2,12 @@ from app.agent.sop_quality.nodes.review_sop import (
     _load_json_object,
     _normalize_result,
 )
-from app.agent.sop_quality.state import SopQualityState
+from app.agent.sop_quality.state import (
+    SopQualityFinding,
+    SopQualityReviewResult,
+    SopQualityState,
+)
 from app.core.agent_streaming import SessionMessageWriter
-from app.core.json_types import JsonObject
 
 
 def make_summarize_result(message_writer: SessionMessageWriter):
@@ -73,7 +76,7 @@ def _summarize_result_state(state: SopQualityState) -> SopQualityState:
     }
 
 
-def _result_from_review_output(review_output: str) -> JsonObject:
+def _result_from_review_output(review_output: str) -> SopQualityReviewResult:
     try:
         return _normalize_result(_load_json_object(review_output))
     except ValueError:
@@ -94,7 +97,7 @@ def _first_non_empty_line(text: str) -> str:
     return "SOP quality review completed."
 
 
-def _report_markdown(summary: str, findings: list[JsonObject]) -> str:
+def _report_markdown(summary: str, findings: list[SopQualityFinding]) -> str:
     if not findings:
         return f"## SOP Quality Report\n\n{summary}\n"
     lines = ["## SOP Quality Report", "", summary, ""]

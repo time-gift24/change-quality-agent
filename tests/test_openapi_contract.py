@@ -304,6 +304,14 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     draft_properties = schemas["AgentDraftConfig"]["properties"]
     assert "model_config" in draft_properties
     assert "model_parameters" not in draft_properties
+    assert draft_properties["model_config"] == {
+        "$ref": "#/components/schemas/LlmModelParameters"
+    }
+    model_parameters = schemas["LlmModelParameters"]
+    assert model_parameters["additionalProperties"] is True
+    assert {"temperature", "top_p", "max_tokens", "reasoning_effort"} <= set(
+        model_parameters["properties"]
+    )
     assert draft_properties["provider_id"] == {
         "type": "string",
         "format": "uuid",
@@ -316,6 +324,9 @@ def test_agent_schemas_use_api_json_field_names() -> None:
     version_properties = schemas["AgentVersionDetail"]["properties"]
     assert "model_config" in version_properties
     assert "model_parameters" not in version_properties
+    assert version_properties["model_config"] == {
+        "$ref": "#/components/schemas/LlmModelParameters"
+    }
     assert "provider_id" in version_properties
 
 

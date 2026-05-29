@@ -2,9 +2,16 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import cast
 
-from app.agent.sop_quality.state import SopQualityState
+from app.agent.sop_quality.state import (
+    SopQualityFinding,
+    SopQualityFindingSeverity,
+    SopQualityReviewResult,
+    SopQualityResultValue,
+    SopQualityState,
+)
 from app.core.agent_streaming import DeepAgentRunInput, DeepAgentStreamRunner
 from app.core.json_types import JsonObject
+from app.core.llm_model_config import LlmModelParameters
 
 CreateDeepagents = Callable[..., Awaitable[object]]
 
@@ -44,7 +51,7 @@ def make_review_sop(
     async def review_sop(state: SopQualityState) -> SopQualityState:
         agent = await create_deepagents(
             system_prompt=SYSTEM_PROMPT,
-            model_config={"temperature": 0},
+            model_config=LlmModelParameters(temperature=0),
         )
         result = await deepagent_stream_runner.run_step(
             agent=agent,
@@ -96,7 +103,7 @@ def _strip_code_fence(text: str) -> str:
     return text
 
 
-def _normalize_result(parsed: JsonObject) -> JsonObject:
+def _normalize_result(parsed: JsonObject) -> SopQualityReviewResult:
     quality_result = parsed.get("quality_result")
     if quality_result not in {"pass", "warn", "fail"}:
         raise ValueError("SOP quality agent returned an invalid quality_result.")
@@ -115,14 +122,14 @@ def _normalize_result(parsed: JsonObject) -> JsonObject:
         report_markdown = _fallback_report(summary, normalized_findings)
 
     return {
-        "quality_result": quality_result,
+        "quality_result": cast(SopQualityResultValue, quality_result),
         "summary": summary.strip(),
         "findings": normalized_findings,
         "report_markdown": report_markdown,
     }
 
 
-def _normalize_finding(finding: object) -> dict[str, str]:
+def _normalize_finding(finding: object) -> SopQualityFinding:
     if not isinstance(finding, dict):
         raise ValueError("SOP quality agent returned invalid findings.")
     severity = _normalize_severity(finding.get("severity"))
@@ -139,16 +146,16 @@ def _normalize_finding(finding: object) -> dict[str, str]:
     }
 
 
-def _normalize_severity(value: object) -> str:
+def _normalize_severity(value: object) -> SopQualityFindingSeverity:
     if not isinstance(value, str):
         raise ValueError("SOP quality agent returned an invalid finding severity.")
     severity = SEVERITY_ALIASES.get(value.strip().lower())
     if severity is None:
         raise ValueError("SOP quality agent returned an invalid finding severity.")
-    return severity
+    return cast(SopQualityFindingSeverity, severity)
 
 
-def _fallback_report(summary: str, findings: list[dict[str, str]]) -> str:
+def _fallback_report(summary: str, findings: list[SopQualityFinding]) -> str:
     if not findings:
         return f"## SOP Quality Report\n\n{summary}\n"
     lines = ["## SOP Quality Report", "", summary, ""]

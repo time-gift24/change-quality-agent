@@ -7,12 +7,16 @@ from uuid import UUID
 
 from langchain.agents import create_agent as langchain_create_agent
 
+from app.core.json_types import JsonObject, JsonValue
+from app.core.llm_model_config import (
+    LlmModelParameters,
+    dump_llm_model_parameters,
+)
 from app.core.llm_models import (
     LlmProviderRuntimeConfig,
     create_chat_model,
     create_provider_chat_model,
 )
-from app.core.json_types import JsonObject, JsonValue
 from app.core.stream_events import runtime_stream_event
 
 
@@ -40,7 +44,7 @@ class AgentVersionLike(Protocol):
     model: str
     system_prompt: str
     provider_id: UUID | None
-    model_config: Mapping[str, JsonValue] | None
+    model_config: LlmModelParameters | Mapping[str, object] | None
     tool_allowlist: list[str]
     mcp_server_ids: list[str]
 
@@ -115,7 +119,9 @@ class AgentRuntime:
         )
         if inspect.isawaitable(tools):
             tools = await tools
-        model_config = getattr(version, "model_config", {}) or {}
+        model_config = dump_llm_model_parameters(
+            getattr(version, "model_config", None)
+        )
         provider_id = getattr(version, "provider_id", None)
         if provider_id:
             if self._provider_resolver is None:
@@ -124,10 +130,10 @@ class AgentRuntime:
             model = self._provider_model_factory(
                 version.model,
                 provider,
-                **dict(model_config),
+                **model_config,
             )
         else:
-            model = self._model_factory(version.model, **dict(model_config))
+            model = self._model_factory(version.model, **model_config)
         agent = self._create_agent(
             model=model,
             tools=tools,

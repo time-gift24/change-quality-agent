@@ -1,5 +1,6 @@
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Final, Mapping
+from typing import Final
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -7,8 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.json_types import JsonObject, to_json_object
+from app.core.llm_model_config import dump_llm_model_parameters
 from app.models.agents import Agent, AgentVersion
-from app.core.json_types import JsonObject, JsonValue
 from app.schemas.agents import AgentDraftConfig
 
 
@@ -45,7 +47,7 @@ class AgentVersionNotFoundError(Exception):
 
 
 def validate_draft_config(
-    draft: AgentDraftConfig | Mapping[str, JsonValue] | None,
+    draft: AgentDraftConfig | Mapping[str, object] | None,
     *,
     agent_id: UUID | None = None,
 ) -> AgentDraftConfig:
@@ -60,14 +62,15 @@ def validate_draft_config(
 
 
 def dump_draft_config(
-    draft: AgentDraftConfig | Mapping[str, JsonValue],
+    draft: AgentDraftConfig | Mapping[str, object],
     *,
     agent_id: UUID | None = None,
 ) -> JsonObject:
-    return validate_draft_config(draft, agent_id=agent_id).model_dump(
+    payload = validate_draft_config(draft, agent_id=agent_id).model_dump(
         mode="json",
         by_alias=True,
     )
+    return to_json_object(payload)
 
 
 class AgentRepository:
@@ -79,7 +82,7 @@ class AgentRepository:
         *,
         display_name: str,
         description: str | None,
-        draft: AgentDraftConfig | Mapping[str, JsonValue],
+        draft: AgentDraftConfig | Mapping[str, object],
         created_by: str | None = None,
     ) -> Agent:
         agent = Agent(
@@ -127,7 +130,7 @@ class AgentRepository:
         display_name: str | _UnsetType = UNSET,
         description: str | None | _UnsetType = UNSET,
         enabled: bool | _UnsetType = UNSET,
-        draft: AgentDraftConfig | Mapping[str, JsonValue] | _UnsetType = UNSET,
+        draft: AgentDraftConfig | Mapping[str, object] | _UnsetType = UNSET,
         updated_by: str | None = None,
     ) -> Agent:
         """Update only fields whose arguments are not the public UNSET sentinel."""
@@ -160,7 +163,7 @@ class AgentRepository:
             system_prompt=draft.system_prompt,
             model=draft.model,
             provider_id=draft.provider_id,
-            model_config=dict(draft.model_parameters),
+            model_config=dump_llm_model_parameters(draft.model_parameters),
             tool_allowlist=list(draft.tool_allowlist),
             mcp_server_ids=list(draft.mcp_server_ids),
             published_by=published_by,
@@ -252,6 +255,6 @@ class AgentRepository:
 
     def _dump_draft(
         self,
-        draft: AgentDraftConfig | Mapping[str, JsonValue],
+        draft: AgentDraftConfig | Mapping[str, object],
     ) -> JsonObject:
         return dump_draft_config(draft)

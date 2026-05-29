@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -5,8 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.json_types import JsonObject, to_json_object
 from app.models.sop_quality_checks import SopQualityCheck, SopQualityEvent
-from app.core.json_types import JsonObject
 
 ACTIVE_CHECK_STATUSES = {"pending", "running"}
 
@@ -116,8 +117,8 @@ class SopQualityCheckRepository:
         check_id: UUID,
         status: str,
         quality_result: str | None = None,
-        result: JsonObject | None = None,
-        error: JsonObject | None = None,
+        result: Mapping[str, object] | None = None,
+        error: Mapping[str, object] | None = None,
     ) -> SopQualityCheck:
         check = await self._require_check(check_id)
         await self._session.refresh(check)
@@ -126,8 +127,8 @@ class SopQualityCheckRepository:
 
         check.status = status
         check.quality_result = quality_result
-        check.result = result
-        check.error = error
+        check.result = to_json_object(result) if result is not None else None
+        check.error = to_json_object(error) if error is not None else None
         check.finished_at = datetime.now(UTC)
         await self._session.flush()
         return check

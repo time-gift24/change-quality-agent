@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from app.core.llm_model_config import LlmModelParameters
 from app.schemas.agents import (
     AgentCreate,
     AgentDraftConfig,
@@ -32,13 +33,37 @@ def test_agent_draft_config_dumps_external_model_config_key() -> None:
     draft = AgentDraftConfig(
         system_prompt="You are careful.",
         model="openai:gpt-5-mini",
-        model_config={"temperature": 0},
+        model_config={"temperature": 0, "reasoning_effort": "high"},
     )
 
     payload = draft.model_dump(mode="json")
 
-    assert payload["model_config"] == {"temperature": 0}
+    assert isinstance(draft.model_parameters, LlmModelParameters)
+    assert draft.model_parameters.temperature == 0
+    assert draft.model_parameters.reasoning_effort == "high"
+    assert payload["model_config"] == {
+        "temperature": 0,
+        "reasoning_effort": "high",
+    }
     assert "model_parameters" not in payload
+
+
+def test_agent_draft_config_preserves_provider_specific_model_config_extensions() -> None:
+    draft = AgentDraftConfig(
+        system_prompt="You are careful.",
+        model="openai:gpt-5-mini",
+        model_config={
+            "temperature": 0,
+            "model_kwargs": {"stream_options": {"include_usage": True}},
+        },
+    )
+
+    payload = draft.model_dump(mode="json")
+
+    assert payload["model_config"] == {
+        "temperature": 0,
+        "model_kwargs": {"stream_options": {"include_usage": True}},
+    }
 
 
 def test_agent_draft_config_accepts_provider_id_with_bare_model() -> None:
@@ -92,7 +117,7 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
     detail = AgentVersionDetail.model_validate(AgentVersionRecord())
     payload = detail.model_dump(mode="json")
 
-    assert detail.model_parameters == {"temperature": 0}
+    assert detail.model_parameters == LlmModelParameters(temperature=0)
     assert detail.provider_id == AgentVersionRecord.provider_id
     assert payload["model_config"] == {"temperature": 0}
     assert "model_parameters" not in payload

@@ -4,6 +4,7 @@ from uuid import UUID
 from app.agent.manager.agent_factory import AgentFactory
 from app.agent.sop_quality.graph import build_sop_quality_graph
 from app.agent.sop_quality.nodes.submit_result import SubmitQualityResult
+from app.agent.sop_quality.state import SopQualityError
 from app.core.agent_streaming import (
     DeepAgentStreamRunner,
     LiveEventPublisher,
@@ -227,7 +228,7 @@ async def _mark_failed(
     broadcast: SopQualityBroadcast | None = None,
     session_repository: SessionRepository | None = None,
 ) -> dict[str, object]:
-    error: JsonObject = {"type": type(exc).__name__, "message": str(exc)}
+    error: SopQualityError = {"type": type(exc).__name__, "message": str(exc)}
     check = await repository.get_check(check_id)
     await repository.mark_terminal(check_id, "failed", error=error)
     session_id = getattr(check, "session_id", None) if check is not None else None
