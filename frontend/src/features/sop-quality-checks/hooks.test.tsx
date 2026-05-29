@@ -88,12 +88,20 @@ describe("sop quality check hooks", () => {
       expect(
         urls.some((u) => /^\/api\/sessions\/42\/stream\?after=/.test(u)),
       ).toBe(true);
+      expect(
+        urls.some((u) => u === "/api/sop-quality-checks/check-1/stream?after=5"),
+      ).toBe(true);
     });
 
     const sessionStreams = MockEventSource.instances.filter((i) =>
       /^\/api\/sessions\/42\/stream\?after=/.test(i.url),
     );
     expect(sessionStreams).toHaveLength(1);
+
+    const checkStreams = MockEventSource.instances.filter(
+      (i) => i.url === "/api/sop-quality-checks/check-1/stream?after=5",
+    );
+    expect(checkStreams).toHaveLength(1);
 
     unmount();
   });

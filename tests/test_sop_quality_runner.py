@@ -67,6 +67,8 @@ class FakeRepository:
 class FakeSessionRepository:
     def __init__(self) -> None:
         self.appended: list[dict] = []
+        self.statuses: list[tuple[int, str]] = []
+        self.commits = 0
 
     async def append_message(self, session_id, *, role, content, additional_kwargs=None):
         record = {
@@ -78,6 +80,13 @@ class FakeSessionRepository:
         }
         self.appended.append(record)
         return type("Msg", (), record)()
+
+    async def set_status(self, session_id, status):
+        self.statuses.append((session_id, status))
+        return type("Session", (), {"id": session_id, "status": status})()
+
+    async def commit(self):
+        self.commits += 1
 
 
 class FakeLlmProviderRepository:
@@ -99,6 +108,14 @@ class FakeBroadcast:
 
     async def publish(self, check_id, message):
         self.messages.append(message)
+
+
+class FakeSessionBroadcast:
+    def __init__(self) -> None:
+        self.messages: list[tuple[int, dict]] = []
+
+    async def publish(self, session_id, message):
+        self.messages.append((session_id, message))
 
 
 class FakeSessionContext:
@@ -123,6 +140,39 @@ class FakeSnapshot:
 
 class FakeGraph:
     async def ainvoke(self, initial_state, *, config):
+        return {
+            "quality_result": "warn",
+            "result": {
+                "quality_result": "warn",
+                "summary": "Reviewed by fake graph.",
+                "findings": [],
+                "report_markdown": "## SOP Quality Report",
+            },
+        }
+
+    async def aget_state(self, config):
+        return FakeSnapshot()
+
+
+class RuntimePublishingGraph:
+    def __init__(self, build_kwargs: dict) -> None:
+        self._build_kwargs = build_kwargs
+
+    async def ainvoke(self, initial_state, *, config):
+        await self._build_kwargs["message_writer"].append_step_message(
+            step="review_sop",
+            role="assistant",
+            content="final review",
+            additional_kwargs={"kind": "final_message"},
+        )
+        await self._build_kwargs["live_event_publisher"](
+            {
+                "type": "message_delta",
+                "role": "assistant",
+                "content": "partial",
+                "additional_kwargs": {"step": "review_sop", "channel": "content"},
+            }
+        )
         return {
             "quality_result": "warn",
             "result": {
@@ -258,18 +308,78 @@ async def test_runner_passes_runtime_dependencies_to_graph(monkeypatch) -> None:
     assert call["agent_factory"].repository is llm_provider_repository
     assert isinstance(call["sop_client"], FakeSopClient)
     assert call["submit_quality_result"] is fake_submit_quality_result
-    assert call["message_writer"] is not None
-    assert call["deepagent_stream_runner"] is not None
-    assert call["live_event_publisher"] is not None
 
 
 @pytest.mark.asyncio
-async def test_runner_broadcasts_live_graph_events_with_check_context(
+async def test_runner_publishes_session_messages_and_deltas_to_session_broadcast(
     monkeypatch,
 ) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
-    broadcast = FakeBroadcast()
+    session_repository = FakeSessionRepository()
+    session_broadcast = FakeSessionBroadcast()
+    llm_provider_repository = FakeLlmProviderRepository()
+
+    def fake_build_sop_quality_graph(**kwargs):
+        return RuntimePublishingGraph(kwargs)
+
+    monkeypatch.setattr(
+        sop_quality_runner,
+        "build_sop_quality_graph",
+        fake_build_sop_quality_graph,
+    )
+
+    await run_sop_quality_check(
+        check.id,
+        repository,
+        checkpointer=None,
+        llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
+        session_repository=session_repository,
+        session_broadcast=session_broadcast,
+    )
+
+    assert session_broadcast.messages[0][0] == check.session_id
+    assert session_broadcast.messages[0][1]["type"] == "message"
+    assert session_broadcast.messages[0][1]["content"] == "final review"
+    assert session_broadcast.messages[1][1]["type"] == "message_delta"
+    assert session_broadcast.messages[1][1]["content"] == "partial"
+
+
+@pytest.mark.asyncio
+async def test_runner_marks_session_completed_on_success(monkeypatch) -> None:
+    check = FakeCheck()
+    repository = FakeRepository(check)
+    session_repository = FakeSessionRepository()
+    llm_provider_repository = FakeLlmProviderRepository()
+
+    monkeypatch.setattr(
+        sop_quality_runner,
+        "build_sop_quality_graph",
+        lambda **kwargs: FakeGraph(),
+    )
+
+    await run_sop_quality_check(
+        check.id,
+        repository,
+        checkpointer=None,
+        llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
+        session_repository=session_repository,
+    )
+
+    assert session_repository.statuses[-1] == (check.session_id, "completed")
+
+
+@pytest.mark.asyncio
+async def test_runner_broadcasts_live_graph_events_to_session_broadcast(
+    monkeypatch,
+) -> None:
+    check = FakeCheck()
+    repository = FakeRepository(check)
+    session_broadcast = FakeSessionBroadcast()
     llm_provider_repository = FakeLlmProviderRepository()
 
     class LiveGraph(FakeGraph):
@@ -302,14 +412,13 @@ async def test_runner_broadcasts_live_graph_events_with_check_context(
         llm_provider_repository=llm_provider_repository,
         sop_client=FakeSopClient(),
         submit_quality_result=fake_submit_quality_result,
-        broadcast=broadcast,
+        session_broadcast=session_broadcast,
     )
 
-    live_message = next(
-        message for message in broadcast.messages if message["type"] == "messages"
+    _, live_message = next(
+        item for item in session_broadcast.messages if item[1]["type"] == "messages"
     )
-    assert live_message["check_id"] == check.id
-    assert live_message["sequence"] == 2
+    assert live_message["session_id"] == check.session_id
     assert live_message["node"] == "review_sop"
     assert live_message["message"] == "Streaming"
 
@@ -338,6 +447,32 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
     assert repository.terminal["status"] == "failed"
     assert repository.terminal["error"]["message"] == "graph unavailable"
     assert repository.events[-1]["event_type"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_runner_marks_session_failed_when_graph_fails(monkeypatch) -> None:
+    check = FakeCheck()
+    repository = FakeRepository(check)
+    session_repository = FakeSessionRepository()
+    llm_provider_repository = FakeLlmProviderRepository()
+
+    def fail_build(**kwargs):
+        raise RuntimeError("graph unavailable")
+
+    monkeypatch.setattr(sop_quality_runner, "build_sop_quality_graph", fail_build)
+
+    result = await run_sop_quality_check(
+        check.id,
+        repository,
+        checkpointer=None,
+        llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
+        session_repository=session_repository,
+    )
+
+    assert result["status"] == "failed"
+    assert session_repository.statuses[-1] == (check.session_id, "failed")
 
 
 @pytest.mark.asyncio

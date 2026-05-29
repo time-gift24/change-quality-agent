@@ -103,20 +103,20 @@ async def test_format_session_sse_advances_cursor_for_persisted_message() -> Non
     sse = sessions_api.format_session_sse(
         {
             "type": "message",
-            "message": {
-                "id": "u",
-                "session_id": 1,
-                "sequence": 5,
-                "role": "assistant",
-                "content": "x",
-                "additional_kwargs": {},
-                "created_at": "2026-01-01T00:00:00Z",
-            },
+            "id": "u",
+            "session_id": 1,
+            "sequence": 5,
+            "role": "assistant",
+            "content": "x",
+            "additional_kwargs": {},
+            "created_at": "2026-01-01T00:00:00Z",
         }
     )
 
     assert "id: 5" in sse
     assert "event: message" in sse
+    assert '"session_id": 1' in sse
+    assert '"message": {' not in sse
 
 
 @pytest.mark.asyncio
@@ -134,3 +134,24 @@ async def test_format_session_sse_omits_cursor_for_live_delta() -> None:
 
     assert "id:" not in sse
     assert "event: message_delta" in sse
+
+
+def test_message_event_sequence_supports_flat_and_nested_events() -> None:
+    assert (
+        sessions_api.message_event_sequence(
+            {"type": "message", "session_id": 1, "sequence": 8}
+        )
+        == 8
+    )
+    assert (
+        sessions_api.message_event_sequence(
+            {"type": "message", "message": {"session_id": 1, "sequence": 9}}
+        )
+        == 9
+    )
+    assert (
+        sessions_api.message_event_sequence(
+            {"type": "message_delta", "session_id": 1, "sequence": 10}
+        )
+        is None
+    )

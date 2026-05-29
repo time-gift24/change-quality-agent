@@ -61,7 +61,7 @@ async def stream_session(
                     cursor = max(cursor, int(message.sequence))
                     event = {
                         "type": "message",
-                        "message": _message_to_dict(message),
+                        **_message_to_dict(message),
                     }
                     yield format_session_sse(event)
                 if messages:
@@ -80,24 +80,37 @@ async def stream_session(
                     )
                 except TimeoutError:
                     continue
-                if live_event.get("type") == "message":
-                    message_payload = live_event.get("message")
-                    if isinstance(message_payload, dict):
-                        sequence = message_payload.get("sequence")
-                        if isinstance(sequence, int):
-                            cursor = max(cursor, sequence)
+                sequence = message_event_sequence(live_event)
+                if sequence is not None:
+                    cursor = max(cursor, sequence)
                 yield format_session_sse(live_event)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 def format_session_sse(event: dict[str, object]) -> str:
+    event = _flatten_message_event(event)
     data = json.dumps(event, ensure_ascii=False, default=str)
     if event.get("type") == "message":
-        message = event.get("message")
-        if isinstance(message, dict) and isinstance(message.get("sequence"), int):
-            return f"id: {message['sequence']}\nevent: message\ndata: {data}\n\n"
+        sequence = event.get("sequence")
+        if isinstance(sequence, int):
+            return f"id: {sequence}\nevent: message\ndata: {data}\n\n"
     return f"event: {event.get('type', 'live')}\ndata: {data}\n\n"
+
+
+def _flatten_message_event(event: dict[str, object]) -> dict[str, object]:
+    message = event.get("message")
+    if event.get("type") == "message" and isinstance(message, dict):
+        return {"type": "message", **message}
+    return event
+
+
+def message_event_sequence(event: dict[str, object]) -> int | None:
+    flattened = _flatten_message_event(event)
+    if flattened.get("type") != "message":
+        return None
+    sequence = flattened.get("sequence")
+    return sequence if isinstance(sequence, int) else None
 
 
 def _to_session_detail(runtime_session) -> SessionDetail:

@@ -114,6 +114,45 @@ describe("session stream hook", () => {
     expect(result.current.state.latestSequence).toBe(5);
   });
 
+  it("processes backend persisted message envelope events", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useSessionStream(1));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emitNamed({
+        type: "message",
+        message: {
+          id: "msg-7",
+          session_id: 1,
+          sequence: 7,
+          role: "assistant",
+          content: "final text",
+          additional_kwargs: { step: "review_sop" },
+          created_at: "",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.messages).toHaveLength(1);
+    });
+    expect(result.current.state.messages[0]?.id).toBe("msg-7");
+    expect(result.current.state.latestSequence).toBe(7);
+  });
+
   it("sets error when fetch fails", async () => {
     vi.stubGlobal(
       "fetch",

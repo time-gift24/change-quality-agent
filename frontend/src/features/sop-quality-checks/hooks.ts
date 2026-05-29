@@ -125,11 +125,6 @@ export function useSopQualityCheck(checkId: string): UseSopQualityCheckResult {
       return;
     }
 
-    if (typeof detail.session_id === "number") {
-      // Session-stream path handles this check; skip legacy SOP SSE.
-      return;
-    }
-
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let isClosed = false;

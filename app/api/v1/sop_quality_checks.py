@@ -12,6 +12,7 @@ from app.agent.sop_quality.display import (
 )
 from app.api.deps import (
     SessionDep,
+    SessionBroadcastDep,
     SessionRepositoryDep,
     SopQualityCheckRepositoryDep,
 )
@@ -41,6 +42,7 @@ async def start_sop_quality_check(
     session: SessionDep,
     repository: SopQualityCheckRepositoryDep,
     session_repository: SessionRepositoryDep,
+    session_broadcast: SessionBroadcastDep,
     sop_id: Annotated[str, Query(min_length=1)],
     env: Annotated[str, Query(min_length=1)],
 ) -> JSONResponse:
@@ -53,6 +55,7 @@ async def start_sop_quality_check(
             run_sop_quality_check_with_new_session,
             check_id,
             broadcast=_broadcast,
+            session_broadcast=session_broadcast,
         )
 
     service = SopQualityService(

@@ -1,5 +1,7 @@
 """Persist DeepAgent step messages into a session transcript."""
 
+import inspect
+from collections.abc import Callable
 from typing import Any, Protocol
 
 
@@ -29,10 +31,12 @@ class RepositorySessionMessageWriter:
         repository: _SessionRepositoryLike,
         session_id: int,
         broadcast: _BroadcastLike | None = None,
+        commit: Callable[[], Any] | None = None,
     ) -> None:
         self._repository = repository
         self._session_id = session_id
         self._broadcast = broadcast
+        self._commit = commit
 
     async def append_step_message(
         self,
@@ -52,10 +56,15 @@ class RepositorySessionMessageWriter:
             additional_kwargs=merged,
         )
 
+        if self._commit is not None:
+            result = self._commit()
+            if inspect.isawaitable(result):
+                await result
+
         if self._broadcast is not None:
             await self._broadcast.publish(
                 self._session_id,
-                {"type": "message", "message": _message_to_dict(message)},
+                {"type": "message", **_message_to_dict(message)},
             )
 
         return message

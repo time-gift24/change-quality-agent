@@ -28,6 +28,7 @@ class FakeMessage:
 class FakeRepository:
     def __init__(self) -> None:
         self.appended: list[FakeMessage] = []
+        self.commits = 0
 
     async def append_message(
         self,
@@ -48,12 +49,18 @@ class FakeRepository:
         self.appended.append(message)
         return message
 
+    async def commit(self) -> None:
+        self.commits += 1
+
 
 class FakeBroadcast:
-    def __init__(self) -> None:
+    def __init__(self, repository: FakeRepository | None = None) -> None:
+        self._repository = repository
         self.published: list[tuple[int, dict[str, Any]]] = []
 
     async def publish(self, session_id: int, message: dict[str, Any]) -> None:
+        if self._repository is not None:
+            assert self._repository.commits == 1
         self.published.append((session_id, message))
 
 
@@ -102,8 +109,29 @@ async def test_writer_publishes_persisted_message_event() -> None:
     session_id, event = broadcast.published[0]
     assert session_id == 7
     assert event["type"] == "message"
-    assert event["message"]["content"] == "SOP loaded."
-    assert event["message"]["additional_kwargs"]["step"] == "load_sop"
+    assert event["content"] == "SOP loaded."
+    assert event["additional_kwargs"]["step"] == "load_sop"
+
+
+@pytest.mark.asyncio
+async def test_writer_commits_before_publishing_persisted_message() -> None:
+    repo = FakeRepository()
+    broadcast = FakeBroadcast(repository=repo)
+    writer = RepositorySessionMessageWriter(
+        repository=repo,
+        session_id=7,
+        broadcast=broadcast,
+        commit=repo.commit,
+    )
+
+    await writer.append_step_message(
+        step="load_sop",
+        role="system",
+        content="SOP loaded.",
+    )
+
+    assert repo.commits == 1
+    assert len(broadcast.published) == 1
 
 
 @pytest.mark.asyncio

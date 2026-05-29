@@ -10,6 +10,7 @@ from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.services.session_messages import RepositorySessionMessageWriter
+from app.services.session_streaming import SessionBroadcast
 from app.services.sop_client import MockSopClient
 from app.services.sop_quality_streaming import SopQualityBroadcast
 
@@ -27,6 +28,7 @@ async def run_sop_quality_check(
     submit_quality_result: Any,
     session_repository: Any | None = None,
     broadcast: SopQualityBroadcast | None = None,
+    session_broadcast: SessionBroadcast | None = None,
 ) -> dict[str, Any]:
     try:
         check = await repository.mark_running(check_id)
@@ -42,13 +44,11 @@ async def run_sop_quality_check(
         message_writer = _build_message_writer(
             session_repository=session_repository,
             session_id=session_id,
-            broadcast=broadcast,
-            check_id=check_id,
+            session_broadcast=session_broadcast,
         )
-        live_event_publisher = _live_event_publisher(
-            broadcast,
-            check_id,
-            sequence=started_event.sequence,
+        live_event_publisher = _session_live_event_publisher(
+            session_broadcast,
+            session_id,
         )
         deepagent_stream_runner = DeepAgentStreamRunner(
             message_writer=message_writer,
@@ -90,6 +90,8 @@ async def run_sop_quality_check(
             quality_result=final_state.get("quality_result"),
             result=final_state.get("result"),
         )
+        if session_repository is not None and session_id is not None:
+            await session_repository.set_status(session_id, "completed")
         completed_event = await repository.append_event(
             check_id,
             event_type="completed",
@@ -99,12 +101,19 @@ async def run_sop_quality_check(
         await _publish_event(broadcast, check_id, completed_event)
         return {"status": "succeeded", "result": final_state.get("result")}
     except Exception as exc:
-        return await _mark_failed(repository, check_id, exc, broadcast=broadcast)
+        return await _mark_failed(
+            repository,
+            check_id,
+            exc,
+            broadcast=broadcast,
+            session_repository=session_repository,
+        )
 
 
 async def run_sop_quality_check_with_new_session(
     check_id: UUID,
     broadcast: SopQualityBroadcast | None = None,
+    session_broadcast: SessionBroadcast | None = None,
 ) -> dict[str, Any]:
     async with async_session() as session:
         repository = SopQualityCheckRepository(session)
@@ -121,26 +130,31 @@ async def run_sop_quality_check_with_new_session(
                     submit_quality_result=_mock_external_submit,
                     session_repository=session_repository,
                     broadcast=broadcast,
+                    session_broadcast=session_broadcast,
                 )
         except Exception as exc:
-            return await _mark_failed(repository, check_id, exc, broadcast=broadcast)
+            return await _mark_failed(
+                repository,
+                check_id,
+                exc,
+                broadcast=broadcast,
+                session_repository=session_repository,
+            )
 
 
 def _build_message_writer(
     *,
     session_repository: Any | None,
     session_id: int | None,
-    broadcast: SopQualityBroadcast | None,
-    check_id: UUID,
+    session_broadcast: SessionBroadcast | None,
 ):
     if session_repository is None or session_id is None:
         return _NoopMessageWriter()
     return RepositorySessionMessageWriter(
         repository=session_repository,
         session_id=session_id,
-        broadcast=_SessionBroadcastAdapter(broadcast, check_id)
-        if broadcast is not None
-        else None,
+        broadcast=session_broadcast,
+        commit=getattr(session_repository, "commit", None),
     )
 
 
@@ -157,24 +171,6 @@ class _NoopMessageWriter:
             sequence = 0
 
         return _Msg()
-
-
-class _SessionBroadcastAdapter:
-    """Adapt session-level broadcast publishes onto the SOP check broadcast."""
-
-    def __init__(self, broadcast: SopQualityBroadcast, check_id: UUID) -> None:
-        self._broadcast = broadcast
-        self._check_id = check_id
-
-    async def publish(self, session_id: int, message: dict[str, Any]) -> None:
-        await self._broadcast.publish(
-            self._check_id,
-            {
-                "check_id": self._check_id,
-                "session_id": session_id,
-                **message,
-            },
-        )
 
 
 async def _latest_checkpoint_id(
@@ -202,9 +198,14 @@ async def _mark_failed(
     exc: Exception,
     *,
     broadcast: SopQualityBroadcast | None = None,
+    session_repository: Any | None = None,
 ) -> dict[str, Any]:
     error = {"type": type(exc).__name__, "message": str(exc)}
+    check = await repository.get_check(check_id)
     await repository.mark_terminal(check_id, "failed", error=error)
+    session_id = getattr(check, "session_id", None) if check is not None else None
+    if session_repository is not None and session_id is not None:
+        await session_repository.set_status(session_id, "failed")
     failed_event = await repository.append_event(
         check_id,
         event_type="failed",
@@ -232,21 +233,19 @@ async def _publish_event(
     await broadcast.publish(check_id, _event_to_message(event))
 
 
-def _live_event_publisher(
-    broadcast: SopQualityBroadcast | None,
-    check_id: UUID,
-    *,
-    sequence: int,
+def _session_live_event_publisher(
+    session_broadcast: SessionBroadcast | None,
+    session_id: int | None,
 ):
+    if session_broadcast is None or session_id is None:
+        return None
+
     async def publish(event: dict[str, Any]) -> None:
-        if broadcast is None:
-            return
-        await broadcast.publish(
-            check_id,
+        await session_broadcast.publish(
+            session_id,
             {
-                "check_id": check_id,
-                "sequence": sequence,
                 **event,
+                "session_id": session_id,
             },
         )
 

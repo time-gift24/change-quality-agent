@@ -152,7 +152,7 @@ function parseSessionStreamEvent(data: string): SessionStreamEvent | null {
     return null;
   }
   try {
-    const parsed = JSON.parse(data) as Partial<SessionStreamEvent>;
+    const parsed = normalizeSessionStreamEvent(JSON.parse(data));
     if (parsed.type !== "message" && parsed.type !== "message_delta") {
       return null;
     }
@@ -163,4 +163,22 @@ function parseSessionStreamEvent(data: string): SessionStreamEvent | null {
   } catch {
     return null;
   }
+}
+
+function normalizeSessionStreamEvent(parsed: unknown): Partial<SessionStreamEvent> {
+  if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "type" in parsed &&
+    (parsed as { type?: unknown }).type === "message" &&
+    "message" in parsed &&
+    typeof (parsed as { message?: unknown }).message === "object" &&
+    (parsed as { message?: unknown }).message !== null
+  ) {
+    return {
+      type: "message",
+      ...((parsed as { message: Record<string, unknown> }).message),
+    } as Partial<SessionStreamEvent>;
+  }
+  return parsed as Partial<SessionStreamEvent>;
 }
