@@ -3,10 +3,13 @@ from uuid import UUID
 
 from app.agent.sop_quality.graph import build_sop_quality_graph
 from app.agents.manager.agent_factory import AgentFactory
+from app.core.agent_streaming import DeepAgentStreamRunner
 from app.core.checkpoints import open_postgres_checkpointer
 from app.core.database import async_session
 from app.repositories.llm_providers import LlmProviderRepository
+from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
+from app.services.session_messages import RepositorySessionMessageWriter
 from app.services.sop_client import MockSopClient
 from app.services.sop_quality_streaming import SopQualityBroadcast
 
@@ -22,6 +25,7 @@ async def run_sop_quality_check(
     llm_provider_repository: Any,
     sop_client: Any,
     submit_quality_result: Any,
+    session_repository: Any | None = None,
     broadcast: SopQualityBroadcast | None = None,
 ) -> dict[str, Any]:
     try:
@@ -34,16 +38,32 @@ async def run_sop_quality_check(
         await repository.commit()
         await _publish_event(broadcast, check_id, started_event)
 
+        session_id = getattr(check, "session_id", None)
+        message_writer = _build_message_writer(
+            session_repository=session_repository,
+            session_id=session_id,
+            broadcast=broadcast,
+            check_id=check_id,
+        )
+        live_event_publisher = _live_event_publisher(
+            broadcast,
+            check_id,
+            sequence=started_event.sequence,
+        )
+        deepagent_stream_runner = DeepAgentStreamRunner(
+            message_writer=message_writer,
+            live_event_publisher=live_event_publisher,
+            session_id=session_id,
+        )
+
         graph = build_sop_quality_graph(
             checkpointer=checkpointer,
             agent_factory=AgentFactory(llm_provider_repository),
             sop_client=sop_client,
             submit_quality_result=submit_quality_result,
-            on_live_event=_live_event_publisher(
-                broadcast,
-                check_id,
-                sequence=started_event.sequence,
-            ),
+            message_writer=message_writer,
+            deepagent_stream_runner=deepagent_stream_runner,
+            live_event_publisher=live_event_publisher,
         )
         config = _top_level_checkpoint_config(check.thread_id)
         initial_state = {
@@ -88,6 +108,7 @@ async def run_sop_quality_check_with_new_session(
 ) -> dict[str, Any]:
     async with async_session() as session:
         repository = SopQualityCheckRepository(session)
+        session_repository = SessionRepository(session)
         llm_provider_repository = LlmProviderRepository(session)
         try:
             async with open_postgres_checkpointer(setup=True) as checkpointer:
@@ -98,10 +119,62 @@ async def run_sop_quality_check_with_new_session(
                     llm_provider_repository=llm_provider_repository,
                     sop_client=MockSopClient(),
                     submit_quality_result=_mock_external_submit,
+                    session_repository=session_repository,
                     broadcast=broadcast,
                 )
         except Exception as exc:
             return await _mark_failed(repository, check_id, exc, broadcast=broadcast)
+
+
+def _build_message_writer(
+    *,
+    session_repository: Any | None,
+    session_id: int | None,
+    broadcast: SopQualityBroadcast | None,
+    check_id: UUID,
+):
+    if session_repository is None or session_id is None:
+        return _NoopMessageWriter()
+    return RepositorySessionMessageWriter(
+        repository=session_repository,
+        session_id=session_id,
+        broadcast=_SessionBroadcastAdapter(broadcast, check_id)
+        if broadcast is not None
+        else None,
+    )
+
+
+class _NoopMessageWriter:
+    async def append_step_message(
+        self,
+        *,
+        step: str,
+        role: str,
+        content: str,
+        additional_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
+        class _Msg:
+            sequence = 0
+
+        return _Msg()
+
+
+class _SessionBroadcastAdapter:
+    """Adapt session-level broadcast publishes onto the SOP check broadcast."""
+
+    def __init__(self, broadcast: SopQualityBroadcast, check_id: UUID) -> None:
+        self._broadcast = broadcast
+        self._check_id = check_id
+
+    async def publish(self, session_id: int, message: dict[str, Any]) -> None:
+        await self._broadcast.publish(
+            self._check_id,
+            {
+                "check_id": self._check_id,
+                "session_id": session_id,
+                **message,
+            },
+        )
 
 
 async def _latest_checkpoint_id(

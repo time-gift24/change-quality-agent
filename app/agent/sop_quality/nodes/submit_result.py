@@ -3,9 +3,9 @@ from collections.abc import Callable
 from typing import Any
 
 from app.agent.sop_quality.state import SopQualityState
+from app.core.agent_streaming import SessionMessageWriter
 
 SubmitQualityResult = Callable[[dict[str, Any]], Any]
-LiveEventCallback = Callable[[dict[str, Any]], Any]
 
 
 async def mock_submit_quality_result(payload: dict[str, Any]) -> dict[str, Any]:
@@ -16,8 +16,8 @@ async def mock_submit_quality_result(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_submit_result(
-    submit_quality_result: SubmitQualityResult = mock_submit_quality_result,
-    on_live_event: LiveEventCallback | None = None,
+    submit_quality_result: SubmitQualityResult,
+    message_writer: SessionMessageWriter,
 ):
     async def submit_result(state: SopQualityState) -> SopQualityState:
         result = state.get("result")
@@ -35,13 +35,14 @@ def make_submit_result(
         if inspect.isawaitable(submission):
             submission = await submission
         submission_result = _json_safe(submission)
-        await _publish_live_event(
-            on_live_event,
-            {
-                "type": "messages",
-                "node": "submit_result",
+        await message_writer.append_step_message(
+            step="submit_result",
+            role="assistant",
+            content=_submission_text(submission_result),
+            additional_kwargs={
+                "kind": "step_message",
+                "step": "submit_result",
                 "channel": "summary",
-                "message": _submission_text(submission_result),
             },
         )
         return {
@@ -53,17 +54,6 @@ def make_submit_result(
         }
 
     return submit_result
-
-
-async def _publish_live_event(
-    on_live_event: LiveEventCallback | None,
-    event: dict[str, Any],
-) -> None:
-    if on_live_event is None:
-        return
-    result = on_live_event(event)
-    if inspect.isawaitable(result):
-        await result
 
 
 def _submission_text(submission_result: Any) -> str:

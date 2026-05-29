@@ -15,6 +15,7 @@ class FakeCheck:
         self.thread_id = "thread-1"
         self.checkpoint_ns = "sop_quality"
         self.current_checkpoint_id = None
+        self.session_id = 42
         self.sop_snapshot = {
             "sop_id": "release-checklist",
             "payload": {"title": "Release"},
@@ -61,6 +62,22 @@ class FakeRepository:
 
     async def commit(self):
         return None
+
+
+class FakeSessionRepository:
+    def __init__(self) -> None:
+        self.appended: list[dict] = []
+
+    async def append_message(self, session_id, *, role, content, additional_kwargs=None):
+        record = {
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "additional_kwargs": additional_kwargs or {},
+            "sequence": len(self.appended) + 1,
+        }
+        self.appended.append(record)
+        return type("Msg", (), record)()
 
 
 class FakeLlmProviderRepository:
@@ -207,9 +224,10 @@ async def test_runner_reads_latest_top_level_checkpoint(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_passes_agent_factory_to_graph(monkeypatch) -> None:
+async def test_runner_passes_runtime_dependencies_to_graph(monkeypatch) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)
+    session_repository = FakeSessionRepository()
     llm_provider_repository = FakeLlmProviderRepository()
     build_calls: list[dict] = []
 
@@ -231,13 +249,18 @@ async def test_runner_passes_agent_factory_to_graph(monkeypatch) -> None:
         llm_provider_repository=llm_provider_repository,
         sop_client=FakeSopClient(),
         submit_quality_result=fake_submit_quality_result,
+        session_repository=session_repository,
     )
 
     assert result["status"] == "succeeded"
-    assert isinstance(build_calls[0]["agent_factory"], FakeAgentFactory)
-    assert build_calls[0]["agent_factory"].repository is llm_provider_repository
-    assert isinstance(build_calls[0]["sop_client"], FakeSopClient)
-    assert build_calls[0]["submit_quality_result"] is fake_submit_quality_result
+    call = build_calls[0]
+    assert isinstance(call["agent_factory"], FakeAgentFactory)
+    assert call["agent_factory"].repository is llm_provider_repository
+    assert isinstance(call["sop_client"], FakeSopClient)
+    assert call["submit_quality_result"] is fake_submit_quality_result
+    assert call["message_writer"] is not None
+    assert call["deepagent_stream_runner"] is not None
+    assert call["live_event_publisher"] is not None
 
 
 @pytest.mark.asyncio
@@ -251,12 +274,12 @@ async def test_runner_broadcasts_live_graph_events_with_check_context(
 
     class LiveGraph(FakeGraph):
         async def ainvoke(self, initial_state, *, config):
-            await build_calls[0]["on_live_event"](
-                    {
-                        "type": "messages",
-                        "node": "review_sop",
-                        "message": "Streaming",
-                    }
+            await build_calls[0]["live_event_publisher"](
+                {
+                    "type": "messages",
+                    "node": "review_sop",
+                    "message": "Streaming",
+                }
             )
             return await super().ainvoke(initial_state, config=config)
 
@@ -297,14 +320,7 @@ async def test_runner_marks_failed_when_graph_build_fails(monkeypatch) -> None:
     repository = FakeRepository(check)
     llm_provider_repository = FakeLlmProviderRepository()
 
-    def fail_build(
-        *,
-        checkpointer,
-        agent_factory,
-        sop_client,
-        submit_quality_result,
-        on_live_event,
-    ):
+    def fail_build(**kwargs):
         raise RuntimeError("graph unavailable")
 
     monkeypatch.setattr(sop_quality_runner, "build_sop_quality_graph", fail_build)
@@ -336,6 +352,11 @@ async def test_new_session_runner_marks_failed_when_checkpoint_setup_fails(
         sop_quality_runner,
         "SopQualityCheckRepository",
         lambda session: repository,
+    )
+    monkeypatch.setattr(
+        sop_quality_runner,
+        "SessionRepository",
+        lambda session: FakeSessionRepository(),
     )
     monkeypatch.setattr(
         sop_quality_runner,

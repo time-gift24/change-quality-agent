@@ -1,39 +1,30 @@
-import inspect
-from collections.abc import Callable
-from typing import Any
-
-from app.agent.sop_quality.state import SopQualityState
 from app.agent.sop_quality.nodes.review_sop import (
     _load_json_object,
     _normalize_result,
 )
+from app.agent.sop_quality.state import SopQualityState
+from app.core.agent_streaming import SessionMessageWriter
 
-LiveEventCallback = Callable[[dict[str, Any]], Any]
 
-
-def make_summarize_result(
-    on_live_event: LiveEventCallback | None = None,
-):
+def make_summarize_result(message_writer: SessionMessageWriter):
     async def summarize_result(state: SopQualityState) -> SopQualityState:
         result_state = _summarize_result_state(state)
         result = result_state.get("result")
         if isinstance(result, dict):
-            await _publish_live_event(
-                on_live_event,
-                {
-                    "type": "messages",
-                    "node": "summarize_result",
+            content = result.get("report_markdown") or result.get("summary") or ""
+            await message_writer.append_step_message(
+                step="summarize_result",
+                role="assistant",
+                content=content,
+                additional_kwargs={
+                    "kind": "step_message",
+                    "step": "summarize_result",
                     "channel": "summary",
-                    "message": result.get("report_markdown") or result.get("summary"),
                 },
             )
         return result_state
 
     return summarize_result
-
-
-async def summarize_result(state: SopQualityState) -> SopQualityState:
-    return await make_summarize_result()(state)
 
 
 def _summarize_result_state(state: SopQualityState) -> SopQualityState:
@@ -79,17 +70,6 @@ def _summarize_result_state(state: SopQualityState) -> SopQualityState:
             "report_markdown": report_markdown,
         },
     }
-
-
-async def _publish_live_event(
-    on_live_event: LiveEventCallback | None,
-    event: dict[str, Any],
-) -> None:
-    if on_live_event is None:
-        return
-    result = on_live_event(event)
-    if inspect.isawaitable(result):
-        await result
 
 
 def _result_from_review_output(review_output: str) -> dict:

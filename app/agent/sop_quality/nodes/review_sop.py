@@ -1,13 +1,11 @@
 import json
-import inspect
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from app.agent.sop_quality.state import SopQualityState
-from app.core.stream_events import runtime_stream_event
+from app.core.agent_streaming import DeepAgentRunInput, DeepAgentStreamRunner
 
 CreateDeepagents = Callable[..., Awaitable[Any]]
-LiveEventCallback = Callable[[dict[str, Any]], Any]
 
 SYSTEM_PROMPT = """You are a strict SOP quality reviewer.
 Review the SOP for operational quality, completeness, ambiguity, and execution risk.
@@ -40,141 +38,21 @@ SEVERITY_ALIASES = {
 
 def make_review_sop(
     create_deepagents: CreateDeepagents,
-    *,
-    on_live_event: LiveEventCallback | None = None,
+    deepagent_stream_runner: DeepAgentStreamRunner,
 ) -> Callable[[SopQualityState], Awaitable[SopQualityState]]:
     async def review_sop(state: SopQualityState) -> SopQualityState:
         agent = await create_deepagents(
             system_prompt=SYSTEM_PROMPT,
             model_config={"temperature": 0},
         )
-
-        output = await _run_agent(
-            agent,
-            {"messages": [_user_message(state)]},
-            on_live_event=on_live_event,
+        result = await deepagent_stream_runner.run_step(
+            agent=agent,
+            step="review_sop",
+            input=DeepAgentRunInput(messages=[_user_message(state)]),
         )
-        return {"review_output": _agent_text(output)}
+        return {"review_output": result.final_text}
 
     return review_sop
-
-
-async def _run_agent(
-    agent: Any,
-    payload: dict[str, Any],
-    *,
-    on_live_event: LiveEventCallback | None,
-) -> Any:
-    astream = getattr(agent, "astream", None)
-    if astream is None:
-        return await _invoke_agent(agent, payload)
-
-    chunks: list[str] = []
-    thinking_published = False
-    stream = astream(payload, stream_mode=["messages", "updates"])
-    if inspect.isawaitable(stream):
-        stream = await stream
-
-    async for chunk_type, chunk in stream:
-        event = runtime_stream_event(chunk_type, chunk)
-        event["node"] = event.get("node") or "review_sop"
-        if _reasoning_delta(chunk) and not thinking_published:
-            thinking_published = True
-            await _publish_live_event(
-                on_live_event,
-                {
-                    "type": "messages",
-                    "node": event["node"],
-                    "channel": "thinking",
-                    "message": "正在分析 SOP...",
-                },
-            )
-        delta = _event_delta(event)
-        if delta:
-            chunks.append(delta)
-            await _publish_live_event(
-                on_live_event,
-                {
-                    "type": "messages",
-                    "node": event["node"],
-                    "message": delta,
-                },
-            )
-        elif event["type"] == "updates":
-            await _publish_live_event(
-                on_live_event,
-                {
-                    "type": "updates",
-                    "node": event["node"],
-                },
-            )
-
-    if chunks:
-        return {"messages": [{"role": "assistant", "content": "".join(chunks)}]}
-    return await _invoke_agent(agent, payload)
-
-
-async def _invoke_agent(agent: Any, payload: dict[str, Any]) -> Any:
-    invoke = getattr(agent, "ainvoke", None)
-    if invoke is not None:
-        output = invoke(payload)
-        if inspect.isawaitable(output):
-            return await output
-        return output
-
-    invoke = getattr(agent, "invoke", None)
-    if invoke is None:
-        raise TypeError("SOP quality agent does not support invoke or ainvoke.")
-
-    output = invoke(payload)
-    if inspect.isawaitable(output):
-        return await output
-    return output
-
-
-async def _publish_live_event(
-    on_live_event: LiveEventCallback | None,
-    event: dict[str, Any],
-) -> None:
-    if on_live_event is None:
-        return
-    result = on_live_event(event)
-    if inspect.isawaitable(result):
-        await result
-
-
-def _event_delta(event: dict[str, Any]) -> str | None:
-    payload = event.get("payload")
-    if not isinstance(payload, dict):
-        return None
-    delta = payload.get("delta")
-    return delta if isinstance(delta, str) and delta else None
-
-
-def _reasoning_delta(chunk: Any) -> str | None:
-    message = chunk[0] if _is_message_tuple(chunk) else chunk
-    additional_kwargs = getattr(message, "additional_kwargs", None)
-    if isinstance(additional_kwargs, dict):
-        for key in ("reasoning_content", "reasoning"):
-            value = additional_kwargs.get(key)
-            if isinstance(value, str) and value:
-                return value
-    if isinstance(message, dict):
-        for key in ("reasoning_content", "reasoning"):
-            value = message.get(key)
-            if isinstance(value, str) and value:
-                return value
-        nested = message.get("additional_kwargs")
-        if isinstance(nested, dict):
-            for key in ("reasoning_content", "reasoning"):
-                value = nested.get(key)
-                if isinstance(value, str) and value:
-                    return value
-    return None
-
-
-def _is_message_tuple(chunk: Any) -> bool:
-    return isinstance(chunk, tuple | list) and len(chunk) >= 2
 
 
 def _user_message(state: SopQualityState) -> dict[str, str]:
@@ -192,42 +70,6 @@ def _user_message(state: SopQualityState) -> dict[str, str]:
             f"{json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)}"
         ),
     }
-
-
-def _agent_text(output: Any) -> str:
-    if isinstance(output, str):
-        return output
-    if isinstance(output, dict):
-        messages = output.get("messages")
-        if isinstance(messages, list) and messages:
-            return _message_content(messages[-1])
-        content = output.get("content")
-        if content is not None:
-            return _content_text(content)
-    content = getattr(output, "content", None)
-    if content is not None:
-        return _content_text(content)
-    raise ValueError("SOP quality agent did not return text output.")
-
-
-def _message_content(message: Any) -> str:
-    if isinstance(message, dict):
-        return _content_text(message.get("content"))
-    return _content_text(getattr(message, "content", None))
-
-
-def _content_text(content: Any) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict) and isinstance(item.get("text"), str):
-                parts.append(item["text"])
-        return "\n".join(parts)
-    raise ValueError("SOP quality agent did not return text output.")
 
 
 def _load_json_object(text: str) -> dict[str, Any]:
