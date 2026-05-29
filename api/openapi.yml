@@ -16,6 +16,8 @@ tags:
   description: SOP preview and environment APIs.
 - name: sop-quality-checks
   description: SOP quality check lifecycle, history, events, and SSE streams.
+- name: sessions
+  description: Generic conversation/session transcripts shared by agent workflows.
 - name: mcp
   description: MCP server configuration and runtime management APIs.
 - name: agents
@@ -890,6 +892,104 @@ paths:
         '200':
           description: SSE stream of persisted lifecycle events and live in-process
             updates.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401': *id001
+        '404': *id003
+        '422': *id002
+  /api/sessions/{session_id}:
+    get:
+      tags:
+      - sessions
+      summary: Get session detail
+      operationId: getSession
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Session detail with latest persisted message sequence.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionDetail'
+        '401': *id001
+        '404': *id003
+        '422': *id002
+  /api/sessions/{session_id}/messages:
+    get:
+      tags:
+      - sessions
+      summary: List persisted session messages after a cursor
+      operationId: listSessionMessages
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+      responses:
+        '200':
+          description: Persisted messages after the requested sequence.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionMessage'
+        '401': *id001
+        '404': *id003
+        '422': *id002
+  /api/sessions/{session_id}/stream:
+    get:
+      tags:
+      - sessions
+      summary: Stream session messages and live deltas
+      description: 'Server-Sent Events stream. Persisted message events advance the
+        cursor; live token delta events do not. Reconnect with the last persisted
+        sequence to resume.
+
+        '
+      operationId: streamSession
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - name: after
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: SSE stream of persisted messages and live deltas.
           content:
             text/event-stream:
               schema:
@@ -1883,3 +1983,72 @@ components:
           type: string
           format: date-time
           nullable: true
+    SessionDetail:
+      type: object
+      required:
+      - id
+      - thread_id
+      - status
+      - latest_sequence
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+        thread_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - active
+          - completed
+          - failed
+          - interrupted
+        title:
+          type: string
+          nullable: true
+        latest_sequence:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    SessionMessage:
+      type: object
+      required:
+      - id
+      - session_id
+      - sequence
+      - role
+      - content
+      - additional_kwargs
+      - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: integer
+          format: int64
+        sequence:
+          type: integer
+          minimum: 1
+        role:
+          type: string
+          enum:
+          - user
+          - assistant
+          - tool
+          - system
+        content:
+          type: string
+        additional_kwargs:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time

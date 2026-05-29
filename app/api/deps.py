@@ -9,9 +9,11 @@ from app.core.database import async_session, get_session
 from app.repositories.agents import AgentRepository
 from app.repositories.llm_providers import LlmProviderRepository
 from app.repositories.mcp_servers import McpServerRepository
+from app.repositories.sessions import SessionRepository
 from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
+from app.services.session_streaming import SessionBroadcast
 from app.services.sop_client import MockSopClient, SopClient
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -34,6 +36,23 @@ SopQualityCheckRepositoryDep = Annotated[
     SopQualityCheckRepository,
     Depends(get_sop_quality_check_repository),
 ]
+
+
+def get_session_repository(session: SessionDep) -> SessionRepository:
+    return SessionRepository(session)
+
+
+SessionRepositoryDep = Annotated[SessionRepository, Depends(get_session_repository)]
+
+
+_session_broadcast = SessionBroadcast()
+
+
+def get_session_broadcast() -> SessionBroadcast:
+    return _session_broadcast
+
+
+SessionBroadcastDep = Annotated[SessionBroadcast, Depends(get_session_broadcast)]
 
 
 def get_agent_repository(session: SessionDep) -> AgentRepository:

@@ -198,6 +198,41 @@ def test_openapi_includes_sop_quality_check_routes() -> None:
     assert "channel" in schemas["SopQualityCheckEvent"]["properties"]
 
 
+def test_openapi_includes_session_routes() -> None:
+    contract = load_contract()
+    paths = contract["paths"]
+    schemas = contract["components"]["schemas"]
+
+    expected_operations = {
+        ("/api/sessions/{session_id}", "get"): {"200", "401", "404", "422"},
+        ("/api/sessions/{session_id}/messages", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+        ("/api/sessions/{session_id}/stream", "get"): {
+            "200",
+            "401",
+            "404",
+            "422",
+        },
+    }
+
+    for (path, method), statuses in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["tags"] == ["sessions"]
+        assert statuses <= set(operation["responses"])
+
+    assert {"SessionDetail", "SessionMessage"} <= set(schemas)
+    session_props = schemas["SessionDetail"]["properties"]
+    assert "latest_sequence" in session_props
+    assert "thread_id" in session_props
+    message_props = schemas["SessionMessage"]["properties"]
+    assert "sequence" in message_props
+    assert "additional_kwargs" in message_props
+
+
 def test_agents_parameters_are_reusable_and_referenced() -> None:
     contract = load_contract()
     parameters = contract["components"]["parameters"]
