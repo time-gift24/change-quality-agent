@@ -968,7 +968,8 @@ paths:
       - sessions
       summary: Stream session messages and live deltas
       description: 'Server-Sent Events stream. Persisted message events advance the
-        cursor; live token delta events do not. Reconnect with the last persisted
+        cursor; live token delta events do not. Terminal completed, failed, and
+        interrupted events close the stream. Reconnect with the last persisted
         sequence to resume.
 
         '

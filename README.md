@@ -10,8 +10,9 @@ checks, managing agent definitions, and observing SOP quality check progress.
   agent nodes.
 - Persists SOP quality check history and lightweight lifecycle events in
   Postgres.
-- Stores graph state, messages, and resume data in LangGraph Postgres
-  checkpoints.
+- Stores graph state and resume data in LangGraph Postgres checkpoints.
+- Stores shared agent transcripts in `sessions` and `messages`, with reconnectable
+  SSE streams documented in `docs/streaming.md`.
 - Streams SOP quality check lifecycle events for reconnectable progress
   observation.
 - Manages MCP server configuration and stdio runtime lifecycle for admin users.
@@ -41,9 +42,10 @@ snapshot and `GET /api/sop-quality-checks/{check_id}/events?after=<sequence>`
 for lightweight reconnect replay.
 
 LangGraph Postgres checkpoints are the durable source for graph state,
-messages, and resume data. The `sop_quality_events` table intentionally stores
-only lightweight SSE cursors: sequence, event type, node, checkpoint id, task
-id, message, and timestamp.
+and resume data. The `sop_quality_events` table intentionally stores only
+lightweight SSE cursors: sequence, event type, node, checkpoint id, task id,
+message, and timestamp. Durable transcript content lives in the shared
+`messages` table; see `docs/streaming.md` for the full stream contract.
 
 ## Full-Stack SOP Debugging
 

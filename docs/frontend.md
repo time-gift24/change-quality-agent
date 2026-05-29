@@ -290,6 +290,10 @@ and non-admin users receive the 403 state without leaving the workspace shell.
 
 ## Session Streaming Architecture
 
+Full backend/frontend stream semantics are documented in
+[`docs/streaming.md`](streaming.md). This section only captures the frontend
+module layout.
+
 SOP quality checks and future agent playground sessions share a single transcript
 substrate backed by the `sessions` and `messages` tables.
 
@@ -309,8 +313,10 @@ Frontend contract:
   `SopQualityCheckDetail.session_id` is set, `useSopQualityCheck` subscribes to
   the session stream and calls `projectSessionStateToSopView` to group messages
   by `additional_kwargs.step` into the existing SOP node view.
-- Older SOP checks without `session_id` continue to use the legacy SOP stream
-  endpoint as a compatibility fallback.
+- The SOP stream is still used for check lifecycle events and checkpoint
+  refreshes. It does not replay session messages.
+- Terminal SOP checks do not open SSE streams; they render the server-hydrated
+  `display_state` from the detail endpoint.
 
 Streaming guarantees:
 

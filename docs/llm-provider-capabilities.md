@@ -1,6 +1,6 @@
 # LLM Provider 与模型运行能力
 
-本文档说明当前项目的 LLM Provider 管理、CodeAgent 内网模型接入、Agent runtime 模型解析，以及前后端代码分布。它取代 `docs/plans/` 下的临时设计和实施计划。
+本文档说明当前项目的 LLM Provider 管理、CodeAgent 内网模型接入、Agent runtime 模型解析，以及前后端代码分布。流式输出与 session transcript 设计见 `docs/streaming.md`。
 
 ## 当前能力
 
