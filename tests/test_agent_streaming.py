@@ -83,14 +83,14 @@ async def test_runner_prefers_astream_and_aggregates_content() -> None:
     result = await runner.run_step(
         agent=agent,
         step="review_sop",
-        input=DeepAgentRunInput(messages=[{"role": "user", "content": "review"}]),
+        input=DeepAgentRunInput(messages=[{"role": "user", "content": "请评审。"}]),
     )
 
     assert isinstance(result, DeepAgentRunResult)
     assert result.final_text == "Hello World"
     assert agent.astream_called_with is not None
     payload, stream_mode = agent.astream_called_with
-    assert payload == {"messages": [{"role": "user", "content": "review"}]}
+    assert payload == {"messages": [{"role": "user", "content": "请评审。"}]}
     assert "messages" in stream_mode
 
 

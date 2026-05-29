@@ -54,7 +54,7 @@ class AgentFactory:
     async def create_agent(
         self,
         *,
-        system_prompt: str = "You are a careful SOP quality reviewer.",
+        system_prompt: str = "你是谨慎的 SOP 质量评审助手。",
         tools: Sequence[AgentTool] | None = None,
         model_config: LlmModelParameters | Mapping[str, object] | None = None,
     ) -> object:
@@ -68,7 +68,7 @@ class AgentFactory:
     async def create_deepagents(
         self,
         *,
-        system_prompt: str = "You are a careful SOP quality reviewer.",
+        system_prompt: str = "你是谨慎的 SOP 质量评审助手。",
         tools: Sequence[AgentTool] | None = None,
         model_config: LlmModelParameters | Mapping[str, object] | None = None,
     ) -> object:

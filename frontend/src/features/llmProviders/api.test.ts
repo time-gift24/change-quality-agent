@@ -103,15 +103,15 @@ describe("LLM provider API", () => {
     const result: LlmProviderModelTestResponse = {
       error: null,
       latency_ms: 25,
-      message: "pong",
+      message: "连通性测试通过。",
       request: {
-        messages: [{ content: "ping", role: "user" }],
+        messages: [{ content: "请简短回复：连通性测试通过。", role: "user" }],
         model: "gpt-5-mini",
         provider_type: "openai",
       },
       response: {
-        content: "pong",
-        raw: { content: "pong", type: "ai" },
+        content: "连通性测试通过。",
+        raw: { content: "连通性测试通过。", type: "ai" },
       },
       status: "ok",
     };

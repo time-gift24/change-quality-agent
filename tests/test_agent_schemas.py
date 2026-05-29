@@ -17,7 +17,7 @@ def test_agent_create_accepts_initial_draft() -> None:
         display_name="Release Reviewer",
         description="Checks release quality",
         draft=AgentDraftConfig(
-            system_prompt="You are careful.",
+            system_prompt="你是谨慎的评审助手。",
             model="openai:gpt-5-mini",
             model_config={"temperature": 0},
             tool_allowlist=["search_sop"],
@@ -31,7 +31,7 @@ def test_agent_create_accepts_initial_draft() -> None:
 
 def test_agent_draft_config_dumps_external_model_config_key() -> None:
     draft = AgentDraftConfig(
-        system_prompt="You are careful.",
+        system_prompt="你是谨慎的评审助手。",
         model="openai:gpt-5-mini",
         model_config={"temperature": 0, "reasoning_effort": "high"},
     )
@@ -50,7 +50,7 @@ def test_agent_draft_config_dumps_external_model_config_key() -> None:
 
 def test_agent_draft_config_preserves_provider_specific_model_config_extensions() -> None:
     draft = AgentDraftConfig(
-        system_prompt="You are careful.",
+        system_prompt="你是谨慎的评审助手。",
         model="openai:gpt-5-mini",
         model_config={
             "temperature": 0,
@@ -69,7 +69,7 @@ def test_agent_draft_config_preserves_provider_specific_model_config_extensions(
 def test_agent_draft_config_accepts_provider_id_with_bare_model() -> None:
     provider_id = uuid4()
     draft = AgentDraftConfig(
-        system_prompt="You are careful.",
+        system_prompt="你是谨慎的评审助手。",
         model="gpt-5-mini",
         provider_id=provider_id,
         model_config={"temperature": 0},
@@ -84,7 +84,7 @@ def test_agent_draft_config_accepts_provider_id_with_bare_model() -> None:
 def test_agent_draft_config_rejects_provider_id_with_prefixed_model() -> None:
     with pytest.raises(ValidationError, match="provider_id requires bare model name"):
         AgentDraftConfig(
-            system_prompt="You are careful.",
+            system_prompt="你是谨慎的评审助手。",
             model="openai:gpt-5-mini",
             provider_id=uuid4(),
         )
@@ -92,7 +92,7 @@ def test_agent_draft_config_rejects_provider_id_with_prefixed_model() -> None:
 
 def test_agent_draft_config_allows_codeagent_without_provider_id() -> None:
     draft = AgentDraftConfig(
-        system_prompt="You are careful.",
+        system_prompt="你是谨慎的评审助手。",
         model="codeagent:deepseek-v4-pro",
     )
 
@@ -105,7 +105,7 @@ def test_agent_version_detail_validates_orm_model_config_and_dumps_external_key(
         id = uuid4()
         agent_id = uuid4()
         version_number = 3
-        system_prompt = "You are careful."
+        system_prompt = "你是谨慎的评审助手。"
         model = "openai:gpt-5-mini"
         provider_id = uuid4()
         model_config = {"temperature": 0}

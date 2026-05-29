@@ -98,7 +98,7 @@ class SopQualityService:
             )
 
         runtime_session = await self._session_repository.create_session(
-            title=f"SOP quality check: {sop_id}",
+            title=f"SOP 质量检查：{sop_id}",
         )
 
         try:

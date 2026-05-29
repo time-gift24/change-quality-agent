@@ -6,7 +6,7 @@ from app.core.llm_model_config import LlmModelParameters, dump_llm_model_paramet
 from app.core.llm_models import LlmProviderRuntimeConfig, create_provider_chat_model
 from app.schemas.llm_providers import LlmProviderModelTestResponse, REDACTED
 
-TEST_MESSAGES = [{"role": "user", "content": "ping"}]
+TEST_MESSAGES = [{"role": "user", "content": "请简短回复：连通性测试通过。"}]
 TEST_MODEL_CONFIG = LlmModelParameters(temperature=0)
 
 

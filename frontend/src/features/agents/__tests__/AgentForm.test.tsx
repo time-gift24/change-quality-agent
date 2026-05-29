@@ -20,14 +20,14 @@ describe("AgentForm", () => {
         modelSource: "codeagent",
         selectedProviderId: " ignored-provider ",
         selectedProviderModel: " ignored-model ",
-        systemPrompt: " Prompt ",
+        systemPrompt: " 提示词 ",
       }),
     ).toEqual({
       mcp_server_ids: [],
       model: "codeagent:deepseek-v4-pro",
       model_config: {},
       provider_id: null,
-      system_prompt: "Prompt",
+      system_prompt: "提示词",
       tool_allowlist: [],
     });
 
@@ -37,14 +37,14 @@ describe("AgentForm", () => {
         modelSource: "provider",
         selectedProviderId: " provider-2 ",
         selectedProviderModel: " claude-sonnet-5 ",
-        systemPrompt: " Provider prompt ",
+        systemPrompt: " Provider 提示词 ",
       }),
     ).toEqual({
       mcp_server_ids: [],
       model: "claude-sonnet-5",
       model_config: {},
       provider_id: "provider-2",
-      system_prompt: "Provider prompt",
+      system_prompt: "Provider 提示词",
       tool_allowlist: [],
     });
   });
@@ -64,8 +64,8 @@ describe("AgentForm", () => {
     fireEvent.change(screen.getByLabelText("Agent 名称"), {
       target: { value: " Release Reviewer " },
     });
-    fireEvent.change(screen.getByLabelText("System Prompt"), {
-      target: { value: " You are careful. " },
+    fireEvent.change(screen.getByLabelText("系统提示词"), {
+      target: { value: " 你是谨慎的评审助手。 " },
     });
     fireEvent.change(screen.getByLabelText("CodeAgent 模型"), {
       target: { value: "codeagent:codeagent-v4-pro" },
@@ -81,7 +81,7 @@ describe("AgentForm", () => {
         model: "codeagent:codeagent-v4-pro",
         model_config: {},
         provider_id: null,
-        system_prompt: "You are careful.",
+        system_prompt: "你是谨慎的评审助手。",
         tool_allowlist: [],
       },
     });
@@ -102,8 +102,8 @@ describe("AgentForm", () => {
     fireEvent.change(screen.getByLabelText("Agent 名称"), {
       target: { value: "Provider Agent" },
     });
-    fireEvent.change(screen.getByLabelText("System Prompt"), {
-      target: { value: "Use the configured provider." },
+    fireEvent.change(screen.getByLabelText("系统提示词"), {
+      target: { value: "使用已配置的 Provider。" },
     });
     fireEvent.change(screen.getByLabelText("模型来源"), {
       target: { value: "provider" },
@@ -127,7 +127,7 @@ describe("AgentForm", () => {
         model: "claude-sonnet-5",
         model_config: {},
         provider_id: "provider-2",
-        system_prompt: "Use the configured provider.",
+        system_prompt: "使用已配置的 Provider。",
         tool_allowlist: [],
       },
     });
@@ -167,7 +167,7 @@ describe("AgentForm", () => {
 
     expect(screen.getByLabelText("Agent 名称")).toHaveValue("Existing Agent");
     fireEvent.click(screen.getByRole("button", { name: "切换到编辑模式" }));
-    expect(screen.getByLabelText("System Prompt")).toHaveValue("Existing prompt.");
+    expect(screen.getByLabelText("系统提示词")).toHaveValue("已有系统提示词。");
     expect(screen.getByLabelText("模型来源")).toHaveValue("provider");
     expect(screen.getByLabelText("LLM Provider")).toHaveValue("provider-1");
     expect(screen.getByLabelText("Provider 模型")).toHaveValue("gpt-5-mini");
@@ -184,7 +184,7 @@ describe("AgentForm", () => {
         model: "gpt-5-mini",
         model_config: {},
         provider_id: "provider-1",
-        system_prompt: "Existing prompt.",
+        system_prompt: "已有系统提示词。",
         tool_allowlist: [],
       },
       enabled: false,
@@ -199,7 +199,7 @@ describe("AgentForm", () => {
         model: "disabled-model",
         model_config: {},
         provider_id: "provider-disabled",
-        system_prompt: "Existing prompt.",
+        system_prompt: "已有系统提示词。",
         tool_allowlist: [],
       },
     });
@@ -237,7 +237,7 @@ describe("AgentForm", () => {
         model: "gpt-legacy",
         model_config: {},
         provider_id: "provider-1",
-        system_prompt: "Existing prompt.",
+        system_prompt: "已有系统提示词。",
         tool_allowlist: [],
       },
     });
@@ -275,7 +275,7 @@ describe("AgentForm", () => {
         model: "codeagent:legacy",
         model_config: {},
         provider_id: null,
-        system_prompt: "Existing prompt.",
+        system_prompt: "已有系统提示词。",
         tool_allowlist: [],
       },
     });
@@ -351,7 +351,7 @@ function buildAgent(overrides: Partial<AgentDetail> = {}): AgentDetail {
       model: "gpt-5-mini",
       model_config: {},
       provider_id: "provider-1",
-      system_prompt: "Existing prompt.",
+      system_prompt: "已有系统提示词。",
       tool_allowlist: [],
     },
     enabled: false,

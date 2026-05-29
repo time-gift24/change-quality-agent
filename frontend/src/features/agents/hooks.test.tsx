@@ -203,7 +203,7 @@ function buildDetail(overrides: Partial<AgentDetail> = {}): AgentDetail {
       model: "codeagent:deepseek-v4-pro",
       model_config: {},
       provider_id: null,
-      system_prompt: "You are an agent.",
+      system_prompt: "你是一个 Agent。",
       tool_allowlist: [],
     },
     ...overrides,
@@ -218,7 +218,7 @@ function buildCreatePayload(): AgentCreate {
       model: "codeagent:deepseek-v4-pro",
       model_config: {},
       provider_id: null,
-      system_prompt: "You are an agent.",
+      system_prompt: "你是一个 Agent。",
       tool_allowlist: [],
     },
   };

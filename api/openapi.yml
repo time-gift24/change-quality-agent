@@ -1855,7 +1855,7 @@ components:
         content:
           type: string
           minLength: 1
-          example: Can this deploy?
+          example: 这次变更可以发布吗？
     SopQualityCheckStatus:
       type: string
       enum:

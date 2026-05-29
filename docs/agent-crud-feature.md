@@ -43,7 +43,7 @@ An agent draft stores editable runtime configuration:
 
 ```json
 {
-  "system_prompt": "You are a careful release reviewer.",
+  "system_prompt": "你是谨慎的发布评审助手。请识别发布风险、审批缺口和可执行的整改建议。",
   "model": "gpt-5-mini",
   "provider_id": "00000000-0000-0000-0000-000000000000",
   "model_config": {

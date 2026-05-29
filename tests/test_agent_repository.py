@@ -107,7 +107,7 @@ def test_dump_draft_config_preserves_provider_id() -> None:
 
 def draft_config(
     *,
-    system_prompt: str = "You are careful.",
+    system_prompt: str = "你是谨慎的评审助手。",
     model: str = "openai:gpt-5-mini",
     provider_id=None,
     temperature: float = 0,
@@ -307,7 +307,7 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     await repository.update_draft(
         agent.id,
         draft=draft_config(
-            system_prompt="You are more concise.",
+            system_prompt="请更简洁地评审。",
             temperature=0.2,
         ),
     )
@@ -317,7 +317,7 @@ async def test_publish_agent_creates_monotonic_versions_and_eager_loads_latest(
     assert first.model_config == {"temperature": 0}
     assert first.published_by == "publisher@example.com"
     assert second.version_number == 2
-    assert second.system_prompt == "You are more concise."
+    assert second.system_prompt == "请更简洁地评审。"
     assert second.model_config == {"temperature": 0.2}
 
     versions = await repository.list_versions(agent.id)

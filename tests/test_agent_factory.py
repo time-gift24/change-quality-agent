@@ -84,7 +84,7 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
     )
 
     agent = await factory.create_agent(
-        system_prompt="Review the SOP carefully.",
+        system_prompt="请仔细评审 SOP。",
         tools=tools,
         model_config={"temperature": 0},
     )
@@ -105,7 +105,7 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
         {
             "model": configured_model,
             "tools": tools,
-            "system_prompt": "Review the SOP carefully.",
+            "system_prompt": "请仔细评审 SOP。",
         }
     ]
 
@@ -163,19 +163,19 @@ async def test_agent_factory_create_deepagents_returns_fresh_agent_each_call() -
     )
 
     first = await factory.create_deepagents(
-        system_prompt="Review one.",
+        system_prompt="请评审第一份内容。",
         model_config={"temperature": 0},
     )
     second = await factory.create_deepagents(
-        system_prompt="Review two.",
+        system_prompt="请评审第二份内容。",
         model_config={"temperature": 0},
     )
 
     assert first is created_agents[0]
     assert second is created_agents[1]
     assert len(create_deep_agent_calls) == 2
-    assert create_deep_agent_calls[0]["system_prompt"] == "Review one."
-    assert create_deep_agent_calls[1]["system_prompt"] == "Review two."
+    assert create_deep_agent_calls[0]["system_prompt"] == "请评审第一份内容。"
+    assert create_deep_agent_calls[1]["system_prompt"] == "请评审第二份内容。"
 
 
 @pytest.mark.asyncio

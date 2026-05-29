@@ -241,52 +241,43 @@ List page rules:
   delete because Agent disablement is handled through the edit form's
   `启用 Agent` toggle.
 
-Form rules (`AgentForm.tsx`):
+表单规则（`AgentForm.tsx`）：
 
-- Action bar (`保存 Agent` / `取消` / `启用 Agent` toggle in edit mode) sits at
-  the top of the form so it stays reachable as the System Prompt grows.
-- Page-level fields (`Agent 名称`, `Description`) and the model row sit above
-  the System Prompt block. The System Prompt area lives at the bottom and uses
-  `field-sizing-content` to auto-grow with content.
-- `Agent 名称` and `System Prompt` are required. Other fields are optional.
-- The model row has two layouts driven by `模型来源`:
-  - `CodeAgent`: pick from the hard-coded `CODEAGENT_MODEL_OPTIONS` list. The
-    payload sets `provider_id = null`.
-  - `LLM Provider`: pick an enabled provider and then one of that provider's
-    configured models. The payload sets `provider_id` to the chosen provider.
-- Selects use `appearance-none` with a custom SVG chevron and `pr-9` so they
-  share the same chrome and never have a chevron flush against the right edge.
-- Field labels render in a fixed-height row with a visible or `invisible`
-  required asterisk, so required and optional labels share the same baseline.
-- Unavailable draft references (disabled provider, removed CodeAgent model,
-  provider model no longer in the list) keep the original value as a disabled
-  `(不可用)` option, render an error banner, and block save until the user
-  picks a valid alternative.
-- Auto-pick only fills empty selections. It must not clobber an unavailable
-  draft value, because that would hide the warning state.
+- 操作栏（`保存 Agent` / `取消` / 编辑模式的 `启用 Agent` 开关）固定在表单顶部，
+  即使系统提示词变长也能快速保存或取消。
+- 页面级字段（`Agent 名称`、`Description`）和模型选择行位于系统提示词区域上方。
+  系统提示词区域位于底部，使用 `field-sizing-content` 随内容自动增高。
+- `Agent 名称` 和 `系统提示词` 必填，其它字段可选。
+- 模型选择行由 `模型来源` 控制两种布局：
+  - `CodeAgent`：从硬编码的 `CODEAGENT_MODEL_OPTIONS` 列表选择，payload 设置
+    `provider_id = null`。
+  - `LLM Provider`：先选择已启用的 provider，再选择该 provider 配置的模型，
+    payload 将 `provider_id` 设置为所选 provider。
+- Select 使用 `appearance-none`、自定义 SVG 下拉箭头和 `pr-9`，保证所有选择框视觉一致，
+  且下拉箭头不会贴住右边缘。
+- 字段 label 使用固定高度行；必填星号在非必填字段上以 `invisible` 占位，保证基线一致。
+- 不可用的 draft 引用（provider 被禁用、CodeAgent 模型被移除、provider 模型不在列表中）
+  会保留原值作为 disabled 的 `(不可用)` option，展示错误提示，并阻止保存直到用户选择有效值。
+- 自动选择只填充空选择；不能覆盖不可用的 draft 值，否则会隐藏警告状态。
 
-System Prompt block:
+系统提示词区域：
 
-- A single icon-only toggle button switches between edit (textarea) and
-  preview (`StreamMarkdown`) modes. Edit mode shows a pencil icon; preview
-  shows an eye icon.
-- Edit mode is the default when creating; preview mode is the default when
-  opening an existing agent for editing.
-- Validation failure on System Prompt forces the view back to edit and focuses
-  the textarea so the user can fix the input.
+- 单个纯图标按钮在编辑（textarea）与预览（`StreamMarkdown`）之间切换；编辑状态显示铅笔图标，
+  预览状态显示眼睛图标。
+- 新建 Agent 时默认进入编辑模式；打开已有 Agent 编辑时默认进入预览模式。
+- 系统提示词校验失败时会切回编辑模式，并聚焦 textarea 方便用户修正。
 
-API payloads:
+API payload：
 
 - Create: `POST /api/agents` with
   `{ display_name, description, draft: AgentDraftConfig }`.
 - Update: `PATCH /api/agents/{agentId}/draft` with
   `{ display_name, description, draft, enabled }`.
-- `AgentDraftConfig` always trims `model`, `provider_id`, and `system_prompt`,
-  and currently sends empty `mcp_server_ids`, `model_config`, and
-  `tool_allowlist`.
+- `AgentDraftConfig` 始终 trim `model`、`provider_id` 和 `system_prompt`；
+  当前会发送空的 `mcp_server_ids`、`model_config` 和 `tool_allowlist`。
 
-Authorization mirrors MCP: `ProtectedRoute` + `useAuthz()` gate the routes,
-and non-admin users receive the 403 state without leaving the workspace shell.
+鉴权与 MCP 一致：路由通过 `ProtectedRoute` + `useAuthz()` 保护，非管理员用户会在 workspace
+shell 内看到 403 状态，不会离开当前外壳。
 
 ## Session Streaming Architecture
 

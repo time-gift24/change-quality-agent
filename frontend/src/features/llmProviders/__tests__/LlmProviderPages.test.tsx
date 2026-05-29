@@ -109,15 +109,15 @@ describe("LLM provider pages", () => {
     testProviderModel.mockResolvedValue({
       error: null,
       latency_ms: 20,
-      message: "pong",
+      message: "连通性测试通过。",
       request: {
-        messages: [{ content: "ping", role: "user" }],
+        messages: [{ content: "请简短回复：连通性测试通过。", role: "user" }],
         model: "gpt-5-mini",
         provider_type: "openai",
       },
       response: {
-        content: "**pong**",
-        raw: { content: "**pong**", type: "ai" },
+        content: "**连通性测试通过。**",
+        raw: { content: "**连通性测试通过。**", type: "ai" },
       },
       status: "ok",
     });
@@ -134,7 +134,7 @@ describe("LLM provider pages", () => {
 
     await waitFor(() => expect(testProviderModel).toHaveBeenCalledWith("provider-1", "gpt-5-mini"));
     expect(await screen.findByRole("status")).toHaveTextContent("20ms");
-    expect(screen.getByTestId("stream-markdown")).toHaveTextContent("pong");
+    expect(screen.getByTestId("stream-markdown")).toHaveTextContent("连通性测试通过。");
     expect(screen.getByText(/provider_type/)).toBeInTheDocument();
   });
 

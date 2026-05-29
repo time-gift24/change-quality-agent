@@ -278,16 +278,16 @@ async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
         return LlmProviderModelTestResponse(
             status="ok",
             latency_ms=12.5,
-            message="pong",
+            message="连通性测试通过。",
             error=None,
             request={
                 "model": model,
-                "messages": [{"role": "user", "content": "ping"}],
+                "messages": [{"role": "user", "content": "请简短回复：连通性测试通过。"}],
                 "provider_type": provider.provider_type,
             },
             response={
-                "content": "pong",
-                "raw": {"type": "ai", "content": "pong"},
+                "content": "连通性测试通过。",
+                "raw": {"type": "ai", "content": "连通性测试通过。"},
             },
         )
 
@@ -310,16 +310,16 @@ async def test_test_provider_model_uses_selected_model(monkeypatch) -> None:
     assert response.json() == {
         "status": "ok",
         "latency_ms": 12.5,
-        "message": "pong",
+        "message": "连通性测试通过。",
         "error": None,
         "request": {
             "model": "gpt-5-mini",
-            "messages": [{"role": "user", "content": "ping"}],
+            "messages": [{"role": "user", "content": "请简短回复：连通性测试通过。"}],
             "provider_type": "openai",
         },
         "response": {
-            "content": "pong",
-            "raw": {"type": "ai", "content": "pong"},
+            "content": "连通性测试通过。",
+            "raw": {"type": "ai", "content": "连通性测试通过。"},
         },
     }
     assert len(calls) == 1
