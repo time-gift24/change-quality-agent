@@ -72,7 +72,11 @@ class FakeSessionRepository:
         self.messages.append(message)
 
     async def get_messages_after(self, session_id, after=0, limit=100):
-        return [m for m in self.messages if m.session_id == session_id and m.sequence > after]
+        return [
+            message
+            for message in self.messages
+            if message.session_id == session_id and message.sequence > after
+        ][:limit]
 
 
 class PollingRepository:
@@ -160,8 +164,11 @@ async def test_stream_polls_until_terminal_event(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stream_replays_session_messages_for_check(monkeypatch, override_repository) -> None:
-    """Persisted session messages should be replayed in the SOP stream."""
+async def test_stream_does_not_replay_session_messages_for_check(
+    monkeypatch,
+    override_repository,
+) -> None:
+    """SOP stream owns check lifecycle; session messages use /api/sessions."""
     monkeypatch.setattr(checks_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     check, session_repository = override_repository
     session_repository.add_message(FakeMessage(1, "load_sop", "Loaded SOP X."))
@@ -176,7 +183,8 @@ async def test_stream_replays_session_messages_for_check(monkeypatch, override_r
         )
 
     assert response.status_code == 200
-    # Persisted session messages emitted as 'message' events
-    assert "event: message" in response.text
-    assert "Loaded SOP X." in response.text
-    assert "Reviewing..." in response.text
+    assert "event: checkpoint" in response.text
+    assert "event: completed" in response.text
+    assert "event: message" not in response.text
+    assert "Loaded SOP X." not in response.text
+    assert "Reviewing..." not in response.text

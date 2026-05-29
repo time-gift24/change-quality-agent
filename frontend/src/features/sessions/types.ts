@@ -39,4 +39,8 @@ export type SessionStreamEvent =
       role: SessionMessageRole;
       content: string;
       additional_kwargs: Record<string, unknown>;
+    }
+  | {
+      type: "completed" | "failed" | "interrupted";
+      session_id: number;
     };

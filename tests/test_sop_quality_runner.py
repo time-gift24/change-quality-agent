@@ -219,6 +219,39 @@ async def test_runner_marks_success_and_writes_lifecycle_events(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_runner_skips_check_that_cannot_transition_to_running(monkeypatch) -> None:
+    check = FakeCheck()
+    repository = FakeRepository(check)
+    llm_provider_repository = FakeLlmProviderRepository()
+    build_calls: list[dict] = []
+
+    async def mark_running_skipped(check_id):
+        repository.events.append({"type": "mark_running_skipped"})
+        return None
+
+    repository.mark_running = mark_running_skipped
+    monkeypatch.setattr(
+        sop_quality_runner,
+        "build_sop_quality_graph",
+        lambda **kwargs: build_calls.append(kwargs) or FakeGraph(),
+    )
+
+    result = await run_sop_quality_check(
+        check.id,
+        repository,
+        checkpointer=None,
+        llm_provider_repository=llm_provider_repository,
+        sop_client=FakeSopClient(),
+        submit_quality_result=fake_submit_quality_result,
+    )
+
+    assert result == {"status": "skipped"}
+    assert repository.terminal is None
+    assert build_calls == []
+    assert repository.events == [{"type": "mark_running_skipped"}]
+
+
+@pytest.mark.asyncio
 async def test_runner_broadcasts_persisted_event_envelopes(monkeypatch) -> None:
     check = FakeCheck()
     repository = FakeRepository(check)

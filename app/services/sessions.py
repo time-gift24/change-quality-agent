@@ -71,6 +71,11 @@ class SessionService:
                     current_session is None
                     or current_session.status in TERMINAL_SESSION_STATUSES
                 ):
+                    if current_session is not None:
+                        yield {
+                            "type": current_session.status,
+                            "session_id": session_id,
+                        }
                     return
 
                 try:

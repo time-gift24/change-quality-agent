@@ -67,6 +67,9 @@ export function reduceSessionStreamEvent(
       liveBuffers: remainingBuffers,
     };
   }
+  if (event.type !== "message_delta") {
+    return state;
+  }
 
   const stepKey = bufferKey(event.additional_kwargs);
   const channel = readString(event.additional_kwargs.channel);

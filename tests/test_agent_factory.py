@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.agents.manager.agent_factory import (
+from app.agent.manager.agent_factory import (
     AgentFactory,
     LlmProviderAgentConfigurationError,
 )
@@ -10,14 +10,19 @@ from app.core.llm_models import LlmProviderRuntimeConfig
 
 
 class FakeProvider:
-    def __init__(self, *, models: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        models: list[str] | None = None,
+        enabled: bool = True,
+    ) -> None:
         self.id = uuid4()
         self.provider_type = "deepseek"
         self.base_url = "https://llm.example.test/v1"
         self.api_key = "sk-test"
         self.default_headers = {"X-Tenant": "quality"}
         self.default_query = {"trace": "1"}
-        self.enabled = True
+        self.enabled = enabled
         self.models = models if models is not None else ["deepseek-v4-pro"]
 
 
@@ -87,6 +92,33 @@ async def test_agent_factory_create_agent_uses_first_provider_and_model() -> Non
 
 
 @pytest.mark.asyncio
+async def test_agent_factory_skips_disabled_providers() -> None:
+    disabled_provider = FakeProvider(
+        models=["disabled-model"],
+        enabled=False,
+    )
+    enabled_provider = FakeProvider(models=["deepseek-v4-pro"])
+    repository = FakeRepository([disabled_provider, enabled_provider])
+    provider_model_calls: list[tuple[str, LlmProviderRuntimeConfig, dict]] = []
+
+    def fake_provider_model_factory(model: str, provider, **model_config):
+        provider_model_calls.append((model, provider, dict(model_config)))
+        return object()
+
+    factory = AgentFactory(
+        repository,
+        provider_model_factory=fake_provider_model_factory,
+        create_agent_factory=lambda **kwargs: object(),
+    )
+
+    await factory.create_agent()
+
+    assert provider_model_calls[0][0] == "deepseek-v4-pro"
+    assert provider_model_calls[0][1].id == enabled_provider.id
+    assert provider_model_calls[0][1].enabled is True
+
+
+@pytest.mark.asyncio
 async def test_agent_factory_create_deepagents_returns_fresh_agent_each_call() -> None:
     repository = FakeRepository([FakeProvider(models=["deepseek-v4-pro"])])
     created_agents = [object(), object()]
@@ -140,4 +172,15 @@ async def test_agent_factory_fails_without_provider_model() -> None:
     factory = AgentFactory(FakeRepository([FakeProvider(models=[])]))
 
     with pytest.raises(LlmProviderAgentConfigurationError, match="does not list models"):
+        await factory.create_deepagents()
+
+
+@pytest.mark.asyncio
+async def test_agent_factory_fails_when_all_providers_are_disabled() -> None:
+    factory = AgentFactory(FakeRepository([FakeProvider(enabled=False)]))
+
+    with pytest.raises(
+        LlmProviderAgentConfigurationError,
+        match="No enabled LLM provider",
+    ):
         await factory.create_deepagents()

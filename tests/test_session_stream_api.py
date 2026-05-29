@@ -83,6 +83,27 @@ async def test_stream_replays_persisted_messages_after_cursor(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_stream_emits_terminal_event_for_completed_session(monkeypatch) -> None:
+    monkeypatch.setattr(sessions_api, "SSE_POLL_INTERVAL_SECONDS", 0)
+    session = FakeSession()
+    session.status = "completed"
+    repository = FakeRepository(session, [])
+    app.dependency_overrides[get_session_repository] = lambda: repository
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get(f"/api/sessions/{session.id}/stream?after=0")
+
+        assert response.status_code == 200
+        assert "event: completed" in response.text
+        assert '"type": "completed"' in response.text
+        assert '"session_id": 1' in response.text
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
 async def test_stream_returns_404_for_unknown_session(monkeypatch) -> None:
     monkeypatch.setattr(sessions_api, "SSE_POLL_INTERVAL_SECONDS", 0)
     session = FakeSession()

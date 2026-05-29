@@ -106,6 +106,39 @@ describe("sop quality check hooks", () => {
     unmount();
   });
 
+  it("does not open the session stream for terminal checks", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url === "/api/sop-quality-checks/check-1") {
+        return Promise.resolve(
+          jsonResponse(
+            detail({
+              session_id: 42,
+              status: "succeeded",
+              latest_sequence: 5,
+            }),
+          ),
+        );
+      }
+      if (url === "/api/sessions/42/messages?after=0") {
+        return Promise.resolve(jsonResponse([]));
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useSopQualityCheck("check-1"));
+
+    await waitFor(() => {
+      expect(result.current.detail?.status).toBe("succeeded");
+    });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/sessions/42/messages?after=0",
+      expect.any(Object),
+    );
+    expect(MockEventSource.instances).toHaveLength(0);
+  });
+
   it("ignores stale detail after check id changes", async () => {
     const requests: Array<Deferred<Response>> = [];
     const fetchMock = vi.fn(() => {

@@ -100,8 +100,12 @@ class SopQualityCheckRepository:
             check.latest_sequence = await self._latest_sequence(check.id)
         return checks
 
-    async def mark_running(self, check_id: UUID) -> SopQualityCheck:
+    async def mark_running(self, check_id: UUID) -> SopQualityCheck | None:
         check = await self._require_check(check_id)
+        await self._lock_check(check_id)
+        await self._session.refresh(check)
+        if check.status != "pending":
+            return None
         check.status = "running"
         check.started_at = datetime.now(UTC)
         await self._session.flush()

@@ -15,6 +15,9 @@ const RECONNECT_DELAY_MS = 1_000;
 export const SESSION_STREAM_EVENT_NAMES: SessionStreamEvent["type"][] = [
   "message",
   "message_delta",
+  "completed",
+  "failed",
+  "interrupted",
 ];
 
 export type UseSessionStreamResult = {
@@ -27,6 +30,7 @@ export function useSessionStream(
   sessionId: number | null,
 ): UseSessionStreamResult {
   const cursorRef = useRef(0);
+  const terminalRef = useRef(false);
   const [state, setState] = useState<SessionViewState>(
     createInitialSessionViewState,
   );
@@ -36,6 +40,7 @@ export function useSessionStream(
 
   useEffect(() => {
     cursorRef.current = 0;
+    terminalRef.current = false;
     setError(null);
     setHydratedFor(null);
     setState(createInitialSessionViewState());
@@ -95,12 +100,25 @@ export function useSessionStream(
       eventSource = source;
 
       source.onopen = () => {
+        if (isClosed || eventSource !== source || terminalRef.current) {
+          return;
+        }
         setState((current) => ({ ...current, connectionStatus: "open" }));
       };
 
       const handle = (message: MessageEvent<string>) => {
+        if (isClosed || eventSource !== source || terminalRef.current) {
+          return;
+        }
         const event = parseSessionStreamEvent(message.data);
         if (!event) {
+          return;
+        }
+        if (isTerminalSessionEvent(event)) {
+          terminalRef.current = true;
+          source.close();
+          eventSource = null;
+          setState((current) => ({ ...current, connectionStatus: "closed" }));
           return;
         }
         if (event.type === "message" && typeof event.sequence === "number") {
@@ -119,6 +137,9 @@ export function useSessionStream(
       }
 
       source.onerror = () => {
+        if (isClosed || eventSource !== source || terminalRef.current) {
+          return;
+        }
         source.close();
         eventSource = null;
         setState((current) => ({
@@ -153,7 +174,13 @@ function parseSessionStreamEvent(data: string): SessionStreamEvent | null {
   }
   try {
     const parsed = normalizeSessionStreamEvent(JSON.parse(data));
-    if (parsed.type !== "message" && parsed.type !== "message_delta") {
+    if (
+      parsed.type !== "message" &&
+      parsed.type !== "message_delta" &&
+      parsed.type !== "completed" &&
+      parsed.type !== "failed" &&
+      parsed.type !== "interrupted"
+    ) {
       return null;
     }
     if (typeof parsed.session_id !== "number") {
@@ -163,6 +190,19 @@ function parseSessionStreamEvent(data: string): SessionStreamEvent | null {
   } catch {
     return null;
   }
+}
+
+function isTerminalSessionEvent(
+  event: SessionStreamEvent,
+): event is Extract<
+  SessionStreamEvent,
+  { type: "completed" | "failed" | "interrupted" }
+> {
+  return (
+    event.type === "completed" ||
+    event.type === "failed" ||
+    event.type === "interrupted"
+  );
 }
 
 function normalizeSessionStreamEvent(parsed: unknown): Partial<SessionStreamEvent> {

@@ -80,7 +80,12 @@ class AgentFactory:
         providers = await self._repository.list()
         if not providers:
             raise LlmProviderAgentConfigurationError("No LLM provider is configured.")
-        return providers[0]
+        for provider in providers:
+            if provider.enabled:
+                return provider
+        raise LlmProviderAgentConfigurationError(
+            "No enabled LLM provider is configured."
+        )
 
 
 def _first_model(provider: LlmProviderLike) -> str:

@@ -172,25 +172,13 @@ class SopQualityService:
         poll_interval_seconds: float = 0.5,
     ) -> AsyncIterator[dict[str, object]]:
         check = await self._require_check(check_id)
-        session_id = getattr(check, "session_id", None)
         cursor = after
-        message_cursor = after
         broadcast = self._broadcast
         if broadcast is None:
             return
 
         async with broadcast.subscribe(check_id) as queue:
             while True:
-                if session_id is not None:
-                    messages = await self._session_repository.get_messages_after(
-                        session_id,
-                        after=message_cursor,
-                    )
-                    for message in messages:
-                        sequence = int(getattr(message, "sequence", 0))
-                        message_cursor = max(message_cursor, sequence)
-                        yield message_to_event(message, check_id)
-
                 events = await self._repository.get_events_after(check_id, after=cursor)
                 for event in events:
                     cursor = max(cursor, int(event.sequence))

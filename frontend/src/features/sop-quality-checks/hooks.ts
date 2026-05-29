@@ -232,7 +232,9 @@ export function useSopQualityCheck(checkId: string): UseSopQualityCheckResult {
   const visibleError = detailError?.checkId === checkId ? detailError.error : null;
 
   const sessionId =
-    typeof visibleDetail?.session_id === "number"
+    visibleDetail !== null &&
+    !TERMINAL_CHECK_STATUSES.includes(visibleDetail.status) &&
+    typeof visibleDetail.session_id === "number"
       ? visibleDetail.session_id
       : null;
   const sessionStream = useSessionStream(sessionId);

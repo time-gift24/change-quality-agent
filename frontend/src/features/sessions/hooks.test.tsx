@@ -153,6 +153,42 @@ describe("session stream hook", () => {
     expect(result.current.state.latestSequence).toBe(7);
   });
 
+  it("closes without reconnecting when a terminal event arrives", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useSessionStream(1));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+    vi.useFakeTimers();
+
+    act(() => {
+      MockEventSource.instances[0]?.emitNamed({
+        type: "completed",
+        session_id: 1,
+      });
+    });
+
+    expect(result.current.state.connectionStatus).toBe("closed");
+    expect(MockEventSource.instances[0]?.closed).toBe(true);
+
+    act(() => {
+      MockEventSource.instances[0]?.onerror?.(new Event("error"));
+      vi.runOnlyPendingTimers();
+    });
+
+    expect(MockEventSource.instances).toHaveLength(1);
+  });
+
   it("sets error when fetch fails", async () => {
     vi.stubGlobal(
       "fetch",

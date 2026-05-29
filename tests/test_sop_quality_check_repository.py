@@ -97,6 +97,24 @@ async def test_terminal_check_does_not_block_new_check(session) -> None:
     assert second.id != first.id
 
 
+async def test_mark_running_does_not_revive_terminal_check(session) -> None:
+    repository = SopQualityCheckRepository(session)
+    check = await repository.create_check(
+        sop_id="release-checklist",
+        env_key="dev",
+        graph_name="sop_quality",
+        graph_version="sop-quality@1",
+        sop_snapshot={"sop_id": "release-checklist"},
+    )
+    await repository.mark_terminal(check.id, "interrupted", error={"message": "stale"})
+
+    skipped = await repository.mark_running(check.id)
+    refreshed = await repository.get_check(check.id)
+
+    assert skipped is None
+    assert refreshed.status == "interrupted"
+
+
 async def test_append_event_increments_sequence_without_payload(session) -> None:
     repository = SopQualityCheckRepository(session)
     check = await repository.create_check(
@@ -157,4 +175,3 @@ async def test_create_check_accepts_session_id_and_thread_id(session) -> None:
 
     assert check.session_id == runtime_session.id
     assert check.thread_id == "thread-fixed"
-

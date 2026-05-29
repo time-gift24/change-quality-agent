@@ -2,7 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from app.agent.sop_quality.graph import build_sop_quality_graph
-from app.agents.manager.agent_factory import AgentFactory
+from app.agent.manager.agent_factory import AgentFactory
 from app.core.agent_streaming import DeepAgentStreamRunner
 from app.core.checkpoints import open_postgres_checkpointer
 from app.core.database import async_session
@@ -32,6 +32,8 @@ async def run_sop_quality_check(
 ) -> dict[str, Any]:
     try:
         check = await repository.mark_running(check_id)
+        if check is None:
+            return {"status": "skipped"}
         started_event = await repository.append_event(
             check_id,
             event_type="started",

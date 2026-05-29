@@ -1,4 +1,4 @@
-from app.agents.manager.agent_factory import (
+from app.agent.manager.agent_factory import (
     AgentFactory,
     LlmProviderAgentConfigurationError,
 )
