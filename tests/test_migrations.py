@@ -4,6 +4,9 @@ from pathlib import Path
 BASE_MIGRATION_PATH = Path(
     "migrations/versions/20260525_0001_create_sop_quality_checks.py"
 )
+MIGRATION_0008 = Path(
+    "migrations/versions/20260529_0008_create_sessions_messages.py"
+)
 
 
 def test_alembic_revision_ids_are_unique() -> None:
@@ -33,7 +36,7 @@ def test_alembic_revision_graph_has_single_head() -> None:
         down_revisions.update(_down_revisions(module))
 
     heads = revisions - down_revisions
-    assert heads == {"20260527_0007"}
+    assert heads == {"20260529_0008"}
 
 
 def test_base_migration_creates_sop_quality_tables_only() -> None:
@@ -59,8 +62,20 @@ def test_alembic_env_imports_sop_quality_models_for_metadata() -> None:
     module = ast.parse(Path("migrations/env.py").read_text())
     imported_models = _imported_names_from_module(module, "app.models")
 
-    assert {"agents", "mcp", "sop_quality_checks", "users"} <= imported_models
+    assert {"agents", "mcp", "sessions", "sop_quality_checks", "users"} <= imported_models
     assert "runs" not in imported_models
+
+
+def test_sessions_migration_creates_transcript_tables() -> None:
+    source = MIGRATION_0008.read_text()
+
+    assert '"sessions"' in source
+    assert '"messages"' in source
+    assert "thread_id" in source
+    assert "additional_kwargs" in source
+    assert "uq_messages_session_sequence" in source
+    assert "ix_messages_session_created_at" in source
+    assert "user_id" not in source
 
 
 def _string_assignment(module: ast.Module, name: str) -> str | None:
