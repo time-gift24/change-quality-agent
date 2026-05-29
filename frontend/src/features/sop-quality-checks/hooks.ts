@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { createSseEventSource } from "../../lib/sse";
+import { useSessionStream } from "../sessions/hooks";
 import { buildSopQualityCheckStreamUrl, getSopQualityCheck } from "./api";
 import {
   createInitialSopQualityCheckViewState,
   hydrateFromDisplayState,
+  projectSessionStateToSopView,
   reduceSopQualityCheckEvent,
   type SopQualityCheckViewState,
 } from "./reducer";
@@ -123,6 +125,11 @@ export function useSopQualityCheck(checkId: string): UseSopQualityCheckResult {
       return;
     }
 
+    if (typeof detail.session_id === "number") {
+      // Session-stream path handles this check; skip legacy SOP SSE.
+      return;
+    }
+
     let eventSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let isClosed = false;
@@ -229,12 +236,38 @@ export function useSopQualityCheck(checkId: string): UseSopQualityCheckResult {
   const visibleDetail = detail?.check_id === checkId ? detail : null;
   const visibleError = detailError?.checkId === checkId ? detailError.error : null;
 
+  const sessionId =
+    typeof visibleDetail?.session_id === "number"
+      ? visibleDetail.session_id
+      : null;
+  const sessionStream = useSessionStream(sessionId);
+
+  const effectiveState = useMemo<SopQualityCheckViewState>(() => {
+    if (sessionId === null) {
+      return state;
+    }
+    const isRunning =
+      visibleDetail !== null &&
+      !TERMINAL_CHECK_STATUSES.includes(visibleDetail.status);
+    const projection = projectSessionStateToSopView(
+      sessionStream.state,
+      isRunning,
+    );
+    return {
+      ...state,
+      latestSequence: Math.max(state.latestSequence, projection.latestSequence),
+      nodes: projection.nodes,
+      isRunning,
+      connectionStatus: sessionStream.state.connectionStatus,
+    };
+  }, [sessionId, sessionStream.state, state, visibleDetail]);
+
   return {
     detail: visibleDetail,
     error: visibleError,
     loading: loading || (visibleDetail === null && visibleError === null),
     refreshDetail,
-    state,
+    state: effectiveState,
   };
 }
 

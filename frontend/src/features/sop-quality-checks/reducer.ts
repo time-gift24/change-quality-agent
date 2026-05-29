@@ -1,3 +1,4 @@
+import type { SessionViewState } from "../sessions/reducer";
 import type {
   SopQualityCheckEvent,
   SopQualityDisplayState,
@@ -207,4 +208,119 @@ function settleRunningNodes(
       node.status === "running" ? { ...node, status: "done" } : node,
     ]),
   );
+}
+
+const ORDERED_STEPS = [
+  "load_sop",
+  "review_sop",
+  "summarize_result",
+  "submit_result",
+] as const;
+
+export type SopProjection = {
+  latestSequence: number;
+  nodes: Record<string, SopQualityNodeState>;
+};
+
+export function projectSessionStateToSopView(
+  sessionState: SessionViewState,
+  isRunning = false,
+): SopProjection {
+  const seenSteps: string[] = [];
+  const grouped: Record<string, string[]> = {};
+  const firstSequence: Record<string, number> = {};
+
+  for (const message of sessionState.messages) {
+    const step = readString(message.additional_kwargs.step);
+    if (!step) {
+      continue;
+    }
+    if (!(step in grouped)) {
+      grouped[step] = [];
+      seenSteps.push(step);
+      firstSequence[step] = message.sequence;
+    }
+    grouped[step].push(message.content ?? "");
+  }
+
+  let lastSeen = seenSteps[seenSteps.length - 1];
+
+  if (isRunning) {
+    for (const stepKey of Object.keys(sessionState.liveBuffers)) {
+      if (stepKey.startsWith("step:")) {
+        const step = stepKey.slice("step:".length);
+        if (!(step in grouped)) {
+          grouped[step] = [];
+          seenSteps.push(step);
+          firstSequence[step] = sessionState.latestSequence + 1;
+        }
+        lastSeen = step;
+      }
+    }
+    for (const stepKey of Object.keys(sessionState.thinking)) {
+      if (stepKey.startsWith("step:")) {
+        const step = stepKey.slice("step:".length);
+        if (!(step in grouped)) {
+          grouped[step] = [];
+          seenSteps.push(step);
+          firstSequence[step] = sessionState.latestSequence + 1;
+        }
+        lastSeen = step;
+      }
+    }
+  }
+
+  const orderedSteps = sortSteps(seenSteps, firstSequence);
+  const nodes: Record<string, SopQualityNodeState> = {};
+
+  for (const step of orderedSteps) {
+    const persistedChunks = grouped[step] ?? [];
+    const isLast = isRunning && step === lastSeen;
+    const liveText = sessionState.liveBuffers[`step:${step}`];
+    const isThinking = sessionState.thinking[`step:${step}`] === true;
+
+    const streamText =
+      isLast && liveText !== undefined
+        ? liveText
+        : persistedChunks.join("\n");
+
+    const node: SopQualityNodeState = {
+      status: isLast ? "running" : "done",
+      streamText,
+      firstSequence: firstSequence[step],
+    };
+
+    if (isLast && isThinking) {
+      node.thinkingText = "思考中";
+    }
+
+    nodes[step] = node;
+  }
+
+  return {
+    latestSequence: sessionState.messages.reduce(
+      (max, message) => Math.max(max, message.sequence),
+      sessionState.latestSequence,
+    ),
+    nodes,
+  };
+}
+
+function sortSteps(
+  seen: string[],
+  firstSequence: Record<string, number>,
+): string[] {
+  const orderedKnown = ORDERED_STEPS.filter((step) => seen.includes(step));
+  const unknown = seen
+    .filter((step) => !ORDERED_STEPS.includes(step as never))
+    .sort(
+      (left, right) =>
+        (firstSequence[left] ?? Number.MAX_SAFE_INTEGER) -
+        (firstSequence[right] ?? Number.MAX_SAFE_INTEGER),
+    );
+  return [...orderedKnown, ...unknown];
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

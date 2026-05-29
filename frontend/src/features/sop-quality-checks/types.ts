@@ -31,6 +31,7 @@ export type SopQualityCheckDetail = {
   result?: Record<string, unknown> | null;
   error?: Record<string, unknown> | null;
   display_state: SopQualityDisplayState;
+  session_id?: number | null;
 };
 
 export type SopQualityCheckEvent = {
