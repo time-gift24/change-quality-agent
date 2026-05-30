@@ -472,6 +472,54 @@ async def test_get_version_rejects_non_positive_version_number() -> None:
     assert response.status_code == 422
 
 
+class FakeCapabilityService:
+    async def list_capabilities(self):
+        from app.schemas.agents import (
+            AgentCapabilities,
+            BuiltinAgentToolCapability,
+            McpAgentCapability,
+        )
+
+        return AgentCapabilities(
+            builtin_tools=[
+                BuiltinAgentToolCapability(
+                    name="echo",
+                    label="Echo",
+                    description="Echoes input.",
+                    enabled=True,
+                )
+            ],
+            mcp_servers=[
+                McpAgentCapability(
+                    id="mcp-1",
+                    name="Docs MCP",
+                    enabled=True,
+                    runtime_status="running",
+                    tool_count=2,
+                )
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_agent_capabilities_returns_builtin_tools_and_mcp_servers():
+    get_agent_capability_service = getattr(deps, "get_agent_capability_service")
+    app.dependency_overrides[get_agent_capability_service] = (
+        lambda: FakeCapabilityService()
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/agents/capabilities")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["builtin_tools"][0]["name"] == "echo"
+    assert body["mcp_servers"][0]["tool_count"] == 2
+
+
 @pytest.mark.asyncio
 async def test_delete_agent_returns_no_content_and_commits() -> None:
     agent = FakeAgent()

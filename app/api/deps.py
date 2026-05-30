@@ -14,6 +14,7 @@ from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.agents import AgentService
+from app.services.agent_capabilities import AgentCapabilityService
 from app.services.auth import AuthService
 from app.services.llm_providers import LlmProviderService
 from app.services.mcp_servers import McpServerService
@@ -108,6 +109,18 @@ def get_mcp_repository(session: SessionDep) -> McpServerRepository:
 
 
 McpRepositoryDep = Annotated[McpServerRepository, Depends(get_mcp_repository)]
+
+
+def get_agent_capability_service(
+    mcp_repository: McpRepositoryDep,
+) -> AgentCapabilityService:
+    return AgentCapabilityService(mcp_repository=mcp_repository)
+
+
+AgentCapabilityServiceDep = Annotated[
+    AgentCapabilityService,
+    Depends(get_agent_capability_service),
+]
 
 
 def get_user_repository(session: SessionDep) -> UserRepository:

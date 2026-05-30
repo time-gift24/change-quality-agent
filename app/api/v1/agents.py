@@ -10,12 +10,13 @@ from fastapi import (
     status,
 )
 
-from app.api.deps import AgentServiceDep
+from app.api.deps import AgentCapabilityServiceDep, AgentServiceDep
 from app.services.agents import (
     AgentDraftInvalidError,
     AgentNotFoundError,
 )
 from app.schemas.agents import (
+    AgentCapabilities,
     AgentCreate,
     AgentDetail,
     AgentDraftConfig,
@@ -44,6 +45,13 @@ async def list_agents(
 ) -> list[AgentSummary]:
     agents = await service.list_agents(include_deleted=include_deleted)
     return [agent_to_summary(agent) for agent in agents]
+
+
+@router.get("/capabilities")
+async def get_agent_capabilities(
+    service: AgentCapabilityServiceDep,
+) -> AgentCapabilities:
+    return await service.list_capabilities()
 
 
 @router.get("/{agent_id}")
