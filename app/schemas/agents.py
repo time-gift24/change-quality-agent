@@ -88,6 +88,26 @@ class AgentDetail(AgentSummary):
     draft: AgentDraftConfig | None = None
 
 
+class BuiltinAgentToolCapability(BaseModel):
+    name: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    description: str | None = None
+    enabled: bool = True
+
+
+class McpAgentCapability(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    enabled: bool
+    runtime_status: str
+    tool_count: int = Field(ge=0)
+
+
+class AgentCapabilities(BaseModel):
+    builtin_tools: list[BuiltinAgentToolCapability] = Field(default_factory=list)
+    mcp_servers: list[McpAgentCapability] = Field(default_factory=list)
+
+
 class AgentVersionDetail(AgentVersionSummary):
     model_config = ConfigDict(
         from_attributes=True,
