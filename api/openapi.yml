@@ -592,6 +592,25 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /api/agents/capabilities:
+    get:
+      tags:
+      - agents
+      summary: List Agent draft capabilities
+      operationId: getAgentCapabilities
+      description: |
+        Returns the built-in tools and MCP servers an Agent draft may reference.
+      responses:
+        '200':
+          description: Capability inventory for Agent drafts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCapabilities'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/agents/{agent_id}:
     get:
       tags:
@@ -658,6 +677,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentDetail'
+        '404':
+          description: Agent not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/agents/{agent_id}/sessions:
+    post:
+      tags:
+      - agents
+      summary: Start an Agent draft chat session
+      operationId: startAgentSession
+      description: |
+        Append a user message to a draft chat session and trigger a draft run.
+        Pass session_id=null to start a new session, or an existing id to continue.
+      parameters:
+      - $ref: '#/components/parameters/AgentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentSessionStart'
+      responses:
+        '202':
+          description: Session created or extended; the run continues asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSessionStartResponse'
+        '400':
+          description: Agent draft is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Agent not found.
           content:
@@ -1856,6 +1915,88 @@ components:
           type: string
           minLength: 1
           example: 这次变更可以发布吗？
+    BuiltinAgentToolCapability:
+      type: object
+      required:
+      - name
+      - label
+      - enabled
+      properties:
+        name:
+          type: string
+          example: echo
+        label:
+          type: string
+          example: Echo
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+    McpAgentCapability:
+      type: object
+      required:
+      - id
+      - name
+      - enabled
+      - runtime_status
+      - tool_count
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Docs MCP
+        enabled:
+          type: boolean
+        runtime_status:
+          type: string
+          example: running
+        tool_count:
+          type: integer
+          minimum: 0
+    AgentCapabilities:
+      type: object
+      required:
+      - builtin_tools
+      - mcp_servers
+      properties:
+        builtin_tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuiltinAgentToolCapability'
+        mcp_servers:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpAgentCapability'
+    AgentSessionStart:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          example: 你好，帮我看看这次变更
+        session_id:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Existing draft session id to continue, or null to start a new session.
+    AgentSessionStartResponse:
+      type: object
+      required:
+      - session_id
+      - stream_url
+      properties:
+        session_id:
+          type: integer
+          minimum: 1
+        stream_url:
+          type: string
+          description: Generic session stream URL with cursor for the new turn.
     SopQualityCheckStatus:
       type: string
       enum:
