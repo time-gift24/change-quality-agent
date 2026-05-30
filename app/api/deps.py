@@ -15,6 +15,7 @@ from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.agents import AgentService
 from app.services.agent_capabilities import AgentCapabilityService
+from app.services.agent_runs import run_agent_draft_turn_with_new_session
 from app.services.auth import AuthService
 from app.services.llm_providers import LlmProviderService
 from app.services.mcp_servers import McpServerService
@@ -76,12 +77,22 @@ def get_agent_service(
     repository: AgentRepositoryDep,
     session_repository: SessionRepositoryDep,
     session_broadcast: SessionBroadcastDep,
+    background_tasks: BackgroundTasks,
 ) -> AgentService:
+    def schedule_agent_run(session_id: int, agent_id) -> None:
+        background_tasks.add_task(
+            run_agent_draft_turn_with_new_session,
+            agent_id,
+            session_id,
+            session_broadcast,
+        )
+
     return AgentService(
         repository=repository,
         commit=session.commit,
         session_repository=session_repository,
         session_broadcast=session_broadcast,
+        schedule_agent_run=schedule_agent_run,
     )
 
 
