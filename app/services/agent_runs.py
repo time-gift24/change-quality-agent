@@ -77,7 +77,7 @@ class AgentRunService:
             await self._commit_if_configured()
             await self._publish_session_event(
                 session_id,
-                {"type": "session_completed", "session_id": session_id},
+                {"type": "completed", "session_id": session_id},
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Agent draft run failed for session %s", session_id)
@@ -89,7 +89,7 @@ class AgentRunService:
             await self._publish_session_event(
                 session_id,
                 {
-                    "type": "session_failed",
+                    "type": "failed",
                     "session_id": session_id,
                     "error": str(exc),
                 },
@@ -141,7 +141,7 @@ class AgentRunService:
             await self._publish_session_event(
                 session_id,
                 {
-                    "type": "message_appended",
+                    "type": "message",
                     "session_id": session_id,
                     "sequence": getattr(persisted, "sequence", None),
                     "role": role,
@@ -199,6 +199,7 @@ async def run_agent_draft_turn_with_new_session(
     agent_id: UUID,
     session_id: int,
     session_broadcast: SessionBroadcastLike | None = None,
+    mcp_runtime_manager: object | None = None,
 ) -> None:
     """Background entrypoint used by FastAPI BackgroundTasks.
 
@@ -223,7 +224,8 @@ async def run_agent_draft_turn_with_new_session(
         capability_service = AgentCapabilityService(mcp_repository=mcp_repository)
         runtime = AgentRuntime(
             tool_resolver=CapabilityToolResolver(
-                capability_service=capability_service
+                capability_service=capability_service,
+                mcp_runtime=mcp_runtime_manager,
             ),
             provider_resolver=DatabaseLlmProviderResolver(provider_repository),
         )

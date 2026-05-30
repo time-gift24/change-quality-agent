@@ -564,6 +564,9 @@ class FakeSessionRepositoryApi:
     async def get_messages_after(self, session_id: int, after: int = 0, limit: int = 100):
         return []
 
+    async def set_status(self, session_id: int, status: str):
+        return await self.get_session(session_id)
+
 
 class FakeBroadcastApi:
     async def publish(self, *args, **kwargs):
@@ -591,7 +594,7 @@ async def test_start_agent_session_returns_session_id_and_stream_url() -> None:
             json={"message": "你好"},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     body = response.json()
     assert body["session_id"] == 999
     assert body["stream_url"] == "/api/sessions/999/stream?after=0"

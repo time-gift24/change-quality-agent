@@ -13,8 +13,9 @@ export function AgentChatPage() {
   const detailState = useAgentDetail(agentId ?? null);
   const chatMutations = useAgentChatMutations();
   const [sessionId, setSessionId] = useState<number | null>(null);
+  const [streamResetKey, setStreamResetKey] = useState(0);
   const [composer, setComposer] = useState("");
-  const streamState = useSessionStream(sessionId);
+  const streamState = useSessionStream(sessionId, streamResetKey);
   const agent = detailState.data;
 
   const liveItems = useMemo(
@@ -45,6 +46,7 @@ export function AgentChatPage() {
     });
     setComposer("");
     setSessionId(response.session_id);
+    setStreamResetKey((value) => value + 1);
   }
 
   return (
@@ -78,6 +80,14 @@ export function AgentChatPage() {
           role="alert"
         >
           {chatMutations.error.message}
+        </p>
+      ) : null}
+      {streamState.error ? (
+        <p
+          className="mb-3 rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep"
+          role="alert"
+        >
+          {streamState.error.message}
         </p>
       ) : null}
 

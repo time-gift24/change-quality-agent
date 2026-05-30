@@ -85,6 +85,7 @@ def get_agent_service(
             agent_id,
             session_id,
             session_broadcast,
+            get_mcp_runtime_manager(),
         )
 
     return AgentService(

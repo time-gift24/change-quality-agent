@@ -28,6 +28,7 @@ export type UseSessionStreamResult = {
 
 export function useSessionStream(
   sessionId: number | null,
+  resetKey = 0,
 ): UseSessionStreamResult {
   const cursorRef = useRef(0);
   const terminalRef = useRef(false);
@@ -79,7 +80,7 @@ export function useSessionStream(
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [sessionId, resetKey]);
 
   useEffect(() => {
     if (sessionId === null || hydratedFor !== sessionId) {
@@ -118,6 +119,9 @@ export function useSessionStream(
           terminalRef.current = true;
           source.close();
           eventSource = null;
+          if (event.type === "failed") {
+            setError(new Error(event.error ?? "Agent 运行失败。"));
+          }
           setState((current) => ({ ...current, connectionStatus: "closed" }));
           return;
         }

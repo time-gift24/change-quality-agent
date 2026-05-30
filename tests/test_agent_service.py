@@ -263,6 +263,10 @@ class FakeSessionRepository:
     async def get_messages_after(self, session_id: int, after: int = 0, limit: int = 100):
         return list(self.existing_messages.get(session_id, []))
 
+    async def set_status(self, session_id: int, status: str):
+        self.statuses[session_id] = status
+        return await self.get_session(session_id)
+
 
 class FakeBroadcast:
     async def publish_message(self, *args, **kwargs):
@@ -296,6 +300,7 @@ async def test_start_draft_session_creates_session_and_returns_stream_url():
     assert session_repo.appended[0]["role"] == "user"
     assert session_repo.appended[0]["content"] == "你好"
     assert session_repo.appended[0]["additional_kwargs"]["agent_id"] == str(agent.id)
+    assert session_repo.statuses[123] == "active"
     assert scheduled == [(123, agent.id)]
 
 

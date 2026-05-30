@@ -59,7 +59,7 @@ describe("AgentChatPage", () => {
 
     expect(screen.getByRole("heading", { name: "Existing Agent" })).toBeInTheDocument();
     expect(screen.getByText("尚未开始对话，输入消息试一下你的 Agent。")).toBeInTheDocument();
-    expect(useSessionStream).toHaveBeenCalledWith(null);
+    expect(useSessionStream).toHaveBeenCalledWith(null, 0);
   });
 
   it("starts a new session when sending the first message", async () => {
@@ -96,7 +96,7 @@ describe("AgentChatPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "发送" }));
 
-    await waitFor(() => expect(useSessionStream).toHaveBeenCalledWith(42));
+    await waitFor(() => expect(useSessionStream).toHaveBeenCalledWith(42, 1));
   });
 
   it("renders assistant, user, and tool messages from session state", () => {
@@ -115,6 +115,20 @@ describe("AgentChatPage", () => {
     expect(screen.getByText("用户问题")).toBeInTheDocument();
     expect(screen.getByText("助手回答")).toBeInTheDocument();
     expect(screen.getByText("tool-result-payload")).toBeInTheDocument();
+  });
+
+  it("renders stream errors from failed agent runs", () => {
+    vi.mocked(useSessionStream).mockReturnValue({
+      error: new Error("CODEAGENT_BASE_URL is required for CodeAgent models."),
+      loading: false,
+      state: createInitialSessionViewState(),
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("CODEAGENT_BASE_URL is required for CodeAgent models."),
+    ).toBeInTheDocument();
   });
 
   it("disables the send button while pending or while a connection is open", () => {

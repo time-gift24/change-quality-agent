@@ -199,5 +199,5 @@ async def test_run_draft_turn_marks_failed_when_runtime_errors():
     assert ("failed",) in [(s[1],) for s in session_repo.statuses]
     # broadcast should publish a failure event
     assert any(
-        event[1].get("type") == "session_failed" for event in broadcast.events
+        event[1].get("type") == "failed" for event in broadcast.events
     )

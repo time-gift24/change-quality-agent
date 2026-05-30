@@ -12,6 +12,7 @@ from fastapi import (
 
 from app.api.deps import AgentCapabilityServiceDep, AgentServiceDep
 from app.services.agents import (
+    AgentSessionBusyError,
     AgentDraftInvalidError,
     AgentNotFoundError,
     AgentSessionMismatchError,
@@ -59,7 +60,7 @@ async def get_agent_capabilities(
     return await service.list_capabilities()
 
 
-@router.post("/{agent_id}/sessions")
+@router.post("/{agent_id}/sessions", status_code=status.HTTP_202_ACCEPTED)
 async def start_agent_session(
     agent_id: Annotated[UUID, Path()],
     request: AgentSessionStart,
@@ -73,6 +74,8 @@ async def start_agent_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
     except AgentSessionMismatchError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except AgentSessionBusyError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT) from exc
     except AgentDisabledError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
     except AgentDraftInvalidError as exc:

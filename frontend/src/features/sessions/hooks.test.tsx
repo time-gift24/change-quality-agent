@@ -189,6 +189,37 @@ describe("session stream hook", () => {
     expect(MockEventSource.instances).toHaveLength(1);
   });
 
+  it("surfaces failed terminal event errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { result } = renderHook(() => useSessionStream(1));
+
+    await waitFor(() => {
+      expect(MockEventSource.instances).toHaveLength(1);
+    });
+
+    act(() => {
+      MockEventSource.instances[0]?.emitNamed({
+        type: "failed",
+        session_id: 1,
+        error: "CODEAGENT_BASE_URL is required for CodeAgent models.",
+      });
+    });
+
+    expect(result.current.error?.message).toBe(
+      "CODEAGENT_BASE_URL is required for CodeAgent models.",
+    );
+    expect(result.current.state.connectionStatus).toBe("closed");
+  });
+
   it("sets error when fetch fails", async () => {
     vi.stubGlobal(
       "fetch",

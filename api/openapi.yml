@@ -711,6 +711,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentSessionStartResponse'
+        '409':
+          description: The session already has an active Agent run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '400':
           description: Agent draft is missing or invalid.
           content:

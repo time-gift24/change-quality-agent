@@ -38,18 +38,26 @@ class StaticToolResolver:
 class _CapabilityServiceLike(Protocol):
     def resolve_builtin_tools(self, names: list[str]) -> list[object]: ...
 
+    async def resolve_mcp_tools(
+        self,
+        server_ids: list[str],
+        runtime: object,
+    ) -> list[object]: ...
+
 
 class CapabilityToolResolver:
     """Tool resolver that uses `AgentCapabilityService` for built-in tools.
 
-    MCP runtime binding is not yet implemented. Selecting MCP server IDs in a
-    draft will not attach MCP tools — selections must be validated upstream
-    before the runtime is invoked. This is explicit rather than silently
-    pretending MCP tools were attached.
     """
 
-    def __init__(self, *, capability_service: _CapabilityServiceLike) -> None:
+    def __init__(
+        self,
+        *,
+        capability_service: _CapabilityServiceLike,
+        mcp_runtime: object | None = None,
+    ) -> None:
         self._capability_service = capability_service
+        self._mcp_runtime = mcp_runtime
 
     async def resolve(
         self,
@@ -57,7 +65,15 @@ class CapabilityToolResolver:
         mcp_server_ids: list[str],
     ) -> list[object]:
         builtin = self._capability_service.resolve_builtin_tools(list(tool_allowlist))
-        return list(builtin)
+        if not mcp_server_ids:
+            return list(builtin)
+        if self._mcp_runtime is None:
+            raise RuntimeError("MCP runtime is not configured.")
+        mcp_tools = await self._capability_service.resolve_mcp_tools(
+            list(mcp_server_ids),
+            self._mcp_runtime,
+        )
+        return [*builtin, *mcp_tools]
 
 
 class LlmProviderResolver(Protocol):

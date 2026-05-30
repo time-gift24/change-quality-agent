@@ -43,4 +43,5 @@ export type SessionStreamEvent =
   | {
       type: "completed" | "failed" | "interrupted";
       session_id: number;
+      error?: string;
     };

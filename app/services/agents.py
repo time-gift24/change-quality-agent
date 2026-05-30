@@ -61,6 +61,12 @@ class AgentSessionMismatchError(Exception):
         super().__init__(str(session_id))
 
 
+class AgentSessionBusyError(Exception):
+    def __init__(self, session_id: int) -> None:
+        self.session_id = session_id
+        super().__init__(str(session_id))
+
+
 class DraftAgentRuntimeConfig:
     """Adapter that lets a draft Agent config flow through `AgentRuntime`.
 
@@ -82,6 +88,7 @@ class DraftAgentRuntimeConfig:
 class SessionRepositoryLike(Protocol):
     async def create_session(self, title=None, thread_id=None): ...
     async def get_session(self, session_id: int): ...
+    async def set_status(self, session_id: int, status: str): ...
     async def append_message(
         self,
         session_id: int,
@@ -195,18 +202,21 @@ class AgentService:
             session = await self._session_repository.get_session(request.session_id)
             if session is None:
                 raise AgentSessionNotFoundError(request.session_id)
+            if getattr(session, "status", None) == "active":
+                raise AgentSessionBusyError(request.session_id)
             existing_messages = await self._session_repository.get_messages_after(
                 request.session_id, after=0, limit=1
             )
-            if existing_messages:
-                first = existing_messages[0]
-                first_kwargs = getattr(first, "additional_kwargs", None) or (
-                    first.get("additional_kwargs", {})
-                    if isinstance(first, dict)
-                    else {}
-                )
-                if first_kwargs.get("agent_id") != str(agent_id):
-                    raise AgentSessionMismatchError(request.session_id)
+            if not existing_messages:
+                raise AgentSessionMismatchError(request.session_id)
+            first = existing_messages[0]
+            first_kwargs = getattr(first, "additional_kwargs", None) or (
+                first.get("additional_kwargs", {})
+                if isinstance(first, dict)
+                else {}
+            )
+            if first_kwargs.get("agent_id") != str(agent_id):
+                raise AgentSessionMismatchError(request.session_id)
             session_id = int(request.session_id)
 
         await self._session_repository.append_message(
@@ -215,6 +225,7 @@ class AgentService:
             content=request.message,
             additional_kwargs={"agent_id": str(agent_id)},
         )
+        await self._session_repository.set_status(session_id, "active")
         await self._commit_if_configured()
 
         # touch the draft so callers can detect drift at run time.
