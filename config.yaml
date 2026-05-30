@@ -2,7 +2,7 @@ database_url: postgresql+asyncpg://postgres:postgres@localhost:5432/change_quali
 mcp_allowed_stdio_commands:
   - rust-mcp-filesystem
 mcp_allowed_stdio_specs:
-  - 'rust-mcp-filesystem:"/Users/wanyaozhong/for-test"'
+  - rust-mcp-filesystem:/Users/wanyaozhong/for-test
 environments:
   - key: dev
     name_zh: 开发
