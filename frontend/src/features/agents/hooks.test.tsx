@@ -144,6 +144,7 @@ describe("agent hooks", () => {
           name: "echo",
         },
       ],
+      codeagent_models: ["codeagent:codeagent-v4-pro"],
       mcp_servers: [],
     };
     vi.mocked(getAgentCapabilities).mockResolvedValueOnce(capabilities);

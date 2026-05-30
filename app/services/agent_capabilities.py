@@ -7,7 +7,9 @@ from uuid import UUID
 from langchain_core.tools import StructuredTool, tool
 from pydantic import BaseModel, Field, create_model
 
+from app.core.config import settings
 from app.core.json_types import JsonObject, to_json_object
+from app.core.llm_models import CODEAGENT_MODEL_PREFIX
 from app.schemas.agents import (
     AgentCapabilities,
     BuiltinAgentToolCapability,
@@ -74,6 +76,7 @@ class AgentCapabilityService:
     async def list_capabilities(self) -> AgentCapabilities:
         servers = await self._mcp_repository.list_servers()
         return AgentCapabilities(
+            codeagent_models=list_codeagent_models(),
             builtin_tools=[
                 BuiltinAgentToolCapability(
                     name=item.name,
@@ -134,6 +137,22 @@ class AgentCapabilityService:
             for server_tool in server_tools:
                 tools.append(_build_mcp_tool(server, server_tool, runtime))
         return tools
+
+
+def list_codeagent_models() -> list[str]:
+    if not settings.codeagent_base_url:
+        return []
+    models: list[str] = []
+    for raw_model in settings.codeagent_models:
+        model = raw_model.strip()
+        if not model:
+            continue
+        models.append(
+            model
+            if model.startswith(CODEAGENT_MODEL_PREFIX)
+            else f"{CODEAGENT_MODEL_PREFIX}{model}"
+        )
+    return models
 
 
 def _build_mcp_tool(

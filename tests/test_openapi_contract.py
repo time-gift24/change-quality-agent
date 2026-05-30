@@ -146,6 +146,7 @@ def test_agent_capabilities_and_session_schemas_are_documented() -> None:
     } <= set(schemas)
 
     capabilities_props = schemas["AgentCapabilities"]["properties"]
+    assert capabilities_props["codeagent_models"]["items"] == {"type": "string"}
     assert capabilities_props["builtin_tools"]["items"] == {
         "$ref": "#/components/schemas/BuiltinAgentToolCapability"
     }

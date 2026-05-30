@@ -53,7 +53,7 @@ describe("AgentForm", () => {
     });
   });
 
-  it("creates a CodeAgent-backed draft from hard-coded model dropdown", async () => {
+  it("creates a CodeAgent-backed draft from capability model dropdown", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
       <AgentForm
@@ -317,6 +317,32 @@ describe("AgentForm", () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
+  it("blocks CodeAgent save when backend exposes no CodeAgent models", () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AgentForm
+        agent={null}
+        capabilities={buildCapabilities({ codeagent_models: [] })}
+        capabilitiesLoading={false}
+        mode="create"
+        onCreate={onCreate}
+        providers={buildProviders()}
+        providersLoading={false}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "当前没有可用 CodeAgent 模型，请检查后端 CodeAgent 配置或选择其他模型来源。",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存 Agent" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    expect(onCreate).not.toHaveBeenCalled();
+  });
+
   it("creates a draft with selected built-in tool and MCP server", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
     render(
@@ -391,16 +417,20 @@ describe("AgentForm", () => {
   });
 });
 
-function buildCapabilities(): AgentCapabilities {
+function buildCapabilities(
+  overrides: Partial<AgentCapabilities> = {},
+): AgentCapabilities {
   return {
     builtin_tools: [
       { description: "Echoes input.", enabled: true, label: "Echo", name: "echo" },
       { description: "Does nothing.", enabled: true, label: "Noop", name: "noop" },
     ],
+    codeagent_models: ["codeagent:deepseek-v4-pro", "codeagent:codeagent-v4-pro"],
     mcp_servers: [
       { enabled: true, id: "mcp-1", name: "Docs MCP", runtime_status: "running", tool_count: 2 },
       { enabled: true, id: "mcp-2", name: "Search MCP", runtime_status: "running", tool_count: 1 },
     ],
+    ...overrides,
   };
 }
 

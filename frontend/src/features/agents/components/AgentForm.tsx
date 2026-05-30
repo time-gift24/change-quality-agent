@@ -21,7 +21,6 @@ import type {
   AgentDraftConfig,
   AgentDraftUpdate,
 } from "../types";
-import { CODEAGENT_MODEL_OPTIONS } from "../types";
 
 type AgentFormMode = "create" | "edit";
 type ModelSource = "codeagent" | "provider";
@@ -39,7 +38,6 @@ type AgentFormProps = {
   onUpdate?: (agentId: string, payload: AgentDraftUpdate) => Promise<void>;
 };
 
-const DEFAULT_CODEAGENT_MODEL = CODEAGENT_MODEL_OPTIONS[0];
 const DEFAULT_SYSTEM_PROMPT =
   "你是谨慎的变更质量评审助手。请基于事实审查输入内容，指出风险、缺口和可执行的整改建议。";
 
@@ -65,9 +63,7 @@ export function AgentForm({
   const [description, setDescription] = useState("");
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [modelSource, setModelSource] = useState<ModelSource>("codeagent");
-  const [codeAgentModel, setCodeAgentModel] = useState<string>(
-    DEFAULT_CODEAGENT_MODEL,
-  );
+  const [codeAgentModel, setCodeAgentModel] = useState<string>("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [selectedProviderModel, setSelectedProviderModel] = useState("");
   const [selectedToolNames, setSelectedToolNames] = useState<string[]>([]);
@@ -100,11 +96,7 @@ export function AgentForm({
       setSystemPrompt(draft?.system_prompt ?? "");
       setEnabled(agent.enabled);
       setModelSource(draft?.provider_id ? "provider" : "codeagent");
-      setCodeAgentModel(
-        draft?.provider_id
-          ? DEFAULT_CODEAGENT_MODEL
-          : (draft?.model ?? DEFAULT_CODEAGENT_MODEL),
-      );
+      setCodeAgentModel(draft?.provider_id ? "" : (draft?.model ?? ""));
       setSelectedProviderId(draft?.provider_id ?? "");
       setSelectedProviderModel(draft?.provider_id ? (draft?.model ?? "") : "");
       setSelectedToolNames(draft?.tool_allowlist ?? []);
@@ -117,12 +109,21 @@ export function AgentForm({
     setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
     setEnabled(true);
     setModelSource("codeagent");
-    setCodeAgentModel(DEFAULT_CODEAGENT_MODEL);
+    setCodeAgentModel("");
     setSelectedProviderId("");
     setSelectedProviderModel("");
     setSelectedToolNames([]);
     setSelectedMcpServerIds([]);
   }, [agent, mode]);
+
+  const codeAgentModels = capabilities.codeagent_models ?? [];
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (modelSource !== "codeagent") return;
+    if (codeAgentModel) return;
+    setCodeAgentModel(codeAgentModels[0] ?? "");
+  }, [codeAgentModel, codeAgentModels, mode, modelSource]);
 
   useEffect(() => {
     if (modelSource !== "provider" || enabledProviders.length === 0) return;
@@ -138,7 +139,7 @@ export function AgentForm({
     mode === "edit" &&
     modelSource === "codeagent" &&
     Boolean(codeAgentModel) &&
-    !(CODEAGENT_MODEL_OPTIONS as readonly string[]).includes(codeAgentModel);
+    !codeAgentModels.includes(codeAgentModel);
   const unavailableDraftProvider =
     mode === "edit" &&
     modelSource === "provider" &&
@@ -166,6 +167,12 @@ export function AgentForm({
       unavailableDraftProvider ||
       !selectedProvider ||
       selectedProviderModels.length === 0);
+  const codeAgentSaveBlocked =
+    modelSource === "codeagent" &&
+    (capabilitiesLoading ||
+      codeAgentModels.length === 0 ||
+      !codeAgentModel.trim() ||
+      unavailableCodeAgentModel);
   const showUnavailableProviderMessage = unavailableDraftProvider;
   const modelSaveBlocked = unavailableCodeAgentModel || unavailableProviderModel;
   const showProviderModelsMessage =
@@ -174,6 +181,10 @@ export function AgentForm({
     Boolean(selectedProvider) &&
     selectedProviderModels.length === 0;
   const showUnavailableCodeAgentModelMessage = unavailableCodeAgentModel;
+  const showNoCodeAgentModelsMessage =
+    modelSource === "codeagent" &&
+    !capabilitiesLoading &&
+    codeAgentModels.length === 0;
   const showUnavailableProviderModelMessage = unavailableProviderModel;
 
   const availableToolNames = new Set(
@@ -196,7 +207,10 @@ export function AgentForm({
     missingToolNames.length > 0 || missingMcpServerIds.length > 0;
   const capabilitiesSaveBlocked = hasMissingCapabilities;
   const saveBlocked =
-    providerSaveBlocked || modelSaveBlocked || capabilitiesSaveBlocked;
+    codeAgentSaveBlocked ||
+    providerSaveBlocked ||
+    modelSaveBlocked ||
+    capabilitiesSaveBlocked;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -349,6 +363,7 @@ export function AgentForm({
             <Field label="CodeAgent 模型">
               <select
                 className={selectClass}
+                disabled={capabilitiesLoading || codeAgentModels.length === 0}
                 name="codeagent_model"
                 onChange={(event) => setCodeAgentModel(event.target.value)}
                 value={codeAgentModel}
@@ -358,7 +373,10 @@ export function AgentForm({
                     {codeAgentModel} (不可用)
                   </option>
                 ) : null}
-                {CODEAGENT_MODEL_OPTIONS.map((model) => (
+                {codeAgentModels.length === 0 ? (
+                  <option value="">暂无 CodeAgent 模型</option>
+                ) : null}
+                {codeAgentModels.map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>
@@ -444,6 +462,12 @@ export function AgentForm({
         {showUnavailableCodeAgentModelMessage ? (
           <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
             当前 draft 引用的 CodeAgent 模型不在可选列表中，请重新选择模型。
+          </p>
+        ) : null}
+
+        {showNoCodeAgentModelsMessage ? (
+          <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+            当前没有可用 CodeAgent 模型，请检查后端 CodeAgent 配置或选择其他模型来源。
           </p>
         ) : null}
 

@@ -104,6 +104,7 @@ class McpAgentCapability(BaseModel):
 
 
 class AgentCapabilities(BaseModel):
+    codeagent_models: list[str] = Field(default_factory=list)
     builtin_tools: list[BuiltinAgentToolCapability] = Field(default_factory=list)
     mcp_servers: list[McpAgentCapability] = Field(default_factory=list)
 

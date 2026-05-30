@@ -1,8 +1,3 @@
-export const CODEAGENT_MODEL_OPTIONS = [
-  "codeagent:deepseek-v4-pro",
-  "codeagent:codeagent-v4-pro",
-] as const;
-
 export type AgentDraftConfig = {
   system_prompt: string;
   model: string;
@@ -64,6 +59,7 @@ export type McpAgentCapability = {
 };
 
 export type AgentCapabilities = {
+  codeagent_models: string[];
   builtin_tools: BuiltinAgentToolCapability[];
   mcp_servers: McpAgentCapability[];
 };

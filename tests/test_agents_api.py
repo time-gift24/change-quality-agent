@@ -481,6 +481,7 @@ class FakeCapabilityService:
         )
 
         return AgentCapabilities(
+            codeagent_models=["codeagent:codeagent-v4-pro"],
             builtin_tools=[
                 BuiltinAgentToolCapability(
                     name="echo",
@@ -516,6 +517,7 @@ async def test_get_agent_capabilities_returns_builtin_tools_and_mcp_servers():
 
     assert response.status_code == 200
     body = response.json()
+    assert body["codeagent_models"] == ["codeagent:codeagent-v4-pro"]
     assert body["builtin_tools"][0]["name"] == "echo"
     assert body["mcp_servers"][0]["tool_count"] == 2
 

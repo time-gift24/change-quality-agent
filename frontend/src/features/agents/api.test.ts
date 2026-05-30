@@ -113,6 +113,7 @@ describe("agent API", () => {
           name: "echo",
         },
       ],
+      codeagent_models: ["codeagent:codeagent-v4-pro"],
       mcp_servers: [
         {
           enabled: true,

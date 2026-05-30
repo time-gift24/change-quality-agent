@@ -1965,9 +1965,14 @@ components:
     AgentCapabilities:
       type: object
       required:
+      - codeagent_models
       - builtin_tools
       - mcp_servers
       properties:
+        codeagent_models:
+          type: array
+          items:
+            type: string
         builtin_tools:
           type: array
           items:

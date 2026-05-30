@@ -173,7 +173,7 @@ export function useAgentMutations() {
 
 export function useAgentCapabilities(): AsyncStateWithRefetch<AgentCapabilities> {
   const [state, setState] = useState<AsyncState<AgentCapabilities>>({
-    data: { builtin_tools: [], mcp_servers: [] },
+    data: { builtin_tools: [], codeagent_models: [], mcp_servers: [] },
     error: null,
     loading: true,
   });
@@ -199,7 +199,7 @@ export function useAgentCapabilities(): AsyncStateWithRefetch<AgentCapabilities>
     } catch (error) {
       if (!mountedRef.current || requestIdRef.current !== requestId) return;
       setState({
-        data: { builtin_tools: [], mcp_servers: [] },
+        data: { builtin_tools: [], codeagent_models: [], mcp_servers: [] },
         error: asError(error),
         loading: false,
       });

@@ -110,7 +110,11 @@ beforeEach(() => {
     refetch: refetchProviders,
   });
   vi.mocked(useAgentCapabilities).mockReturnValue({
-    data: { builtin_tools: [], mcp_servers: [] },
+    data: {
+      builtin_tools: [],
+      codeagent_models: ["codeagent:deepseek-v4-pro"],
+      mcp_servers: [],
+    },
     error: null,
     loading: false,
     refetch: refetchCapabilities,
