@@ -178,13 +178,22 @@ function AgentRow({
         </span>
       </MetricCell>
       <MetricCell className="rounded-r-3xl border-r">
-        <Link
-          aria-label={`编辑 ${agent.display_name}`}
-          className="inline-flex h-8 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-medium text-body transition-colors hover:border-primary/40 hover:text-primary-deep focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          to={`/agents/${agent.id}/edit`}
-        >
-          编辑
-        </Link>
+        <div className="flex items-center justify-end gap-1.5">
+          <Link
+            aria-label={`与 ${agent.display_name} 对话`}
+            className="inline-flex h-8 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-medium text-body transition-colors hover:border-primary/40 hover:text-primary-deep focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            to={`/agents/${agent.id}/chat`}
+          >
+            对话
+          </Link>
+          <Link
+            aria-label={`编辑 ${agent.display_name}`}
+            className="inline-flex h-8 items-center justify-center rounded-lg border border-hairline bg-canvas px-3 text-xs font-medium text-body transition-colors hover:border-primary/40 hover:text-primary-deep focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            to={`/agents/${agent.id}/edit`}
+          >
+            编辑
+          </Link>
+        </div>
       </MetricCell>
     </TableRow>
   );

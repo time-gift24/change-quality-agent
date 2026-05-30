@@ -16,6 +16,7 @@ import {
   AgentCreatePage,
   AgentEditPage,
 } from "../features/agents/pages/AgentFormPage";
+import { AgentChatPage } from "../features/agents/pages/AgentChatPage";
 import { AgentListPage } from "../features/agents/pages/AgentListPage";
 import { LlmProviderDetailPage } from "../features/llmProviders/pages/LlmProviderDetailPage";
 import {
@@ -63,6 +64,7 @@ export function App() {
               <Route element={<AgentListPage />} path="agents" />
               <Route element={<AgentCreatePage />} path="agents/new" />
               <Route element={<AgentEditPage />} path="agents/:agentId/edit" />
+              <Route element={<AgentChatPage />} path="agents/:agentId/chat" />
             </Route>
             <Route element={<Navigate replace to="/sop" />} path="*" />
           </Route>
