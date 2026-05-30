@@ -67,6 +67,7 @@ class TaskOwnedMcpRuntimeHandle:
 class _TaskOwnedMcpCommand:
     name: str
     future: asyncio.Future[object]
+    arguments: dict[str, object] | None = None
 
 
 class McpServerLike(Protocol):
@@ -129,6 +130,14 @@ class McpProbe(Protocol):
     async def list_tools(self, handle: object) -> list[JsonObject]:
         ...
 
+    async def call_tool(
+        self,
+        handle: object,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        ...
+
     async def stop(self, handle: object) -> None:
         ...
 
@@ -175,6 +184,14 @@ class StdioMcpProbe:
     async def list_tools(self, handle: McpRuntimeHandle) -> list[JsonObject]:
         return await _list_session_tools(handle)
 
+    async def call_tool(
+        self,
+        handle: McpRuntimeHandle,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        return await handle.session.call_tool(tool_name, arguments)
+
     async def stop(self, handle: McpRuntimeHandle) -> None:
         await handle.exit_stack.aclose()
 
@@ -206,6 +223,14 @@ class StreamableHttpMcpProbe:
     async def list_tools(self, handle: McpRuntimeHandle) -> list[JsonObject]:
         return await _list_session_tools(handle)
 
+    async def call_tool(
+        self,
+        handle: McpRuntimeHandle,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        return await handle.session.call_tool(tool_name, arguments)
+
     async def stop(self, handle: McpRuntimeHandle) -> None:
         await handle.exit_stack.aclose()
 
@@ -230,6 +255,18 @@ class TransportMcpProbe:
 
     async def list_tools(self, handle: TransportMcpRuntimeHandle) -> list[JsonObject]:
         return await self._probe_for_transport(handle.transport).list_tools(handle.handle)
+
+    async def call_tool(
+        self,
+        handle: TransportMcpRuntimeHandle,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        return await self._probe_for_transport(handle.transport).call_tool(
+            handle.handle,
+            tool_name,
+            arguments,
+        )
 
     async def stop(self, handle: TransportMcpRuntimeHandle) -> None:
         await self._probe_for_transport(handle.transport).stop(handle.handle)
@@ -271,6 +308,18 @@ class TaskOwnedMcpProbe:
     ) -> list[JsonObject]:
         return cast(list[JsonObject], await self._send(handle, "list_tools"))
 
+    async def call_tool(
+        self,
+        handle: TaskOwnedMcpRuntimeHandle,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        return await self._send(
+            handle,
+            "call_tool",
+            {"tool_name": tool_name, "arguments": arguments},
+        )
+
     async def stop(self, handle: TaskOwnedMcpRuntimeHandle) -> None:
         try:
             await self._send(handle, "stop")
@@ -304,6 +353,29 @@ class TaskOwnedMcpProbe:
                         _set_future_result(command.future, tools)
                     continue
 
+                if command.name == "call_tool":
+                    payload = command.arguments or {}
+                    tool_name = payload.get("tool_name")
+                    arguments = payload.get("arguments")
+                    try:
+                        if not isinstance(tool_name, str) or not isinstance(
+                            arguments, dict
+                        ):
+                            raise ValueError("Invalid MCP tool call payload.")
+                        result = await self.inner_probe.call_tool(
+                            inner_handle,
+                            tool_name,
+                            cast(JsonObject, arguments),
+                        )
+                    except Exception as exc:
+                        _set_future_exception(command.future, exc)
+                    except BaseException as exc:
+                        _set_future_exception(command.future, exc)
+                        raise
+                    else:
+                        _set_future_result(command.future, result)
+                    continue
+
                 if command.name == "stop":
                     try:
                         await self.inner_probe.stop(inner_handle)
@@ -319,14 +391,21 @@ class TaskOwnedMcpProbe:
             _set_future_exception(started, exc)
             raise
 
-    async def _send(self, handle: TaskOwnedMcpRuntimeHandle, name: str) -> object:
+    async def _send(
+        self,
+        handle: TaskOwnedMcpRuntimeHandle,
+        name: str,
+        arguments: dict[str, object] | None = None,
+    ) -> object:
         if handle.task.done():
             await handle.task
             raise RuntimeError("MCP runtime worker is not running.")
 
         loop = asyncio.get_running_loop()
         future: asyncio.Future[object] = loop.create_future()
-        await handle.commands.put(_TaskOwnedMcpCommand(name=name, future=future))
+        await handle.commands.put(
+            _TaskOwnedMcpCommand(name=name, future=future, arguments=arguments)
+        )
         return await future
 
 
@@ -558,6 +637,27 @@ class McpRuntimeManager:
                 if temporary_handle is not None:
                     await self._run_operation(self._probe.stop(temporary_handle))
             return await self._response(repository, server_id)
+
+    async def call_tool(
+        self,
+        server_id: UUID,
+        tool_name: str,
+        arguments: JsonObject,
+    ) -> object:
+        self._require_runtime_enabled()
+        async with self._lock_for(server_id):
+            async with self._repository_context() as repository:
+                server = await repository.require_server(server_id)
+                if not server.enabled:
+                    raise RuntimeError(f"MCP server is disabled: {server_id}")
+                if server.runtime_status != McpServerRuntimeStatus.running.value:
+                    raise RuntimeError(f"MCP server is not running: {server_id}")
+                handle = self._handles.get(server_id)
+                if handle is None:
+                    raise RuntimeError(f"MCP server runtime is not running: {server_id}")
+                return await self._run_operation(
+                    self._probe.call_tool(handle, tool_name, arguments)
+                )
 
     async def shutdown(self) -> None:
         for server_id, handle in list(self._handles.items()):

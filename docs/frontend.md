@@ -229,6 +229,7 @@ Routes:
 - `/agents` -> `AgentListPage`
 - `/agents/new` -> `AgentFormPage` (create)
 - `/agents/:agentId/edit` -> `AgentFormPage` (edit)
+- `/agents/:agentId/chat` -> `AgentChatPage`
 
 List page rules:
 
@@ -237,9 +238,9 @@ List page rules:
 - Provider column resolves provider id to display name and marks disabled
   providers with `Provider 已停用`.
 - Toolbar has search, refresh, and the `+ 新增 Agent` primary CTA.
-- Row action is `编辑`, linking to `/agents/:agentId/edit`. There is no inline
-  delete because Agent disablement is handled through the edit form's
-  `启用 Agent` toggle.
+- Row actions are `对话` (links to `/agents/:agentId/chat`) and `编辑` (links to
+  `/agents/:agentId/edit`). There is no inline delete because Agent disablement is
+  handled through the edit form's `启用 Agent` toggle.
 
 表单规则（`AgentForm.tsx`）：
 
@@ -260,6 +261,21 @@ List page rules:
   会保留原值作为 disabled 的 `(不可用)` option，展示错误提示，并阻止保存直到用户选择有效值。
 - 自动选择只填充空选择；不能覆盖不可用的 draft 值，否则会隐藏警告状态。
 
+能力区域（Tools / MCP）：
+
+- `AgentForm` 通过 `useAgentCapabilities()` 拉取 `/api/agents/capabilities`，
+  渲染两列卡片：`内置工具`（`builtin_tools`）和 `MCP 服务`（`mcp_servers`）。
+- 复选框使用 `aria-label`，复选状态映射到 `draft.tool_allowlist` 与
+  `draft.mcp_server_ids`。
+- 如 draft 引用了当前 capabilities 中不存在的工具或已禁用的 MCP 服务，
+  顶部展示错误提示 `当前 draft 引用的能力已下线：…`，保存按钮禁用直到用户调整选择。
+- capabilities 加载中时卡片显示占位，但不阻塞表单其它字段的编辑。
+
+保存后跳转：
+
+- 创建或保存成功后跳转 `/agents/:agentId/chat`，并通过 `location.state.agentNotice`
+  传递 `Agent 已创建。` / `Agent 已保存。` 文案供 chat 页展示。
+
 系统提示词区域：
 
 - 单个纯图标按钮在编辑（textarea）与预览（`StreamMarkdown`）之间切换；编辑状态显示铅笔图标，
@@ -278,6 +294,25 @@ API payload：
 
 鉴权与 MCP 一致：路由通过 `ProtectedRoute` + `useAuthz()` 保护，非管理员用户会在 workspace
 shell 内看到 403 状态，不会离开当前外壳。
+
+Agent 对话页（`AgentChatPage.tsx`）：
+
+- 路由 `/agents/:agentId/chat`，复用 `AgentPageLayout`，面包屑指向 `Agent 配置`、Agent
+  编辑页、`对话`。
+- 通过 `useAgentDetail` 加载 Agent 元信息，通过 `useAgentChatMutations` 调用
+  `POST /api/agents/:agentId/sessions` 启动或继续会话。请求负载 `{ message, session_id }`，
+  返回 `{ session_id, stream_url }`。
+- 第一次发送后用返回的 `session_id` 调用通用 `useSessionStream(sessionId)`，
+  之后所有消息都附带同一 `session_id` 持续追加到该会话。
+- 对话区域直接消费 `sessions/messages` 流：复用 `SessionViewState` 中的
+  `messages` 和 `liveBuffers`，不再发明新的 transcript 模型。
+- `MessageBubble` 根据 `role` 渲染：
+  - `assistant`：`StreamMarkdown` 卡片。
+  - `tool`：默认折叠的 `<details>`，展示原始 payload。
+  - `system`：浅色提示卡片。
+  - `user`：右对齐主色卡片。
+- 当 `connectionStatus` 处于 `connecting` / `open` / `reconnecting`、或 mutation
+  pending、或输入为空时禁用 `发送` 按钮，避免重叠轮次。
 
 ## Session Streaming Architecture
 
@@ -331,8 +366,9 @@ Step grouping:
 
 Future work:
 
-- The agent playground UI will reuse `sessions/messages` directly through
-  `useSessionStream`. New surfaces should not invent another transcript model.
+- `AgentChatPage` already reuses `sessions/messages` through `useSessionStream`.
+  New agent surfaces should follow the same pattern and never invent another
+  transcript model.
 
 ## Local MCP HTTP Echo Server
 

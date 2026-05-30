@@ -472,6 +472,163 @@ async def test_get_version_rejects_non_positive_version_number() -> None:
     assert response.status_code == 422
 
 
+class FakeCapabilityService:
+    async def list_capabilities(self):
+        from app.schemas.agents import (
+            AgentCapabilities,
+            BuiltinAgentToolCapability,
+            McpAgentCapability,
+        )
+
+        return AgentCapabilities(
+            codeagent_models=["codeagent:codeagent-v4-pro"],
+            builtin_tools=[
+                BuiltinAgentToolCapability(
+                    name="echo",
+                    label="Echo",
+                    description="Echoes input.",
+                    enabled=True,
+                )
+            ],
+            mcp_servers=[
+                McpAgentCapability(
+                    id="mcp-1",
+                    name="Docs MCP",
+                    enabled=True,
+                    runtime_status="running",
+                    tool_count=2,
+                )
+            ],
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_agent_capabilities_returns_builtin_tools_and_mcp_servers():
+    get_agent_capability_service = getattr(deps, "get_agent_capability_service")
+    app.dependency_overrides[get_agent_capability_service] = (
+        lambda: FakeCapabilityService()
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/agents/capabilities")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["codeagent_models"] == ["codeagent:codeagent-v4-pro"]
+    assert body["builtin_tools"][0]["name"] == "echo"
+    assert body["mcp_servers"][0]["tool_count"] == 2
+
+
+class FakeSessionForAgent:
+    def __init__(self, sid: int = 999) -> None:
+        self.id = sid
+        self.thread_id = f"thread-{sid}"
+
+
+class FakeSessionRepositoryApi:
+    def __init__(self) -> None:
+        self.appended: list[dict] = []
+        self.created: list[FakeSessionForAgent] = []
+        self.next_id = 999
+
+    async def create_session(self, title=None, thread_id=None):
+        sess = FakeSessionForAgent(self.next_id)
+        self.next_id += 1
+        self.created.append(sess)
+        return sess
+
+    async def get_session(self, session_id: int):
+        for s in self.created:
+            if s.id == session_id:
+                return s
+        return None
+
+    async def append_message(
+        self,
+        session_id: int,
+        *,
+        role: str,
+        content: str,
+        additional_kwargs=None,
+    ):
+        record = {
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "additional_kwargs": additional_kwargs or {},
+        }
+        self.appended.append(record)
+        return record
+
+    async def get_messages_after(self, session_id: int, after: int = 0, limit: int = 100):
+        return []
+
+    async def set_status(self, session_id: int, status: str):
+        return await self.get_session(session_id)
+
+
+class FakeBroadcastApi:
+    async def publish(self, *args, **kwargs):
+        pass
+
+
+@pytest.mark.asyncio
+async def test_start_agent_session_returns_session_id_and_stream_url() -> None:
+    agent = FakeAgent()
+    repository = FakeAgentRepository(agents=[agent])
+    session = FakeSession()
+    session_repo = FakeSessionRepositoryApi()
+
+    app.dependency_overrides[get_session] = make_session_override(session)
+    app.dependency_overrides[deps.get_agent_repository] = lambda: repository
+    app.dependency_overrides[deps.get_session_repository] = lambda: session_repo
+    app.dependency_overrides[deps.get_session_broadcast] = lambda: FakeBroadcastApi()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/agents/{agent.id}/sessions",
+            json={"message": "你好"},
+        )
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["session_id"] == 999
+    assert body["stream_url"] == "/api/sessions/999/stream?after=0"
+    assert session_repo.appended[0]["content"] == "你好"
+    assert session_repo.appended[0]["additional_kwargs"]["agent_id"] == str(agent.id)
+
+
+@pytest.mark.asyncio
+async def test_start_agent_session_returns_400_for_disabled_agent() -> None:
+    agent = FakeAgent()
+    agent.enabled = False
+    repository = FakeAgentRepository(agents=[agent])
+    session = FakeSession()
+    session_repo = FakeSessionRepositoryApi()
+
+    app.dependency_overrides[get_session] = make_session_override(session)
+    app.dependency_overrides[deps.get_agent_repository] = lambda: repository
+    app.dependency_overrides[deps.get_session_repository] = lambda: session_repo
+    app.dependency_overrides[deps.get_session_broadcast] = lambda: FakeBroadcastApi()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            f"/api/agents/{agent.id}/sessions",
+            json={"message": "你好"},
+        )
+
+    assert response.status_code == 400
+
+
 @pytest.mark.asyncio
 async def test_delete_agent_returns_no_content_and_commits() -> None:
     agent = FakeAgent()

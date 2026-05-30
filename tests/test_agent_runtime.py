@@ -343,3 +343,41 @@ async def test_agent_runtime_stream_falls_back_to_final_run_output() -> None:
             },
         }
     ]
+
+
+class FakeCapabilityServiceForResolver:
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def resolve_builtin_tools(self, names):
+        self.calls.append(list(names))
+        if "missing" in names:
+            from app.services.agent_capabilities import UnknownBuiltinToolError
+
+            raise UnknownBuiltinToolError("missing")
+        return [object()] * len(names)
+
+
+@pytest.mark.asyncio
+async def test_capability_tool_resolver_resolves_builtin_tools() -> None:
+    from app.core.agent_runtime import CapabilityToolResolver
+
+    capability_service = FakeCapabilityServiceForResolver()
+    resolver = CapabilityToolResolver(capability_service=capability_service)
+
+    tools = await resolver.resolve(["echo"], [])
+
+    assert capability_service.calls == [["echo"]]
+    assert len(tools) == 1
+
+
+@pytest.mark.asyncio
+async def test_capability_tool_resolver_raises_for_unknown_builtin_tool() -> None:
+    from app.core.agent_runtime import CapabilityToolResolver
+    from app.services.agent_capabilities import UnknownBuiltinToolError
+
+    capability_service = FakeCapabilityServiceForResolver()
+    resolver = CapabilityToolResolver(capability_service=capability_service)
+
+    with pytest.raises(UnknownBuiltinToolError):
+        await resolver.resolve(["missing"], [])

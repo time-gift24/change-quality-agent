@@ -1,8 +1,3 @@
-export const CODEAGENT_MODEL_OPTIONS = [
-  "codeagent:deepseek-v4-pro",
-  "codeagent:codeagent-v4-pro",
-] as const;
-
 export type AgentDraftConfig = {
   system_prompt: string;
   model: string;
@@ -46,4 +41,35 @@ export type AgentDraftUpdate = {
   description?: string | null;
   enabled?: boolean | null;
   draft?: AgentDraftConfig | null;
+};
+
+export type BuiltinAgentToolCapability = {
+  name: string;
+  label: string;
+  description: string | null;
+  enabled: boolean;
+};
+
+export type McpAgentCapability = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  runtime_status: string;
+  tool_count: number;
+};
+
+export type AgentCapabilities = {
+  codeagent_models: string[];
+  builtin_tools: BuiltinAgentToolCapability[];
+  mcp_servers: McpAgentCapability[];
+};
+
+export type AgentSessionStart = {
+  message: string;
+  session_id?: number | null;
+};
+
+export type AgentSessionStartResponse = {
+  session_id: number;
+  stream_url: string;
 };

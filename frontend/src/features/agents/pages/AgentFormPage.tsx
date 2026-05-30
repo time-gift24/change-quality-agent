@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AgentForm } from "../components/AgentForm";
-import { useAgentDetail, useAgentMutations } from "../hooks";
+import { useAgentCapabilities, useAgentDetail, useAgentMutations } from "../hooks";
 import { useLlmProviders } from "../../llmProviders/hooks";
 import { AgentPageLayout } from "./AgentPageLayout";
 
@@ -9,6 +9,7 @@ export function AgentCreatePage() {
   const navigate = useNavigate();
   const mutations = useAgentMutations();
   const providersState = useLlmProviders();
+  const capabilitiesState = useAgentCapabilities();
 
   return (
     <AgentPageLayout
@@ -26,11 +27,15 @@ export function AgentCreatePage() {
       ) : null}
       <AgentForm
         agent={null}
+        capabilities={capabilitiesState.data}
+        capabilitiesLoading={capabilitiesState.loading}
         mode="create"
         onCancel={() => navigate("/agents")}
         onCreate={async (payload) => {
-          await mutations.createAgent(payload);
-          navigate("/agents", { state: { agentNotice: "Agent 已创建。" } });
+          const created = await mutations.createAgent(payload);
+          navigate(`/agents/${created.id}/chat`, {
+            state: { agentNotice: "Agent 已创建。" },
+          });
         }}
         pending={mutations.pending}
         providers={providersState.data}
@@ -45,6 +50,7 @@ export function AgentEditPage() {
   const navigate = useNavigate();
   const detailState = useAgentDetail(agentId ?? null);
   const providersState = useLlmProviders();
+  const capabilitiesState = useAgentCapabilities();
   const mutations = useAgentMutations();
   const agent = detailState.data;
 
@@ -81,11 +87,15 @@ export function AgentEditPage() {
           ) : null}
           <AgentForm
             agent={agent}
+            capabilities={capabilitiesState.data}
+            capabilitiesLoading={capabilitiesState.loading}
             mode="edit"
             onCancel={() => navigate("/agents")}
             onUpdate={async (id, payload) => {
               await mutations.updateAgentDraft(id, payload);
-              navigate("/agents", { state: { agentNotice: "Agent 已保存。" } });
+              navigate(`/agents/${id}/chat`, {
+                state: { agentNotice: "Agent 已保存。" },
+              });
             }}
             pending={mutations.pending}
             providers={providersState.data}

@@ -14,6 +14,8 @@ from app.repositories.sop_quality_checks import SopQualityCheckRepository
 from app.repositories.users import UserRepository
 from app.services.mcp_runtime import McpRuntimeManager, StdioMcpProbe, TransportMcpProbe
 from app.services.agents import AgentService
+from app.services.agent_capabilities import AgentCapabilityService
+from app.services.agent_runs import run_agent_draft_turn_with_new_session
 from app.services.auth import AuthService
 from app.services.llm_providers import LlmProviderService
 from app.services.mcp_servers import McpServerService
@@ -73,8 +75,26 @@ AgentRepositoryDep = Annotated[AgentRepository, Depends(get_agent_repository)]
 def get_agent_service(
     session: SessionDep,
     repository: AgentRepositoryDep,
+    session_repository: SessionRepositoryDep,
+    session_broadcast: SessionBroadcastDep,
+    background_tasks: BackgroundTasks,
 ) -> AgentService:
-    return AgentService(repository=repository, commit=session.commit)
+    def schedule_agent_run(session_id: int, agent_id) -> None:
+        background_tasks.add_task(
+            run_agent_draft_turn_with_new_session,
+            agent_id,
+            session_id,
+            session_broadcast,
+            get_mcp_runtime_manager(),
+        )
+
+    return AgentService(
+        repository=repository,
+        commit=session.commit,
+        session_repository=session_repository,
+        session_broadcast=session_broadcast,
+        schedule_agent_run=schedule_agent_run,
+    )
 
 
 AgentServiceDep = Annotated[AgentService, Depends(get_agent_service)]
@@ -108,6 +128,18 @@ def get_mcp_repository(session: SessionDep) -> McpServerRepository:
 
 
 McpRepositoryDep = Annotated[McpServerRepository, Depends(get_mcp_repository)]
+
+
+def get_agent_capability_service(
+    mcp_repository: McpRepositoryDep,
+) -> AgentCapabilityService:
+    return AgentCapabilityService(mcp_repository=mcp_repository)
+
+
+AgentCapabilityServiceDep = Annotated[
+    AgentCapabilityService,
+    Depends(get_agent_capability_service),
+]
 
 
 def get_user_repository(session: SessionDep) -> UserRepository:

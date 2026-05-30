@@ -15,12 +15,12 @@ import { Button } from "../../../components/ui/button";
 import { StreamMarkdown } from "../../sop-quality-checks/components/StreamMarkdown";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 import type {
+  AgentCapabilities,
   AgentCreate,
   AgentDetail,
   AgentDraftConfig,
   AgentDraftUpdate,
 } from "../types";
-import { CODEAGENT_MODEL_OPTIONS } from "../types";
 
 type AgentFormMode = "create" | "edit";
 type ModelSource = "codeagent" | "provider";
@@ -30,13 +30,14 @@ type AgentFormProps = {
   agent: AgentDetail | null;
   providers: LlmProviderSummary[];
   providersLoading: boolean;
+  capabilities: AgentCapabilities;
+  capabilitiesLoading: boolean;
   pending?: boolean;
   onCancel?: () => void;
   onCreate?: (payload: AgentCreate) => Promise<void>;
   onUpdate?: (agentId: string, payload: AgentDraftUpdate) => Promise<void>;
 };
 
-const DEFAULT_CODEAGENT_MODEL = CODEAGENT_MODEL_OPTIONS[0];
 const DEFAULT_SYSTEM_PROMPT =
   "你是谨慎的变更质量评审助手。请基于事实审查输入内容，指出风险、缺口和可执行的整改建议。";
 
@@ -47,6 +48,8 @@ export function AgentForm({
   agent,
   providers,
   providersLoading,
+  capabilities,
+  capabilitiesLoading,
   pending = false,
   onCancel,
   onCreate,
@@ -60,11 +63,11 @@ export function AgentForm({
   const [description, setDescription] = useState("");
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [modelSource, setModelSource] = useState<ModelSource>("codeagent");
-  const [codeAgentModel, setCodeAgentModel] = useState<string>(
-    DEFAULT_CODEAGENT_MODEL,
-  );
+  const [codeAgentModel, setCodeAgentModel] = useState<string>("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [selectedProviderModel, setSelectedProviderModel] = useState("");
+  const [selectedToolNames, setSelectedToolNames] = useState<string[]>([]);
+  const [selectedMcpServerIds, setSelectedMcpServerIds] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FieldErrorKey | null>(null);
@@ -93,13 +96,11 @@ export function AgentForm({
       setSystemPrompt(draft?.system_prompt ?? "");
       setEnabled(agent.enabled);
       setModelSource(draft?.provider_id ? "provider" : "codeagent");
-      setCodeAgentModel(
-        draft?.provider_id
-          ? DEFAULT_CODEAGENT_MODEL
-          : (draft?.model ?? DEFAULT_CODEAGENT_MODEL),
-      );
+      setCodeAgentModel(draft?.provider_id ? "" : (draft?.model ?? ""));
       setSelectedProviderId(draft?.provider_id ?? "");
       setSelectedProviderModel(draft?.provider_id ? (draft?.model ?? "") : "");
+      setSelectedToolNames(draft?.tool_allowlist ?? []);
+      setSelectedMcpServerIds(draft?.mcp_server_ids ?? []);
       return;
     }
 
@@ -108,10 +109,21 @@ export function AgentForm({
     setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
     setEnabled(true);
     setModelSource("codeagent");
-    setCodeAgentModel(DEFAULT_CODEAGENT_MODEL);
+    setCodeAgentModel("");
     setSelectedProviderId("");
     setSelectedProviderModel("");
+    setSelectedToolNames([]);
+    setSelectedMcpServerIds([]);
   }, [agent, mode]);
+
+  const codeAgentModels = capabilities.codeagent_models ?? [];
+
+  useEffect(() => {
+    if (mode !== "create") return;
+    if (modelSource !== "codeagent") return;
+    if (codeAgentModel) return;
+    setCodeAgentModel(codeAgentModels[0] ?? "");
+  }, [codeAgentModel, codeAgentModels, mode, modelSource]);
 
   useEffect(() => {
     if (modelSource !== "provider" || enabledProviders.length === 0) return;
@@ -127,7 +139,7 @@ export function AgentForm({
     mode === "edit" &&
     modelSource === "codeagent" &&
     Boolean(codeAgentModel) &&
-    !(CODEAGENT_MODEL_OPTIONS as readonly string[]).includes(codeAgentModel);
+    !codeAgentModels.includes(codeAgentModel);
   const unavailableDraftProvider =
     mode === "edit" &&
     modelSource === "provider" &&
@@ -155,16 +167,50 @@ export function AgentForm({
       unavailableDraftProvider ||
       !selectedProvider ||
       selectedProviderModels.length === 0);
+  const codeAgentSaveBlocked =
+    modelSource === "codeagent" &&
+    (capabilitiesLoading ||
+      codeAgentModels.length === 0 ||
+      !codeAgentModel.trim() ||
+      unavailableCodeAgentModel);
   const showUnavailableProviderMessage = unavailableDraftProvider;
   const modelSaveBlocked = unavailableCodeAgentModel || unavailableProviderModel;
-  const saveBlocked = providerSaveBlocked || modelSaveBlocked;
   const showProviderModelsMessage =
     modelSource === "provider" &&
     !providersLoading &&
     Boolean(selectedProvider) &&
     selectedProviderModels.length === 0;
   const showUnavailableCodeAgentModelMessage = unavailableCodeAgentModel;
+  const showNoCodeAgentModelsMessage =
+    modelSource === "codeagent" &&
+    !capabilitiesLoading &&
+    codeAgentModels.length === 0;
   const showUnavailableProviderModelMessage = unavailableProviderModel;
+
+  const availableToolNames = new Set(
+    capabilities.builtin_tools
+      .filter((tool) => tool.enabled)
+      .map((tool) => tool.name),
+  );
+  const availableMcpServerIds = new Set(
+    capabilities.mcp_servers
+      .filter((server) => server.enabled)
+      .map((server) => server.id),
+  );
+  const missingToolNames = selectedToolNames.filter(
+    (name) => !availableToolNames.has(name),
+  );
+  const missingMcpServerIds = selectedMcpServerIds.filter(
+    (id) => !availableMcpServerIds.has(id),
+  );
+  const hasMissingCapabilities =
+    missingToolNames.length > 0 || missingMcpServerIds.length > 0;
+  const capabilitiesSaveBlocked = hasMissingCapabilities;
+  const saveBlocked =
+    codeAgentSaveBlocked ||
+    providerSaveBlocked ||
+    modelSaveBlocked ||
+    capabilitiesSaveBlocked;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -193,8 +239,10 @@ export function AgentForm({
     const draft = buildAgentDraftPayload({
       codeAgentModel,
       modelSource,
+      selectedMcpServerIds,
       selectedProviderId,
       selectedProviderModel,
+      selectedToolNames,
       systemPrompt,
     });
 
@@ -315,6 +363,7 @@ export function AgentForm({
             <Field label="CodeAgent 模型">
               <select
                 className={selectClass}
+                disabled={capabilitiesLoading || codeAgentModels.length === 0}
                 name="codeagent_model"
                 onChange={(event) => setCodeAgentModel(event.target.value)}
                 value={codeAgentModel}
@@ -324,7 +373,10 @@ export function AgentForm({
                     {codeAgentModel} (不可用)
                   </option>
                 ) : null}
-                {CODEAGENT_MODEL_OPTIONS.map((model) => (
+                {codeAgentModels.length === 0 ? (
+                  <option value="">暂无 CodeAgent 模型</option>
+                ) : null}
+                {codeAgentModels.map((model) => (
                   <option key={model} value={model}>
                     {model}
                   </option>
@@ -413,11 +465,122 @@ export function AgentForm({
           </p>
         ) : null}
 
+        {showNoCodeAgentModelsMessage ? (
+          <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+            当前没有可用 CodeAgent 模型，请检查后端 CodeAgent 配置或选择其他模型来源。
+          </p>
+        ) : null}
+
         {showProviderModelsMessage ? (
           <p className="rounded-lg bg-warning/15 px-3 py-2 text-xs text-charcoal">
             先到 LLM Provider 页面补模型列表
           </p>
         ) : null}
+
+        <section className="space-y-3 rounded-2xl border border-hairline-soft bg-canvas-soft/50 p-3">
+          <h2 className="text-sm font-semibold text-ink">能力</h2>
+          {capabilitiesLoading ? (
+            <p className="text-xs text-mute">能力加载中...</p>
+          ) : null}
+          {!capabilitiesLoading && capabilities.builtin_tools.length === 0 ? (
+            <p className="text-xs text-mute">暂无可用内置工具。</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-body">内置工具</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {capabilities.builtin_tools.map((tool) => {
+                  const checked = selectedToolNames.includes(tool.name);
+                  return (
+                    <label
+                      className={`flex items-start gap-2 rounded-xl border border-hairline bg-canvas px-3 py-2 ${
+                        tool.enabled ? "cursor-pointer" : "opacity-60"
+                      }`}
+                      key={tool.name}
+                    >
+                      <input
+                        aria-label={`内置工具 ${tool.label}`}
+                        checked={checked}
+                        className="mt-1 h-4 w-4 rounded border-hairline text-primary"
+                        disabled={!tool.enabled}
+                        onChange={(event) => {
+                          setSelectedToolNames((current) =>
+                            event.target.checked
+                              ? [...current.filter((name) => name !== tool.name), tool.name]
+                              : current.filter((name) => name !== tool.name),
+                          );
+                        }}
+                        type="checkbox"
+                      />
+                      <span className="flex-1 space-y-0.5">
+                        <span className="block text-sm font-medium text-ink">{tool.label}</span>
+                        {tool.description ? (
+                          <span className="block text-xs text-mute">{tool.description}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {!capabilitiesLoading && capabilities.mcp_servers.length === 0 ? (
+            <p className="text-xs text-mute">暂无可用 MCP 服务。</p>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-body">MCP 服务</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {capabilities.mcp_servers.map((server) => {
+                  const checked = selectedMcpServerIds.includes(server.id);
+                  return (
+                    <label
+                      className={`flex items-start gap-2 rounded-xl border border-hairline bg-canvas px-3 py-2 ${
+                        server.enabled ? "cursor-pointer" : "opacity-60"
+                      }`}
+                      key={server.id}
+                    >
+                      <input
+                        aria-label={`MCP 服务 ${server.name}`}
+                        checked={checked}
+                        className="mt-1 h-4 w-4 rounded border-hairline text-primary"
+                        disabled={!server.enabled}
+                        onChange={(event) => {
+                          setSelectedMcpServerIds((current) =>
+                            event.target.checked
+                              ? [...current.filter((id) => id !== server.id), server.id]
+                              : current.filter((id) => id !== server.id),
+                          );
+                        }}
+                        type="checkbox"
+                      />
+                      <span className="flex-1 space-y-0.5">
+                        <span className="block text-sm font-medium text-ink">{server.name}</span>
+                        <span className="block text-xs text-mute">
+                          {server.runtime_status} · {server.tool_count} 个工具
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {hasMissingCapabilities ? (
+            <p className="rounded-lg bg-error-soft px-3 py-2 text-xs text-error-deep">
+              当前 draft 引用的能力已下线：
+              {[
+                missingToolNames.length > 0
+                  ? `内置工具 ${missingToolNames.join("、")}`
+                  : null,
+                missingMcpServerIds.length > 0
+                  ? `MCP 服务 ${missingMcpServerIds.join("、")}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join("；")}
+              。请重新选择能力。
+            </p>
+          ) : null}
+        </section>
 
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-2">
@@ -507,26 +670,30 @@ function Field({
 export function buildAgentDraftPayload({
   codeAgentModel,
   modelSource,
+  selectedMcpServerIds,
   selectedProviderId,
   selectedProviderModel,
+  selectedToolNames,
   systemPrompt,
 }: {
   codeAgentModel: string;
   modelSource: ModelSource;
+  selectedMcpServerIds: string[];
   selectedProviderId: string;
   selectedProviderModel: string;
+  selectedToolNames: string[];
   systemPrompt: string;
 }): AgentDraftConfig {
   const selectedModel =
     modelSource === "provider" ? selectedProviderModel : codeAgentModel;
 
   return {
-    mcp_server_ids: [],
+    mcp_server_ids: selectedMcpServerIds.map((id) => id.trim()).filter(Boolean),
     model: selectedModel.trim(),
     model_config: {},
     provider_id: modelSource === "provider" ? selectedProviderId.trim() : null,
     system_prompt: systemPrompt.trim(),
-    tool_allowlist: [],
+    tool_allowlist: selectedToolNames.map((name) => name.trim()).filter(Boolean),
   };
 }
 

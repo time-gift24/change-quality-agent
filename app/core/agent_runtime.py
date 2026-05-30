@@ -35,6 +35,47 @@ class StaticToolResolver:
         return []
 
 
+class _CapabilityServiceLike(Protocol):
+    def resolve_builtin_tools(self, names: list[str]) -> list[object]: ...
+
+    async def resolve_mcp_tools(
+        self,
+        server_ids: list[str],
+        runtime: object,
+    ) -> list[object]: ...
+
+
+class CapabilityToolResolver:
+    """Tool resolver that uses `AgentCapabilityService` for built-in tools.
+
+    """
+
+    def __init__(
+        self,
+        *,
+        capability_service: _CapabilityServiceLike,
+        mcp_runtime: object | None = None,
+    ) -> None:
+        self._capability_service = capability_service
+        self._mcp_runtime = mcp_runtime
+
+    async def resolve(
+        self,
+        tool_allowlist: list[str],
+        mcp_server_ids: list[str],
+    ) -> list[object]:
+        builtin = self._capability_service.resolve_builtin_tools(list(tool_allowlist))
+        if not mcp_server_ids:
+            return list(builtin)
+        if self._mcp_runtime is None:
+            raise RuntimeError("MCP runtime is not configured.")
+        mcp_tools = await self._capability_service.resolve_mcp_tools(
+            list(mcp_server_ids),
+            self._mcp_runtime,
+        )
+        return [*builtin, *mcp_tools]
+
+
 class LlmProviderResolver(Protocol):
     async def resolve(self, provider_id: UUID) -> LlmProviderRuntimeConfig:
         pass

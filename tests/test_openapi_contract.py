@@ -102,9 +102,17 @@ def test_agents_tag_and_paths_are_documented() -> None:
     expected_operations = {
         ("/api/agents", "get"): {"200", "422"},
         ("/api/agents", "post"): {"201", "422"},
+        ("/api/agents/capabilities", "get"): {"200", "401", "422"},
         ("/api/agents/{agent_id}", "get"): {"200", "404", "422"},
         ("/api/agents/{agent_id}", "delete"): {"204", "404", "422"},
         ("/api/agents/{agent_id}/draft", "patch"): {"200", "404", "422"},
+        ("/api/agents/{agent_id}/sessions", "post"): {
+            "202",
+            "400",
+            "401",
+            "404",
+            "422",
+        },
         ("/api/agents/{agent_id}/publish", "post"): {
             "201",
             "400",
@@ -123,6 +131,44 @@ def test_agents_tag_and_paths_are_documented() -> None:
         operation = paths[path][method]
         assert operation["tags"] == ["agents"]
         assert statuses <= set(operation["responses"])
+
+
+def test_agent_capabilities_and_session_schemas_are_documented() -> None:
+    contract = load_contract()
+    schemas = contract["components"]["schemas"]
+
+    assert {
+        "AgentCapabilities",
+        "BuiltinAgentToolCapability",
+        "McpAgentCapability",
+        "AgentSessionStart",
+        "AgentSessionStartResponse",
+    } <= set(schemas)
+
+    capabilities_props = schemas["AgentCapabilities"]["properties"]
+    assert capabilities_props["codeagent_models"]["items"] == {"type": "string"}
+    assert capabilities_props["builtin_tools"]["items"] == {
+        "$ref": "#/components/schemas/BuiltinAgentToolCapability"
+    }
+    assert capabilities_props["mcp_servers"]["items"] == {
+        "$ref": "#/components/schemas/McpAgentCapability"
+    }
+
+    builtin_props = schemas["BuiltinAgentToolCapability"]["properties"]
+    assert {"name", "label", "description", "enabled"} <= set(builtin_props)
+
+    mcp_props = schemas["McpAgentCapability"]["properties"]
+    assert {"id", "name", "enabled", "runtime_status", "tool_count"} <= set(
+        mcp_props
+    )
+
+    start_props = schemas["AgentSessionStart"]["properties"]
+    assert start_props["message"]["minLength"] == 1
+    assert start_props["session_id"]["nullable"] is True
+
+    response_props = schemas["AgentSessionStartResponse"]["properties"]
+    assert response_props["session_id"]["type"] == "integer"
+    assert response_props["stream_url"]["type"] == "string"
 
 
 def test_llm_provider_tag_and_paths_are_documented() -> None:

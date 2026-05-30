@@ -1,8 +1,11 @@
 import { requestJson } from "../../lib/apiClient";
 import type {
+  AgentCapabilities,
   AgentCreate,
   AgentDetail,
   AgentDraftUpdate,
+  AgentSessionStart,
+  AgentSessionStartResponse,
   AgentSummary,
 } from "./types";
 
@@ -37,6 +40,26 @@ export function updateAgentDraft(
     },
     method: "PATCH",
   });
+}
+
+export function getAgentCapabilities(): Promise<AgentCapabilities> {
+  return requestJson<AgentCapabilities>(`${AGENTS_BASE}/capabilities`);
+}
+
+export function startAgentSession(
+  agentId: string,
+  payload: AgentSessionStart,
+): Promise<AgentSessionStartResponse> {
+  return requestJson<AgentSessionStartResponse>(
+    `${buildAgentUrl(agentId)}/sessions`,
+    {
+      body: JSON.stringify(payload),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    },
+  );
 }
 
 function buildAgentUrl(agentId: string): string {

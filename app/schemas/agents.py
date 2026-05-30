@@ -88,6 +88,37 @@ class AgentDetail(AgentSummary):
     draft: AgentDraftConfig | None = None
 
 
+class BuiltinAgentToolCapability(BaseModel):
+    name: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    description: str | None = None
+    enabled: bool = True
+
+
+class McpAgentCapability(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    enabled: bool
+    runtime_status: str
+    tool_count: int = Field(ge=0)
+
+
+class AgentCapabilities(BaseModel):
+    codeagent_models: list[str] = Field(default_factory=list)
+    builtin_tools: list[BuiltinAgentToolCapability] = Field(default_factory=list)
+    mcp_servers: list[McpAgentCapability] = Field(default_factory=list)
+
+
+class AgentSessionStart(BaseModel):
+    message: str = Field(min_length=1)
+    session_id: int | None = Field(default=None, ge=1)
+
+
+class AgentSessionStartResponse(BaseModel):
+    session_id: int
+    stream_url: str
+
+
 class AgentVersionDetail(AgentVersionSummary):
     model_config = ConfigDict(
         from_attributes=True,

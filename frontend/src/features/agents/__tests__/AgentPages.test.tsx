@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
-import { useAgentDetail, useAgentMutations, useAgents } from "../hooks";
+import { useAgentCapabilities, useAgentDetail, useAgentMutations, useAgents } from "../hooks";
 import { formatAgentUpdatedAt } from "../components/AgentTable";
 import { AgentListPage } from "../pages/AgentListPage";
 import { AgentCreatePage, AgentEditPage } from "../pages/AgentFormPage";
@@ -14,6 +14,7 @@ import { useLlmProviders } from "../../llmProviders/hooks";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 
 vi.mock("../hooks", () => ({
+  useAgentCapabilities: vi.fn(),
   useAgentDetail: vi.fn(),
   useAgentMutations: vi.fn(),
   useAgents: vi.fn(),
@@ -70,6 +71,7 @@ const disabledProvider = buildProvider({
 const refetchAgents = vi.fn();
 const refetchAgentDetail = vi.fn();
 const refetchProviders = vi.fn();
+const refetchCapabilities = vi.fn();
 const createAgent = vi.fn();
 const updateAgentDraft = vi.fn();
 
@@ -77,6 +79,7 @@ beforeEach(() => {
   refetchAgents.mockReset();
   refetchAgentDetail.mockReset();
   refetchProviders.mockReset();
+  refetchCapabilities.mockReset();
   createAgent.mockReset();
   updateAgentDraft.mockReset();
   createAgent.mockResolvedValue(detail);
@@ -105,6 +108,16 @@ beforeEach(() => {
     error: null,
     loading: false,
     refetch: refetchProviders,
+  });
+  vi.mocked(useAgentCapabilities).mockReturnValue({
+    data: {
+      builtin_tools: [],
+      codeagent_models: ["codeagent:deepseek-v4-pro"],
+      mcp_servers: [],
+    },
+    error: null,
+    loading: false,
+    refetch: refetchCapabilities,
   });
 });
 
@@ -196,6 +209,7 @@ describe("Agent pages", () => {
         <Routes>
           <Route element={<AgentCreatePage />} path="/agents/new" />
           <Route element={<div>Agent 列表</div>} path="/agents" />
+          <Route element={<div>Agent 对话</div>} path="/agents/:agentId/chat" />
         </Routes>
       </MemoryRouter>,
     );
@@ -209,7 +223,7 @@ describe("Agent pages", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
 
     await waitFor(() => expect(createAgent).toHaveBeenCalled());
-    expect(screen.getByText("Agent 列表")).toBeInTheDocument();
+    expect(screen.getByText("Agent 对话")).toBeInTheDocument();
   });
 
   it("edits an existing agent and returns to the list", async () => {
@@ -218,6 +232,7 @@ describe("Agent pages", () => {
         <Routes>
           <Route element={<AgentEditPage />} path="/agents/:agentId/edit" />
           <Route element={<div>Agent 列表</div>} path="/agents" />
+          <Route element={<div>Agent 对话</div>} path="/agents/:agentId/chat" />
         </Routes>
       </MemoryRouter>,
     );
@@ -233,7 +248,7 @@ describe("Agent pages", () => {
         expect.objectContaining({ display_name: "Release Reviewer Updated" }),
       ),
     );
-    expect(screen.getByText("Agent 列表")).toBeInTheDocument();
+    expect(screen.getByText("Agent 对话")).toBeInTheDocument();
   });
 });
 
