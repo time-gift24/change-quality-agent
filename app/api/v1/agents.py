@@ -14,13 +14,18 @@ from app.api.deps import AgentCapabilityServiceDep, AgentServiceDep
 from app.services.agents import (
     AgentDraftInvalidError,
     AgentNotFoundError,
+    AgentSessionMismatchError,
+    AgentSessionNotFoundError,
 )
+from app.repositories.agents import AgentDisabledError
 from app.schemas.agents import (
     AgentCapabilities,
     AgentCreate,
     AgentDetail,
     AgentDraftConfig,
     AgentDraftUpdate,
+    AgentSessionStart,
+    AgentSessionStartResponse,
     AgentSummary,
     AgentVersionDetail,
     AgentVersionSummary,
@@ -52,6 +57,26 @@ async def get_agent_capabilities(
     service: AgentCapabilityServiceDep,
 ) -> AgentCapabilities:
     return await service.list_capabilities()
+
+
+@router.post("/{agent_id}/sessions")
+async def start_agent_session(
+    agent_id: Annotated[UUID, Path()],
+    request: AgentSessionStart,
+    service: AgentServiceDep,
+) -> AgentSessionStartResponse:
+    try:
+        return await service.start_draft_session(agent_id, request)
+    except AgentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except AgentSessionNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except AgentSessionMismatchError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND) from exc
+    except AgentDisabledError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
+    except AgentDraftInvalidError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST) from exc
 
 
 @router.get("/{agent_id}")

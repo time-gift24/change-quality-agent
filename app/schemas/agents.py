@@ -108,6 +108,16 @@ class AgentCapabilities(BaseModel):
     mcp_servers: list[McpAgentCapability] = Field(default_factory=list)
 
 
+class AgentSessionStart(BaseModel):
+    message: str = Field(min_length=1)
+    session_id: int | None = Field(default=None, ge=1)
+
+
+class AgentSessionStartResponse(BaseModel):
+    session_id: int
+    stream_url: str
+
+
 class AgentVersionDetail(AgentVersionSummary):
     model_config = ConfigDict(
         from_attributes=True,

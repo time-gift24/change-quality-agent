@@ -74,8 +74,15 @@ AgentRepositoryDep = Annotated[AgentRepository, Depends(get_agent_repository)]
 def get_agent_service(
     session: SessionDep,
     repository: AgentRepositoryDep,
+    session_repository: SessionRepositoryDep,
+    session_broadcast: SessionBroadcastDep,
 ) -> AgentService:
-    return AgentService(repository=repository, commit=session.commit)
+    return AgentService(
+        repository=repository,
+        commit=session.commit,
+        session_repository=session_repository,
+        session_broadcast=session_broadcast,
+    )
 
 
 AgentServiceDep = Annotated[AgentService, Depends(get_agent_service)]
