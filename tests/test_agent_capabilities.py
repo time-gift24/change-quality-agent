@@ -4,10 +4,10 @@ import pytest
 
 from app.core.config import settings
 from app.services.agent_capabilities import (
-    BUILTIN_AGENT_TOOLS,
     AgentCapabilityService,
     UnknownBuiltinToolError,
 )
+from app.tools.builtin import BUILTIN_AGENT_TOOLS
 
 
 class FakeMcpServer:

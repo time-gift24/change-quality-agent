@@ -1,10 +1,9 @@
-from dataclasses import dataclass
 import json
 import re
 from typing import Protocol
 from uuid import UUID
 
-from langchain_core.tools import StructuredTool, tool
+from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field, create_model
 
 from app.core.config import settings
@@ -15,6 +14,7 @@ from app.schemas.agents import (
     BuiltinAgentToolCapability,
     McpAgentCapability,
 )
+from app.tools.builtin import BUILTIN_AGENT_TOOLS
 
 
 class UnknownBuiltinToolError(ValueError):
@@ -27,31 +27,6 @@ class UnknownMcpServerError(ValueError):
 
 class UnavailableMcpServerError(RuntimeError):
     pass
-
-
-@dataclass(frozen=True)
-class BuiltinAgentTool:
-    name: str
-    label: str
-    description: str | None
-    enabled: bool = True
-    implementation: object | None = None
-
-
-@tool("echo")
-def echo_tool(text: str) -> str:
-    """Echo text back to the caller for local Agent testing."""
-    return text
-
-
-BUILTIN_AGENT_TOOLS: tuple[BuiltinAgentTool, ...] = (
-    BuiltinAgentTool(
-        name="echo",
-        label="Echo",
-        description="Echoes input text. Useful for validating Agent tool wiring.",
-        implementation=echo_tool,
-    ),
-)
 
 
 class McpRepositoryLike(Protocol):
