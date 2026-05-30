@@ -7,16 +7,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAgent,
   getAgent,
+  getAgentCapabilities,
   listAgents,
+  startAgentSession,
   updateAgentDraft,
 } from "./api";
-import { useAgentDetail, useAgentMutations, useAgents } from "./hooks";
-import type { AgentCreate, AgentDetail, AgentSummary } from "./types";
+import {
+  useAgentCapabilities,
+  useAgentChatMutations,
+  useAgentDetail,
+  useAgentMutations,
+  useAgents,
+} from "./hooks";
+import type {
+  AgentCapabilities,
+  AgentCreate,
+  AgentDetail,
+  AgentSessionStartResponse,
+  AgentSummary,
+} from "./types";
 
 vi.mock("./api", () => ({
   createAgent: vi.fn(),
   getAgent: vi.fn(),
+  getAgentCapabilities: vi.fn(),
   listAgents: vi.fn(),
+  startAgentSession: vi.fn(),
   updateAgentDraft: vi.fn(),
 }));
 
@@ -116,6 +132,58 @@ describe("agent hooks", () => {
 
     expect(result.current.error).toBe(mutationError);
     expect(result.current.pending).toBe(false);
+  });
+
+  it("loads agent capabilities on initial render", async () => {
+    const capabilities: AgentCapabilities = {
+      builtin_tools: [
+        {
+          description: null,
+          enabled: true,
+          label: "Echo",
+          name: "echo",
+        },
+      ],
+      mcp_servers: [],
+    };
+    vi.mocked(getAgentCapabilities).mockResolvedValueOnce(capabilities);
+
+    const { result } = renderHook(() => useAgentCapabilities());
+
+    expect(result.current.loading).toBe(true);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.data).toEqual(capabilities);
+    expect(getAgentCapabilities).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls startAgentSession via chat mutations and tracks pending", async () => {
+    const response: AgentSessionStartResponse = {
+      session_id: 12,
+      stream_url: "/api/sessions/12/stream?after=0",
+    };
+    vi.mocked(startAgentSession).mockResolvedValueOnce(response);
+
+    const { result } = renderHook(() => useAgentChatMutations());
+
+    await act(async () => {
+      await expect(
+        result.current.startAgentSession("agent-1", {
+          message: "你好",
+          session_id: null,
+        }),
+      ).resolves.toEqual(response);
+    });
+
+    expect(startAgentSession).toHaveBeenCalledWith("agent-1", {
+      message: "你好",
+      session_id: null,
+    });
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBeNull();
   });
 
   it("does not update mutation state after unmount", async () => {

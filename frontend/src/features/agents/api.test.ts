@@ -5,10 +5,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createAgent,
   getAgent,
+  getAgentCapabilities,
   listAgents,
+  startAgentSession,
   updateAgentDraft,
 } from "./api";
-import type { AgentCreate, AgentDetail, AgentDraftUpdate } from "./types";
+import type {
+  AgentCapabilities,
+  AgentCreate,
+  AgentDetail,
+  AgentDraftUpdate,
+  AgentSessionStartResponse,
+} from "./types";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,6 +99,58 @@ describe("agent API", () => {
       expect.objectContaining({
         body: JSON.stringify(update),
         method: "PATCH",
+      }),
+    );
+  });
+
+  it("fetches agent capabilities", async () => {
+    const capabilities: AgentCapabilities = {
+      builtin_tools: [
+        {
+          description: "Echoes input.",
+          enabled: true,
+          label: "Echo",
+          name: "echo",
+        },
+      ],
+      mcp_servers: [
+        {
+          enabled: true,
+          id: "mcp-1",
+          name: "Docs MCP",
+          runtime_status: "running",
+          tool_count: 2,
+        },
+      ],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(capabilities));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAgentCapabilities()).resolves.toEqual(capabilities);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agents/capabilities",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("starts an agent session for an existing session id", async () => {
+    const response: AgentSessionStartResponse = {
+      session_id: 42,
+      stream_url: "/api/sessions/42/stream?after=0",
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      startAgentSession("agent/1", { message: "你好", session_id: 7 }),
+    ).resolves.toEqual(response);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/agents/agent%2F1/sessions",
+      expect.objectContaining({
+        body: JSON.stringify({ message: "你好", session_id: 7 }),
+        method: "POST",
       }),
     );
   });

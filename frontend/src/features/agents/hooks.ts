@@ -3,13 +3,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createAgent as createAgentApi,
   getAgent,
+  getAgentCapabilities as getAgentCapabilitiesApi,
   listAgents,
+  startAgentSession as startAgentSessionApi,
   updateAgentDraft as updateAgentDraftApi,
 } from "./api";
 import type {
+  AgentCapabilities,
   AgentCreate,
   AgentDetail,
   AgentDraftUpdate,
+  AgentSessionStart,
+  AgentSessionStartResponse,
   AgentSummary,
 } from "./types";
 
@@ -163,6 +168,99 @@ export function useAgentMutations() {
       payload: AgentDraftUpdate,
       options?: MutationOptions<AgentDetail>,
     ) => runMutation(() => updateAgentDraftApi(agentId, payload), options),
+  };
+}
+
+export function useAgentCapabilities(): AsyncStateWithRefetch<AgentCapabilities> {
+  const [state, setState] = useState<AsyncState<AgentCapabilities>>({
+    data: { builtin_tools: [], mcp_servers: [] },
+    error: null,
+    loading: true,
+  });
+  const mountedRef = useRef(true);
+  const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const refetch = useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setState((current) => ({ ...current, error: null, loading: true }));
+
+    try {
+      const capabilities = await getAgentCapabilitiesApi();
+      if (!mountedRef.current || requestIdRef.current !== requestId) return;
+      setState({ data: capabilities, error: null, loading: false });
+    } catch (error) {
+      if (!mountedRef.current || requestIdRef.current !== requestId) return;
+      setState({
+        data: { builtin_tools: [], mcp_servers: [] },
+        error: asError(error),
+        loading: false,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { ...state, refetch };
+}
+
+export function useAgentChatMutations() {
+  const [pendingCount, setPendingCount] = useState(0);
+  const [error, setError] = useState<Error | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const runMutation = useCallback(
+    async <TResult,>(
+      action: () => Promise<TResult>,
+      options?: MutationOptions<TResult>,
+    ): Promise<TResult> => {
+      if (mountedRef.current) {
+        setPendingCount((current) => current + 1);
+        setError(null);
+      }
+      try {
+        const result = await action();
+        await options?.onSuccess?.(result);
+        return result;
+      } catch (mutationError) {
+        const nextError = asError(mutationError);
+        if (mountedRef.current) {
+          setError(nextError);
+        }
+        throw nextError;
+      } finally {
+        if (mountedRef.current) {
+          setPendingCount((current) => Math.max(0, current - 1));
+        }
+      }
+    },
+    [],
+  );
+
+  return {
+    error,
+    pending: pendingCount > 0,
+    startAgentSession: (
+      agentId: string,
+      payload: AgentSessionStart,
+      options?: MutationOptions<AgentSessionStartResponse>,
+    ) => runMutation(() => startAgentSessionApi(agentId, payload), options),
   };
 }
 
