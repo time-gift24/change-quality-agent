@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AgentForm, buildAgentDraftPayload } from "../components/AgentForm";
-import type { AgentDetail } from "../types";
+import type { AgentCapabilities, AgentDetail } from "../types";
 import type { LlmProviderSummary } from "../../llmProviders/types";
 
 afterEach(() => {
@@ -18,8 +18,10 @@ describe("AgentForm", () => {
       buildAgentDraftPayload({
         codeAgentModel: " codeagent:deepseek-v4-pro ",
         modelSource: "codeagent",
+        selectedMcpServerIds: [],
         selectedProviderId: " ignored-provider ",
         selectedProviderModel: " ignored-model ",
+        selectedToolNames: [],
         systemPrompt: " 提示词 ",
       }),
     ).toEqual({
@@ -35,17 +37,19 @@ describe("AgentForm", () => {
       buildAgentDraftPayload({
         codeAgentModel: " ignored-codeagent ",
         modelSource: "provider",
+        selectedMcpServerIds: [" mcp-1 ", "mcp-2"],
         selectedProviderId: " provider-2 ",
         selectedProviderModel: " claude-sonnet-5 ",
+        selectedToolNames: [" echo ", "noop"],
         systemPrompt: " Provider 提示词 ",
       }),
     ).toEqual({
-      mcp_server_ids: [],
+      mcp_server_ids: ["mcp-1", "mcp-2"],
       model: "claude-sonnet-5",
       model_config: {},
       provider_id: "provider-2",
       system_prompt: "Provider 提示词",
-      tool_allowlist: [],
+      tool_allowlist: ["echo", "noop"],
     });
   });
 
@@ -54,6 +58,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={null}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="create"
         onCreate={onCreate}
         providers={buildProviders()}
@@ -92,6 +98,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={null}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="create"
         onCreate={onCreate}
         providers={buildProviders()}
@@ -137,6 +145,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={null}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="create"
         onCreate={vi.fn()}
         providers={[buildProvider({ id: "empty-provider", models: [] })]}
@@ -158,6 +168,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={agent}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="edit"
         onUpdate={onUpdate}
         providers={buildProviders()}
@@ -206,6 +218,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={agent}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="edit"
         onUpdate={onUpdate}
         providers={[
@@ -244,6 +258,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={agent}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="edit"
         onUpdate={onUpdate}
         providers={[
@@ -282,6 +298,8 @@ describe("AgentForm", () => {
     render(
       <AgentForm
         agent={agent}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
         mode="edit"
         onUpdate={onUpdate}
         providers={buildProviders()}
@@ -298,7 +316,93 @@ describe("AgentForm", () => {
 
     expect(onUpdate).not.toHaveBeenCalled();
   });
+
+  it("creates a draft with selected built-in tool and MCP server", async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AgentForm
+        agent={null}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
+        mode="create"
+        onCreate={onCreate}
+        providers={buildProviders()}
+        providersLoading={false}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Agent 名称"), {
+      target: { value: "Capable Agent" },
+    });
+    fireEvent.change(screen.getByLabelText("系统提示词"), {
+      target: { value: "你拥有工具。" },
+    });
+    fireEvent.click(screen.getByLabelText("内置工具 Echo"));
+    fireEvent.click(screen.getByLabelText("MCP 服务 Docs MCP"));
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
+    expect(onCreate).toHaveBeenCalledWith({
+      description: null,
+      display_name: "Capable Agent",
+      draft: {
+        mcp_server_ids: ["mcp-1"],
+        model: "codeagent:deepseek-v4-pro",
+        model_config: {},
+        provider_id: null,
+        system_prompt: "你拥有工具。",
+        tool_allowlist: ["echo"],
+      },
+    });
+  });
+
+  it("blocks edit save when draft references unknown built-in tool or MCP server", () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    const agent = buildAgent({
+      draft: {
+        mcp_server_ids: ["mcp-missing"],
+        model: "gpt-5-mini",
+        model_config: {},
+        provider_id: "provider-1",
+        system_prompt: "已有系统提示词。",
+        tool_allowlist: ["echo", "missing-tool"],
+      },
+    });
+    render(
+      <AgentForm
+        agent={agent}
+        capabilities={buildCapabilities()}
+        capabilitiesLoading={false}
+        mode="edit"
+        onUpdate={onUpdate}
+        providers={buildProviders()}
+        providersLoading={false}
+      />,
+    );
+
+    expect(
+      screen.getByText("当前 draft 引用的能力已下线：内置工具 missing-tool；MCP 服务 mcp-missing。请重新选择能力。"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存 Agent" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存 Agent" }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });
+
+function buildCapabilities(): AgentCapabilities {
+  return {
+    builtin_tools: [
+      { description: "Echoes input.", enabled: true, label: "Echo", name: "echo" },
+      { description: "Does nothing.", enabled: true, label: "Noop", name: "noop" },
+    ],
+    mcp_servers: [
+      { enabled: true, id: "mcp-1", name: "Docs MCP", runtime_status: "running", tool_count: 2 },
+      { enabled: true, id: "mcp-2", name: "Search MCP", runtime_status: "running", tool_count: 1 },
+    ],
+  };
+}
 
 function buildProviders(): LlmProviderSummary[] {
   return [
